@@ -1,0 +1,44 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Nova AI project command center">
+    <defs>
+        <radialGradient id="bg1" cx="18%" cy="8%" r="72%">
+            <stop offset="0%" stop-color="#8b5cf6" stop-opacity=".58"/>
+            <stop offset="58%" stop-color="#140b2e" stop-opacity=".96"/>
+            <stop offset="100%" stop-color="#07060c"/>
+        </radialGradient>
+        <radialGradient id="bg2" cx="86%" cy="18%" r="48%">
+            <stop offset="0%" stop-color="#a855f7" stop-opacity=".36"/>
+            <stop offset="100%" stop-color="#07060c" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="card" x1="160" y1="100" x2="1040" y2="530" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity=".13"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity=".04"/>
+        </linearGradient>
+        <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#d8b4fe"/>
+            <stop offset="52%" stop-color="#8b5cf6"/>
+            <stop offset="100%" stop-color="#4f46e5"/>
+        </linearGradient>
+    </defs>
+
+    <rect width="1200" height="630" fill="url(#bg1)"/>
+    <rect width="1200" height="630" fill="url(#bg2)"/>
+    <circle cx="1030" cy="112" r="28" fill="#b8ff7a" opacity=".95"/>
+
+    <rect x="86" y="76" width="1028" height="478" rx="52" fill="url(#card)" stroke="#e2d6ff" stroke-opacity=".18"/>
+    <rect x="132" y="124" width="118" height="118" rx="32" fill="url(#mark)"/>
+    <path d="M163 211V154h18l28 34v-34h18v57h-17l-29-36v36h-18Z" fill="#ffffff"/>
+
+    <text x="132" y="318" fill="#ffffff" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="74" font-weight="900" letter-spacing="-4">
+        Nova
+    </text>
+    <text x="132" y="388" fill="#f4ecff" fill-opacity=".92" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="-2">
+        AI project command center
+    </text>
+    <text x="132" y="456" fill="#f4ecff" fill-opacity=".70" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="30" font-weight="650">
+        Sessions · uploads · project memory · billing credits · long-running work
+    </text>
+
+    <text x="132" y="506" fill="#b8ff7a" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="25" font-weight="850">
+        Built for people shipping real projects.
+    </text>
+</svg>

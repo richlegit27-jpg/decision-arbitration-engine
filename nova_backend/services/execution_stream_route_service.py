@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 
 class ExecutionStreamRouteService:
@@ -8,11 +8,15 @@ class ExecutionStreamRouteService:
         session_service,
         execution_service,
         execution_stream_service,
+        execution_engine_service,
         execution_fix_service,
     ):
         self.session_service = session_service
         self.execution_service = execution_service
         self.execution_stream_service = execution_stream_service
+        self.execution_engine_service = (
+            execution_engine_service
+        )
         self.execution_fix_service = execution_fix_service
 
     def _normalize_execution(self, execution):
@@ -206,6 +210,26 @@ class ExecutionStreamRouteService:
             data.get("action") or ""
         ).strip().lower()
 
+        print(
+            "EXECUTION STREAM ROUTE INPUT =",
+            {
+                "keys": list(data.keys()),
+                "has_execution_state": isinstance(
+                    data.get("execution_state"),
+                    dict,
+                ),
+                "incoming_goal": (
+                    data.get("execution_state") or {}
+                ).get("goal")
+                if isinstance(
+                    data.get("execution_state"),
+                    dict,
+                )
+                else None,
+            },
+            flush=True,
+        )
+
         def generate():
 
             if not session_id:
@@ -240,27 +264,34 @@ class ExecutionStreamRouteService:
             ):
                 session = {}
 
-            working_state = session.get(
-                "working_state",
-                {},
+            incoming_execution = (
+                data.get("execution_state")
+                or data.get("execution")
             )
 
-            if not isinstance(
-                working_state,
-                dict,
-            ):
-                working_state = {}
+            if isinstance(incoming_execution, dict):
 
-            execution = (
-                working_state.get(
-                    "execution"
+                execution = self._normalize_execution(
+                    dict(incoming_execution)
                 )
-                or {}
-            )
 
-            execution = self._normalize_execution(
-                execution
-            )
+                self.execution_engine_service.save_execution(
+                    session_id,
+                    execution,
+                )
+
+            else:
+
+                execution = (
+                    self.execution_engine_service.get_execution(
+                        session_id
+                    )
+                    or {}
+                )
+
+                execution = self._normalize_execution(
+                    execution
+                )
 
             yield self.execution_stream_service.send_event(
                 "start",
@@ -334,6 +365,96 @@ class ExecutionStreamRouteService:
                 )
 
                 return
+
+
+            if action == "run":
+
+                final_result = {
+                    "ok": True,
+                    "status": execution.get("status"),
+                    "output": None,
+                    "error": None,
+                }
+
+                while True:
+
+                    result = (
+                        self.execution_engine_service.execute_next_step(
+                            session_id,
+                            execution,
+                        )
+                    )
+
+                    execution = (
+                        result.get("execution")
+                        or execution
+                    )
+
+                    step = result.get("step")
+
+                    ok = bool(
+                        result.get("ok")
+                    )
+
+                    final_result = result
+
+                    if step:
+
+                        yield self.execution_stream_service.send_event(
+                            "step_start",
+                            {
+                                "step": step,
+                                "execution_state": execution,
+                                "done": False,
+                            },
+                        )
+
+                        yield self.execution_stream_service.send_event(
+                            "step_done",
+                            {
+                                "step": step,
+                                "execution_state": execution,
+                                "done": False,
+                            },
+                        )
+
+                    status = str(
+                        result.get("status")
+                        or execution.get("status")
+                        or ""
+                    ).strip().lower()
+
+                    if not ok:
+                        break
+
+                    if status in {
+                        "complete",
+                        "completed",
+                        "error",
+                        "failed",
+                        "waiting",
+                    }:
+                        break
+
+                yield self.execution_stream_service.send_event(
+                    "done",
+                    {
+                        "ok": bool(
+                            final_result.get("ok")
+                        ),
+                        "status": (
+                            final_result.get("status")
+                            or execution.get("status")
+                        ),
+                        "output": final_result.get("output"),
+                        "error": final_result.get("error"),
+                        "execution_state": execution,
+                        "done": True,
+                    },
+                )
+
+                return
+
 
             execution = self._apply_control_action(
                 execution,

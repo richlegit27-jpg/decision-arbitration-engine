@@ -11,6 +11,7 @@ class AIExecutionService:
         chat_model=None,
     ):
         self.safe_str = safe_str
+
         self.chat_model = (
             chat_model
             or os.getenv("NOVA_CHAT_MODEL")
@@ -57,6 +58,36 @@ class AIExecutionService:
             step.get("action")
         ).strip().lower()
 
+        execution_mode = self._safe_str(
+            step.get("execution_mode")
+        ).strip().lower()
+
+        dependencies = step.get(
+            "dependencies",
+            [],
+        )
+
+        if not isinstance(
+            dependencies,
+            list,
+        ):
+            dependencies = []
+
+        expected_output = self._safe_str(
+            step.get("expected_output")
+        ).strip()
+
+        completion_criteria = step.get(
+            "completion_criteria",
+            [],
+        )
+
+        if not isinstance(
+            completion_criteria,
+            list,
+        ):
+            completion_criteria = []
+
         project_context = self._safe_str(
             context.get("project_context")
         ).strip()
@@ -82,6 +113,36 @@ class AIExecutionService:
         if action:
             prompt_parts.append(
                 f"Execution action: {action}"
+            )
+
+        if execution_mode:
+            prompt_parts.append(
+                f"Execution mode: {execution_mode}"
+            )
+
+        if dependencies:
+            prompt_parts.append(
+                "Task dependencies:\n"
+                + "\n".join(
+                    f"- {self._safe_str(item).strip()}"
+                    for item in dependencies
+                    if self._safe_str(item).strip()
+                )
+            )
+
+        if expected_output:
+            prompt_parts.append(
+                f"Expected output:\n{expected_output}"
+            )
+
+        if completion_criteria:
+            prompt_parts.append(
+                "Completion criteria:\n"
+                + "\n".join(
+                    f"- {self._safe_str(item).strip()}"
+                    for item in completion_criteria
+                    if self._safe_str(item).strip()
+                )
             )
 
         if title:
@@ -116,7 +177,191 @@ class AIExecutionService:
                 "Execution step has no usable task content."
             )
 
-        response = model_gateway_service.responses_create(
+        response = self._create_response(
+            session_id=session_id,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+
+        output = self._extract_response_text(
+            response
+        ).strip()
+
+        if not output:
+            raise RuntimeError(
+                "AI execution returned an empty result."
+            )
+
+        return {
+            "ok": True,
+            "output": output,
+        }
+
+    def generate_file_replacement(
+        self,
+        session_id,
+        step,
+        context=None,
+    ):
+        step = (
+            step
+            if isinstance(step, dict)
+            else {}
+        )
+
+        context = (
+            context
+            if isinstance(context, dict)
+            else {}
+        )
+
+        target_file = self._safe_str(
+            step.get("target_file")
+        ).strip()
+
+        if not target_file:
+            raise ValueError(
+                "File replacement generation requires a target file."
+            )
+
+        title = self._safe_str(
+            step.get("title")
+        ).strip()
+
+        description = self._safe_str(
+            step.get("description")
+        ).strip()
+
+        execution_mode = self._safe_str(
+            step.get("execution_mode")
+        ).strip().lower()
+
+        dependencies = step.get(
+            "dependencies",
+            [],
+        )
+
+        if not isinstance(
+            dependencies,
+            list,
+        ):
+            dependencies = []
+
+        expected_output = self._safe_str(
+            step.get("expected_output")
+        ).strip()
+
+        completion_criteria = step.get(
+            "completion_criteria",
+            [],
+        )
+
+        if not isinstance(
+            completion_criteria,
+            list,
+        ):
+            completion_criteria = []
+
+        project_context = self._safe_str(
+            context.get("project_context")
+        ).strip()
+
+        previous_results = context.get(
+            "previous_results"
+        )
+
+        existing_content = self._safe_str(
+            context.get("existing_content")
+        )
+
+        system_prompt = (
+            "You are Nova's file implementation engine. "
+            "Generate the complete replacement contents for the requested "
+            "target file. "
+            "Return only the raw file contents. "
+            "Do not use Markdown fences. "
+            "Do not add explanations before or after the file contents. "
+            "Do not describe the code. "
+            "The returned output will be written directly to disk as the "
+            "entire file. "
+            "Produce valid, complete, production-quality code appropriate "
+            "for the requested task."
+        )
+
+        prompt_parts = [
+            f"Target file: {target_file}",
+        ]
+
+        if title:
+            prompt_parts.append(
+                f"Implementation task: {title}"
+            )
+
+        if description:
+            prompt_parts.append(
+                f"Task description:\n{description}"
+            )
+
+        if project_context:
+            prompt_parts.append(
+                f"Project context:\n{project_context}"
+            )
+
+        if previous_results:
+            prompt_parts.append(
+                "Previous execution results:\n"
+                + self._safe_str(previous_results)
+            )
+
+        if existing_content:
+            prompt_parts.append(
+                "Existing file contents:\n"
+                + existing_content
+            )
+
+        user_prompt = "\n\n".join(
+            part
+            for part in prompt_parts
+            if part
+        )
+
+        response = self._create_response(
+            session_id=session_id,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+
+        output = self._extract_response_text(
+            response
+        ).strip()
+
+        if not output:
+            raise RuntimeError(
+                "AI file replacement generation returned empty content."
+            )
+
+        output = self._strip_code_fences(
+            output
+        )
+
+        if not output.strip():
+            raise RuntimeError(
+                "AI file replacement generation produced no usable content."
+            )
+
+        return {
+            "ok": True,
+            "target_file": target_file,
+            "content": output,
+        }
+
+    def _create_response(
+        self,
+        session_id,
+        system_prompt,
+        user_prompt,
+    ):
+        return model_gateway_service.responses_create(
             nova_username=(
                 os.getenv("NOVA_DEFAULT_USERNAME")
                 or "richard"
@@ -135,19 +380,30 @@ class AIExecutionService:
             ],
         )
 
-        output = self._extract_response_text(
-            response
-        ).strip()
+    def _strip_code_fences(
+        self,
+        output,
+    ):
+        text = self._safe_str(output).strip()
 
-        if not output:
-            raise RuntimeError(
-                "AI execution returned an empty result."
-            )
+        if not text.startswith("```"):
+            return text
 
-        return {
-            "ok": True,
-            "output": output,
-        }
+        lines = text.splitlines()
+
+        if (
+            lines
+            and lines[0].lstrip().startswith("```")
+        ):
+            lines = lines[1:]
+
+        if (
+            lines
+            and lines[-1].strip() == "```"
+        ):
+            lines = lines[:-1]
+
+        return "\n".join(lines).strip()
 
     def _extract_response_text(
         self,

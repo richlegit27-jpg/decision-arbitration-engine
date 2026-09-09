@@ -1,241 +1,98 @@
-﻿\# Nova
-
-
-
-Nova is a local AI chat application designed to run entirely on your own machine.
-
-It combines conversational AI with memory, file attachments, and workspace awareness to create a persistent AI assistant environment.
-
-
-
-The goal of Nova is to provide a powerful AI interface that behaves more like a real operating system tool than a simple chatbot.
-
-
-
----
-
-
-
-\# Features
-
-
-
-â€¢ Persistent chat sessions  
-
-â€¢ Memory system for contextual learning  
-
-â€¢ File attachments and uploads  
-
-â€¢ Workspace awareness of project files  
-
-â€¢ Streaming AI responses  
-
-â€¢ Sidebar chat navigation  
-
-â€¢ Memory panel management  
-
-â€¢ Local runtime storage
-
-
-
----
-
-
-
-\# Project Structure
-
-
-
-C:\\Users\\Owner\\nova
-
-
-
-nova
-
-â”‚
-
-â”œâ”€â”€ backend
-
-â”‚   â”œâ”€â”€ main.py
-
-â”‚   â”œâ”€â”€ brain.py
-
-â”‚   â”œâ”€â”€ routes\_chat.py
-
-â”‚   â”œâ”€â”€ memory\_store.py
-
-â”‚   â”œâ”€â”€ workspace\_state.py
-
-â”‚   â””â”€â”€ other backend modules
-
-â”‚
-
-â”œâ”€â”€ static
-
-â”‚   â”œâ”€â”€ css
-
-â”‚   â”œâ”€â”€ js
-
-â”‚   â””â”€â”€ assets
-
-â”‚
-
-â”œâ”€â”€ templates
-
-â”‚   â””â”€â”€ index.html
-
-â”‚
-
-â”œâ”€â”€ runtime
-
-â”‚   â”œâ”€â”€ uploads
-
-â”‚   â”œâ”€â”€ runtime\_chats.json
-
-â”‚   â””â”€â”€ runtime\_workspace\_state.json
-
-â”‚
-
-â”œâ”€â”€ requirements.txt
-
-â””â”€â”€ README.md
-
-
-
----
-
-
-
-\# Running Nova
-
-
-
-Open PowerShell and run:
-
-
-
-cd C:\\Users\\Owner\\nova
-
-py -m uvicorn --app-dir C:\\Users\\Owner\\nova backend.main:app --host 127.0.0.1 --port 8000
-
-
-
-Then open your browser:
-
-
-
-http://127.0.0.1:8000
-
-
-
----
-
-
-
-\# Requirements
-
-
-
-Python 3.10+
-
-
-
-Required packages are listed in:
-
-
-
-requirements.txt
-
-
-
-Install dependencies:
-
-
-
-pip install -r requirements.txt
-
-
-
----
-
-
-
-\# Runtime Files
-
-
-
-Nova stores data locally in the runtime directory:
-
-
-
-runtime\_chats.json
-
-runtime\_workspace\_state.json
-
-uploads/
-
-
-
-These files contain chat history, memory state, and uploaded attachments.
-
-
-
----
-
-
-
-\# Notes
-
-
-
-Nova is designed to be modular.
-
-Backend logic, UI rendering, memory management, and workspace analysis are separated into individual components to allow future expansion.
-
-
-
-The system is intended to evolve into a full AI workspace platform.
-
-
-
----
-
-
-
-\# Status
-
-
-
-Current build: Local development version
-
-
-
-Core functionality:
-
-\- Chat
-
-\- Memory
-
-\- Attachments
-
-\- Streaming responses
-
-\- Workspace state
-
-
-
-Further development may include improved UI polish, enhanced reasoning modules, and expanded tool integrations.
-
-
-
----
-
-
-
-\# License
-
-
-
-Private project.
-
-
+# Calculator Application
+
+This application is a command-line calculator that performs basic arithmetic operations. It supports addition, subtraction, multiplication, and division with two numeric operands.
+
+## Prerequisites
+
+- Python 3.6 or higher installed on your system.
+- Basic familiarity with using the terminal or command prompt.
+
+## Installation / Setup
+
+No special installation is required. Simply ensure Python is installed and accessible from your command line.
+
+Place the calculator script (e.g., `calculator.py`) in a directory of your choice.
+
+## How to Run
+
+1. Open your terminal or command prompt.
+
+2. Navigate to the directory containing the calculator script:
+   ```
+   cd /path/to/directory
+   ```
+
+3. Run the calculator script with the following command syntax:
+   ```
+   python calculator.py <operation> <operand1> <operand2>
+   ```
+   or, if your system uses `python3`:
+   ```
+   python3 calculator.py <operation> <operand1> <operand2>
+   ```
+
+## Supported Operations
+
+- `add` — Adds operand1 and operand2.
+- `sub` — Subtracts operand2 from operand1.
+- `mul` — Multiplies operand1 and operand2.
+- `div` — Divides operand1 by operand2 (operand2 should not be zero).
+
+Operands should be numbers (integers or decimals).
+
+## Examples
+
+- Addition:
+  ```
+  python calculator.py add 5 3
+  ```
+  Output:
+  ```
+  Result: 8
+  ```
+
+- Subtraction:
+  ```
+  python calculator.py sub 10 4
+  ```
+  Output:
+  ```
+  Result: 6
+  ```
+
+- Multiplication:
+  ```
+  python calculator.py mul 7 6
+  ```
+  Output:
+  ```
+  Result: 42
+  ```
+
+- Division:
+  ```
+  python calculator.py div 12 4
+  ```
+  Output:
+  ```
+  Result: 3
+  ```
+
+- Handling division by zero:
+  ```
+  python calculator.py div 5 0
+  ```
+  Output:
+  ```
+  Error: Cannot divide by zero.
+  ```
+
+## Notes
+
+- If invalid operation or operands are provided, the program will display an error message with usage instructions.
+- You can use either integer or floating point numbers for the operands, for example:
+  ```
+  python calculator.py mul 3.5 2
+  ```
+
+Enjoy your simple command-line calculator!

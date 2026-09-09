@@ -1,0 +1,217 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova</title>
+
+    <style>
+        :root {
+            --bg: #09090f;
+            --panel: rgba(255,255,255,0.08);
+            --text: rgba(255,255,255,0.94);
+            --muted: rgba(255,255,255,0.62);
+            --line: rgba(255,255,255,0.14);
+            --brand: #8b5cf6;
+            --ok: #22c55e;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Inter, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .shell {
+            width: min(1120px,100%);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.2fr .8fr;
+            gap: 20px;
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            background: var(--panel);
+            padding: 30px;
+        }
+
+        h1 {
+            font-size: 80px;
+            margin: 20px 0;
+        }
+
+        p {
+            color: var(--muted);
+            font-size: 20px;
+        }
+
+        .actions {
+            display:grid;
+            gap:12px;
+            margin-top:30px;
+        }
+
+        a {
+            padding:18px;
+            border-radius:18px;
+            border:1px solid var(--line);
+            color:white;
+            text-decoration:none;
+        }
+
+        .metric {
+            display:flex;
+            justify-content:space-between;
+            padding:16px;
+            margin-bottom:12px;
+            border:1px solid var(--line);
+            border-radius:18px;
+        }
+
+        .value {
+            font-weight:bold;
+        }
+
+        @media(max-width:860px){
+            .hero {
+                grid-template-columns:1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<main class="shell">
+
+<section class="hero">
+
+<div class="card">
+
+<h1>Nova</h1>
+
+<p>
+Clean control center for chat, sessions, memory,
+attachments, execution, and backend readiness.
+</p>
+
+<div class="actions">
+
+<a href="/app">
+Open Desktop Nova
+</a>
+
+<a href="/mobile">
+Open Mobile Nova
+</a>
+
+<a href="/api/backend/readiness">
+Backend Readiness
+</a>
+
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>System Status</h2>
+
+<div class="metric">
+<span>Backend</span>
+<span id="overallValue" class="value">...</span>
+</div>
+
+<div class="metric">
+<span>Sessions</span>
+<span id="sessionsValue" class="value">...</span>
+</div>
+
+<div class="metric">
+<span>Memory</span>
+<span id="memoryValue" class="value">...</span>
+</div>
+
+<div class="metric">
+<span>Execution</span>
+<span id="executionValue" class="value">...</span>
+</div>
+
+</div>
+
+</section>
+
+</main>
+
+
+<script>
+
+async function loadStatus(){
+
+    try {
+
+        const response = await fetch(
+            "/api/backend/readiness"
+        );
+
+        const data = await response.json();
+
+
+        document.getElementById(
+            "overallValue"
+        ).textContent =
+            data.overall_backend_readiness ?? "n/a";
+
+
+        document.getElementById(
+            "sessionsValue"
+        ).textContent =
+            data.session_records ?? "n/a";
+
+
+        document.getElementById(
+            "memoryValue"
+        ).textContent =
+            data.memory_items ?? "n/a";
+
+
+        document.getElementById(
+            "executionValue"
+        ).textContent =
+            data.execution_percent ?? "n/a";
+
+
+    } catch(error){
+
+        console.error(
+            "Nova status failed",
+            error
+        );
+
+    }
+
+}
+
+
+loadStatus();
+
+</script>
+
+
+</body>
+</html>

@@ -69,14 +69,28 @@ class ExecutionHandler:
         self,
         user_text,
         session_id="",
+        attachments=None,
+        regenerate=False,
+        auth_user_id="",
     ):
         print(
             "DEBUG EXECUTION HANDLER ENTERED",
             {
                 "user_text": user_text,
                 "session_id": session_id,
+                "auth_user_id": auth_user_id,
             },
         )
+
+        attachments = attachments or []
+
+        self.current_user_id = str(
+            auth_user_id or ""
+        ).strip()
+
+        self.current_session_id = str(
+            session_id or ""
+        ).strip()
 
         execution = self.service._process_goal_and_plan(
             user_text,
@@ -245,7 +259,7 @@ class ExecutionHandler:
                 with open(
                     target_file,
                     "r",
-                    encoding="utf-8",
+                    encoding="utf-8-sig",
                 ) as f:
                     existing_code = f.read()
 
@@ -718,6 +732,7 @@ Rules:
             step.get("status") != "completed"
             and action in {
                 "implement",
+                "modify",
                 "fix",
             }
             and step.get("next_action") != "request_target"
@@ -860,6 +875,24 @@ Rules:
                     f"Error: {step['error']}"
                 )
 
+        elif action == "analyze":
+
+            step["status"] = "completed"
+
+            result_lines.append(
+                "Result: Analysis step completed."
+            )
+
+
+        elif action == "design":
+
+            step["status"] = "completed"
+
+            result_lines.append(
+                "Result: Design step completed."
+            )
+
+
         elif action == "implement":
 
             if (
@@ -895,9 +928,17 @@ Rules:
                 print(
                     "DEBUG CODE BEFORE PAYLOAD:",
                     {
-                        "code_length": len(step.get("code") or ""),
-                        "contains_after": "after" in (step.get("code") or ""),
-                        "contains_before": "before" in (step.get("code") or ""),
+                        "code_length": len(
+                            step.get("code") or ""
+                        ),
+                        "contains_after": (
+                            "after"
+                            in (step.get("code") or "")
+                        ),
+                        "contains_before": (
+                            "before"
+                            in (step.get("code") or "")
+                        ),
                     },
                 )
 
@@ -908,6 +949,7 @@ Rules:
                 "Result: Fix step prepared."
             )
 
+
         elif action == "review":
 
             step["status"] = "completed"
@@ -916,40 +958,22 @@ Rules:
                 "Result: Review step completed."
             )
 
+
         else:
 
-            result_lines.append(
-                "Result: Generic execution step completed."
+            step["status"] = "failed"
+
+            step["error"] = (
+                f"Unsupported execution action: "
+                f"{action or 'unknown'}"
             )
 
-            if step.get("status") != "failed":
+            result_lines.append(
+                f"Result: {step['error']}"
+            )
 
-                if (
-                    action in {"implement", "fix"}
-                    and isinstance(
-                        step.get("apply_result"),
-                        dict,
-                    )
-                    and step["apply_result"].get("ok")
-                ):
-                    step["mutation_ready"] = True
-                    step["payload_required"] = True
+            return step
 
-                elif step.get("next_action"):
-                    if step.get("next_action") == "request_target":
-                        step["status"] = "waiting_for_target"
-                    else:
-                        step["status"] = "completed"
-                        step["payload_required"] = True
-
-                elif action in {
-                    "implement",
-                    "test",
-                }:
-                    step["status"] = "completed"
-
-                else:
-                    step["status"] = "completed"
 
         if (
             step.get("status") == "waiting_for_payload"
@@ -1118,20 +1142,7 @@ Rules:
                     f"Payload error: {step['error']}"
                 )
 
-        if step.get("status") in {
-            None,
-            "",
-            "pending",
-        }:
 
-            if action in {
-                "design",
-                "implement",
-                "test",
-                "fix",
-                "review",
-            }:
-                step["status"] = "completed"
 
         step["result"] = "\n".join(
             result_lines
@@ -1910,21 +1921,6 @@ No explanation.
         ]:
             step.pop(key, None)
 
-        if execution_state.get("steps"):
-            execution_state["steps"][
-                execution_state.get("current_index", 0)
-            ] = step
-
-        if step.get("status") == "completed":
-            history.append(
-                f"completed: {step.get('title', 'step')}"
-            )
-
-        elif step.get("status") == "failed":
-            history.append(
-                f"failed: {step.get('title', 'step')}"
-            )
-
         return step
 
     def run_next_move(
@@ -1935,19 +1931,21 @@ No explanation.
         **kwargs,
     ) -> dict:
         action = str(action or "").strip().lower()
+
         print(
             "DEBUG RUN_NEXT_MOVE ACTION =",
             action,
         )
+
         execution_state = execution_state or {}
 
         if action in {"run_step", "next", "continue", "go"}:
             action = "run_step"
 
-        if action in {"retry", "retry_failed", "try_again"}:
+        elif action in {"retry", "retry_failed", "try_again"}:
             action = "retry_failed"
 
-        if action in {"run_all", "execute", "execute_all"}:
+        elif action in {"run_all", "execute", "execute_all"}:
             action = "run_all"
 
         if action == "test_fail":
@@ -1961,10 +1959,18 @@ No explanation.
                 "execution_state": {
                     "status": "failed",
                     "steps": [
-                        {"title": "Failed Step 1", "status": "failed"},
-                        {"title": "Failed Step 2", "status": "pending"},
+                        {
+                            "title": "Failed Step 1",
+                            "status": "failed",
+                        },
+                        {
+                            "title": "Failed Step 2",
+                            "status": "pending",
+                        },
                     ],
-                    "history": ["test_fail: Failed Step 1"],
+                    "history": [
+                        "test_fail: Failed Step 1"
+                    ],
                     "last_action": "test_fail",
                     "current_index": 0,
                     "current_step": "Failed Step 1",
@@ -1979,64 +1985,135 @@ No explanation.
         )
 
         history = execution_state.get("history") or []
-        current_index = int(
-            execution_state.get("current_index")
-            if execution_state.get("current_index") is not None
-            else execution_state.get("current_step") or 0
+
+        raw_current_index = execution_state.get(
+            "current_index"
         )
+
+        if raw_current_index is None:
+            current_index = 0
+        else:
+            try:
+                current_index = int(raw_current_index)
+            except Exception:
+                current_index = 0
+
         if not steps:
-            plan = execution_state.get("plan") or execution_state.get("normalized_steps") or []
+            plan = (
+                execution_state.get("plan")
+                or execution_state.get("normalized_steps")
+                or []
+            )
+
             if plan:
                 steps = plan
+                execution_state["steps"] = steps
+                current_index = 0
 
             else:
+                idle_state = {
+                    "status": "idle",
+                    "steps": [],
+                    "history": history,
+                    "current_index": 0,
+                    "current_step": "",
+                    "current_step_title": "",
+                    "last_action": action,
+                }
+
                 return {
                     "ok": True,
                     "status": "idle",
                     "message": "",
-                    "execution_state": {
-                        "status": "idle",
-                        "steps": [],
-                        "history": history,
-                        "current_index": 0,
-                        "current_step": "",
-                    },
+                    "execution_state": idle_state,
                 }
 
-            current_index = 0
-
         if action == "retry_failed":
+
             for index, step in enumerate(steps):
+
                 if step.get("status") == "failed":
-                    step["status"] = "completed"
-                    history.append(f"retried: {step.get('title', 'step')}")
-                    execution_state["current_index"] = index + 1
-                    execution_state["current_step"] = step.get("title", "step")
-                    execution_state["last_action"] = action
-                    execution_state["status"] = "success"
+
+                    step["status"] = "pending"
+
                     execution_state["steps"] = steps
+                    execution_state["current_index"] = index
+                    execution_state["current_step"] = (
+                        step.get("title", "step")
+                    )
+                    execution_state["current_step_title"] = (
+                        step.get("title", "step")
+                    )
+                    execution_state["last_action"] = action
+                    execution_state["status"] = "running"
+
+                    history.append(
+                        f"retry requested: "
+                        f"{step.get('title', 'step')}"
+                    )
+
                     execution_state["history"] = history
+
+                    self.service._save_execution_state(
+                        session_id,
+                        execution_state,
+                    )
 
                     return {
                         "status": "success",
-                        "message": "Failed step retried successfully.",
+                        "message": "Failed step reset for retry.",
                         "execution_state": execution_state,
                     }
 
+            execution_state["status"] = (
+                "complete"
+                if all(
+                    step.get("status") == "completed"
+                    for step in steps
+                )
+                else execution_state.get(
+                    "status",
+                    "running",
+                )
+            )
+
+            execution_state["history"] = history
+            execution_state["last_action"] = action
+
+            self.service._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
             return {
                 "status": "success",
-                "message": "No failed step found. Retry treated as complete.",
+                "message": (
+                    "No failed step found. "
+                    "Retry treated as complete."
+                ),
                 "execution_state": execution_state,
             }
 
         if action == "run_step":
+
             if current_index >= len(steps):
+
                 execution_state["status"] = "complete"
-                execution_state["current_step"] = "All steps completed"
-                execution_state["current_step_title"] = "All steps completed"
+                execution_state["current_index"] = len(steps)
+                execution_state["current_step"] = (
+                    "All steps completed"
+                )
+                execution_state["current_step_title"] = (
+                    "All steps completed"
+                )
                 execution_state["steps"] = steps
                 execution_state["history"] = history
                 execution_state["last_action"] = action
+
+                self.service._save_execution_state(
+                    session_id,
+                    execution_state,
+                )
 
                 return {
                     "status": "complete",
@@ -2046,7 +2123,12 @@ No explanation.
 
             step = steps[current_index]
 
-            completed_status = step.get("status")
+            print(
+                "DEBUG RUN_STEP BEFORE EXECUTE =",
+                step,
+            )
+
+            previous_status = step.get("status")
 
             step = self._execute_runtime_step(
                 step=step,
@@ -2054,17 +2136,25 @@ No explanation.
                 execution_state=execution_state,
             )
 
+            print(
+                "DEBUG RUN_STEP AFTER EXECUTE =",
+                step,
+            )
+
             if (
                 step.get("mutation_execution_result")
-                and step["mutation_execution_result"].get("ok")
+                and step[
+                    "mutation_execution_result"
+                ].get("ok")
             ):
                 step["status"] = "completed"
 
             if (
-                completed_status == "completed"
+                previous_status == "completed"
                 and step.get("status") != "completed"
             ):
                 step["status"] = "completed"
+
             steps[current_index] = step
 
             history.append(
@@ -2075,63 +2165,112 @@ No explanation.
                 }
             )
 
-            execution_state["steps"] = steps
-
             if step.get("status") == "completed":
+
                 current_index += 1
 
             elif (
                 step.get("status") == "failed"
-                and step.get("action") in {"test", "inspect"}
+                and step.get("action")
+                in {"test", "inspect"}
             ):
+
                 current_index += 1
 
+            execution_state["steps"] = steps
+            execution_state["history"] = history
             execution_state["current_index"] = current_index
+            execution_state["last_action"] = action
 
-        execution_state["status"] = (
-            "complete"
-            if execution_state["current_index"] >= len(steps)
-            else (
-                "failed"
-                if (
-                    step.get("status") == "failed"
-                    and step.get("action") not in {"test", "inspect"}
+            if current_index >= len(steps):
+
+                execution_state["status"] = "complete"
+                execution_state["current_step"] = (
+                    "All steps completed"
                 )
-                else "running"
+                execution_state["current_step_title"] = (
+                    "All steps completed"
+                )
+
+            elif step.get("status") == "failed":
+
+                execution_state["status"] = "failed"
+                execution_state["current_step"] = (
+                    step.get("title", "step")
+                )
+                execution_state["current_step_title"] = (
+                    step.get("title", "step")
+                )
+
+                if current_step.get("status") in {
+                    "waiting_for_target",
+                    "waiting_for_apply",
+                    "waiting_for_payload",
+                }:
+
+                    execution_state["status"] = (
+                        current_step.get("status")
+                    )
+
+                execution_state["status"] = step.get(
+                    "status"
+                )
+                execution_state["current_step"] = (
+                    step.get("title", "step")
+                )
+                execution_state["current_step_title"] = (
+                    step.get("title", "step")
+                )
+
+            else:
+
+                execution_state["status"] = "running"
+
+                if current_index < len(steps):
+
+                    next_step = steps[current_index]
+
+                    execution_state["current_step"] = (
+                        next_step.get("title", "step")
+                    )
+                    execution_state["current_step_title"] = (
+                        next_step.get("title", "step")
+                    )
+
+            self.service._save_execution_state(
+                session_id,
+                execution_state,
             )
-        )
 
-
-        self.service._save_execution_state(
-            session_id,
-            execution_state,
-        )
-
-        return {
-            "status": (
-                "success"
-                if step.get("status") == "completed"
-                else "failed"
-            ),
-            "message": (
-                "Run step executed."
-                if step.get("status") == "completed"
-                else step.get("error", "Run step failed.")
-            ),
-            "execution_state": execution_state,
-        }
+            return {
+                "status": (
+                    "success"
+                    if step.get("status") == "completed"
+                    else step.get("status", "failed")
+                ),
+                "message": (
+                    "Run step executed."
+                    if step.get("status") == "completed"
+                    else step.get(
+                        "error",
+                        "Run step did not complete.",
+                    )
+                ),
+                "execution_state": execution_state,
+            }
 
         if action == "run_all":
-            completed = []
 
             while current_index < len(steps):
 
                 step = steps[current_index]
 
                 print(
-                    "DEBUG RUN_STEP BEFORE EXECUTE =",
+                    "DEBUG RUN_ALL BEFORE EXECUTE =",
                     step,
                 )
+
+                previous_status = step.get("status")
 
                 step = self._execute_runtime_step(
                     step=step,
@@ -2140,125 +2279,158 @@ No explanation.
                 )
 
                 print(
-                    "DEBUG RUN_STEP AFTER EXECUTE =",
+                    "DEBUG RUN_ALL AFTER EXECUTE =",
                     step,
                 )
 
+                if (
+                    step.get("mutation_execution_result")
+                    and step[
+                        "mutation_execution_result"
+                    ].get("ok")
+                ):
+                    step["status"] = "completed"
+
+                if (
+                    previous_status == "completed"
+                    and step.get("status") != "completed"
+                ):
+                    step["status"] = "completed"
+
                 steps[current_index] = step
 
-                verify_result = self._verify_step_result(step)
+                verify_result = (
+                    self._verify_step_result(step)
+                )
+
                 step["verify_result"] = verify_result
 
+                history.append(
+                    {
+                        "index": current_index,
+                        "status": step.get("status"),
+                        "step": dict(step),
+                    }
+                )
+
                 if not verify_result.get("ok"):
+
                     step["status"] = "failed"
-                    step["error"] = f"Verification failed: {verify_result.get('reason')}"
-                    history.append(f"verification failed: {step.get('title', 'step')}")
+
+                    step["error"] = (
+                        "Verification failed: "
+                        f"{verify_result.get('reason')}"
+                    )
+
                     break
 
-                completed.append(step.get("title", "step"))
-
                 if step.get("status") in {
+                    "waiting_for_target",
                     "waiting_for_apply",
                     "waiting_for_payload",
                 }:
+
                     break
 
-                current_index += 1
+                if step.get("status") == "failed":
 
-            if (
-                len(steps) == 1
-                and str(steps[0].get("title", "")).strip().lower()
-                == "no saved execution plan found"
-            ):
-                return {
-                    "status": "idle",
-                    "message": "",
-                    "execution_state": {
-                        "status": "idle",
-                        "steps": [],
-                        "history": history,
-                        "current_index": 0,
-                        "current_step": "",
-                    },
-                }
+                    if step.get("action") in {
+                        "test",
+                        "inspect",
+                    }:
 
-            execution_state["current_index"] = current_index
+                        current_index += 1
+                        continue
 
-            execution_state["current_step"] = (
-                steps[current_index].get("title", "payload required")
-                if current_index < len(steps)
-                else None
-            )
+                    break
 
-            execution_state["current_step_title"] = (
-                execution_state["current_step"]
-                or "Execution complete"
-            )
+                if step.get("status") == "completed":
 
-            execution_state["current_step_title"] = execution_state["current_step"]
+                    current_index += 1
+                    continue
 
-            step = steps[current_index]
+                break
 
-            step = self._execute_runtime_step(
-                step=step,
-                history=history,
-                execution_state=execution_state,
-            )
-
-            steps[current_index] = step
-
-            execution_state["steps"] = steps
-
-            if step.get("status") == "completed":
-                current_index += 1
-
-            elif (
-                step.get("status") == "failed"
-                and step.get("action") in {"test", "inspect"}
-            ):
-                current_index += 1
-
-            execution_state["current_index"] = current_index
-
-            execution_state["status"] = (
-                "failed"
-                if current_index < len(steps)
-                and steps[current_index].get("status") == "failed"
-                else (
-                    "waiting_for_payload"
-                    if current_index < len(steps)
-                    and steps[current_index].get("status") == "waiting_for_payload"
-                    else "complete"
-                )
-            )
-
-            execution_state["last_action"] = action
             execution_state["steps"] = steps
             execution_state["history"] = history
+            execution_state["current_index"] = current_index
+            execution_state["last_action"] = action
 
-            summary_lines = [
-                (
-                    "Execution complete."
-                    if execution_state["status"] == "complete"
-                    else "Execution stopped."
-                ),
-                "",
-                "Completed work:",
-            ]
+            if current_index >= len(steps):
 
-            for step in steps:
+                execution_state["status"] = "complete"
+                execution_state["current_step"] = (
+                    "All steps completed"
+                )
+                execution_state["current_step_title"] = (
+                    "All steps completed"
+                )
+
+            else:
+
+                current_step = steps[current_index]
+
+                execution_state["current_step"] = (
+                    current_step.get("title", "step")
+                )
+
+                execution_state["current_step_title"] = (
+                    current_step.get("title", "step")
+                )
+
+                if current_step.get("status") in {
+                    "waiting_for_target",
+                    "waiting_for_apply",
+                    "waiting_for_payload",
+                }:
+
+                    execution_state["status"] = (
+                        current_step.get("status")
+                    )
+
+                elif current_step.get("status") == "failed":
+
+                    execution_state["status"] = "failed"
+
+                else:
+
+                    execution_state["status"] = "running"
+
+            self.service._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
+            summary_lines = []
+
+            if execution_state["status"] == "complete":
+
                 summary_lines.append(
-                    f"- {step.get('title', 'step')}: {step.get('status', 'unknown')}"
+                    "Execution complete."
+                )
+
+            elif execution_state["status"] == "failed":
+
+                summary_lines.append(
+                    "Execution stopped on failed step."
+                )
+
+            else:
+
+                summary_lines.append(
+                    "Execution paused."
                 )
 
             summary_lines.append("")
+            summary_lines.append("Completed work:")
 
-            if execution_state["status"] == "complete":
-                summary_lines.append("Next: execution chain completed successfully.")
-            elif execution_state["status"] == "failed":
-                summary_lines.append("Next: inspect failed step and retry with regenerated mutation payload.")
-            else:
-                summary_lines.append("Next: continue execution chain.")
+            for summary_step in steps:
+
+                summary_lines.append(
+                    "- "
+                    f"{summary_step.get('title', 'step')}: "
+                    f"{summary_step.get('status', 'unknown')}"
+                )
 
             return {
                 "status": execution_state["status"],
@@ -2269,7 +2441,9 @@ No explanation.
         return {
             "status": "failed",
             "message": "Unknown execution action.",
-            "error": f"Unknown execution action: {action}",
+            "error": (
+                f"Unknown execution action: {action}"
+            ),
             "execution_state": execution_state,
         }
 
@@ -2315,128 +2489,152 @@ No explanation.
             action = "run_step"
 
         return results
+def _apply_function_fix_single_file(
+    file_path: str,
+    function_name: str,
+    replacement: str,
+) -> dict:
+    import ast
 
-    def _apply_function_fix_single_file(
-        self,
-        file_path: str,
-        function_name: str,
-        replacement: str,
-    ) -> dict:
-        import ast
+    path = Path(file_path)
 
-        path = Path(file_path)
+    if not path.exists():
+        return {
+            "file_path": file_path,
+            "compiled": False,
+            "error": f"File does not exist: {file_path}",
+        }
 
-        if not path.exists():
-            return {
-                "file_path": file_path,
-                "compiled": False,
-                "error": f"File does not exist: {file_path}",
-            }
+    original = path.read_text(
+        encoding="utf-8-sig"
+    )
 
-        original = path.read_text(encoding="utf-8")
-        lines = original.splitlines()
+    lines = original.splitlines()
 
-        try:
-            tree = ast.parse(original)
-        except SyntaxError as e:
-            return {
-                "file_path": file_path,
-                "compiled": False,
-                "error": f"Cannot parse target file before mutation: {e}",
-            }
+    try:
+        tree = ast.parse(original)
+    except SyntaxError as e:
+        return {
+            "file_path": file_path,
+            "compiled": False,
+            "error": (
+                f"Cannot parse target file before mutation: {e}"
+            ),
+        }
 
-        target_node = None
+    target_node = None
 
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name == function_name:
-                    target_node = node
-                    break
+    for node in ast.walk(tree):
+        if isinstance(
+            node,
+            (
+                ast.FunctionDef,
+                ast.AsyncFunctionDef,
+            ),
+        ):
+            if node.name == function_name:
+                target_node = node
+                break
 
-        if target_node is None:
-            return {
-                "file_path": file_path,
-                "compiled": False,
-                "error": f"Function not found by AST: {function_name}",
-            }
+    if target_node is None:
+        return {
+            "file_path": file_path,
+            "compiled": False,
+            "error": (
+                f"Function not found by AST: {function_name}"
+            ),
+        }
 
-        if not hasattr(target_node, "lineno") or not hasattr(target_node, "end_lineno"):
-            return {
-                "file_path": file_path,
-                "compiled": False,
-                "error": f"AST node missing line boundaries: {function_name}",
-            }
+    if (
+        not hasattr(target_node, "lineno")
+        or not hasattr(target_node, "end_lineno")
+    ):
+        return {
+            "file_path": file_path,
+            "compiled": False,
+            "error": (
+                "AST node missing line boundaries: "
+                f"{function_name}"
+            ),
+        }
 
-        start_index = int(target_node.lineno) - 1
-        end_index = int(target_node.end_lineno)
+    start_index = int(target_node.lineno) - 1
+    end_index = int(target_node.end_lineno)
 
-        backup_path = path.with_suffix(
-            path.suffix + f".bak_{int(time.time() * 1000)}"
-        )
+    backup_path = path.with_suffix(
+        path.suffix
+        + f".bak_{int(time.time() * 1000)}"
+    )
 
+    shutil.copy2(
+        path,
+        backup_path,
+    )
+
+    replacement_lines = (
+        replacement.strip("\n").splitlines()
+    )
+
+    new_lines = (
+        lines[:start_index]
+        + replacement_lines
+        + lines[end_index:]
+    )
+
+    path.write_text(
+        "\n".join(new_lines) + "\n",
+        encoding="utf-8",
+    )
+
+    mutated_source = path.read_text(
+        encoding="utf-8-sig"
+    )
+
+    try:
+        ast.parse(mutated_source)
+    except SyntaxError as e:
         shutil.copy2(
-            path,
             backup_path,
+            path,
         )
-
-        replacement_lines = replacement.strip("\n").splitlines()
-
-        new_lines = (
-            lines[:start_index]
-            + replacement_lines
-            + lines[end_index:]
-        )
-
-        path.write_text(
-            "\n".join(new_lines) + "\n",
-            encoding="utf-8",
-        )
-
-        mutated_source = path.read_text(
-            encoding="utf-8"
-        )
-
-        try:
-            ast.parse(mutated_source)
-        except SyntaxError as e:
-            shutil.copy2(
-                backup_path,
-                path,
-            )
-
-            return {
-                "file_path": file_path,
-                "backup": str(backup_path),
-                "compiled": False,
-                "rolled_back": True,
-                "error": f"AST validation failed after mutation: {e}",
-            }
-
-        compile_ok = True
-        compile_error = ""
-
-        try:
-            py_compile.compile(
-                str(path),
-                doraise=True,
-            )
-        except Exception as e:
-            compile_ok = False
-            compile_error = str(e)
-
-        if not compile_ok:
-            shutil.copy2(
-                backup_path,
-                path,
-            )
 
         return {
             "file_path": file_path,
             "backup": str(backup_path),
-            "compiled": compile_ok,
-            "rolled_back": not compile_ok,
-            "compile_error": compile_error,
+            "compiled": False,
+            "rolled_back": True,
+            "error": (
+                "AST validation failed after mutation: "
+                f"{e}"
+            ),
         }
+
+    compile_ok = True
+    compile_error = ""
+
+    try:
+        py_compile.compile(
+            str(path),
+            doraise=True,
+        )
+    except Exception as e:
+        compile_ok = False
+        compile_error = str(e)
+
+    if not compile_ok:
+        shutil.copy2(
+            backup_path,
+            path,
+        )
+
+    return {
+        "file_path": file_path,
+        "backup": str(backup_path),
+        "compiled": compile_ok,
+        "rolled_back": not compile_ok,
+        "compile_error": compile_error,
+    }
+
 
 def default_executor(move: NextMove) -> ExecutionResult:
     try:
@@ -2530,6 +2728,9 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 },
             )
 
+
+
+
         if move_type == "apply_function_fix":
             file_path = str(
                 payload.get("file_path") or ""
@@ -2568,7 +2769,7 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 backup_path,
             )
 
-            result = self._apply_function_fix_single_file(
+            result = _apply_function_fix_single_file(
                 file_path=file_path,
                 function_name=function_name,
                 replacement=replacement,
@@ -2623,6 +2824,37 @@ def default_executor(move: NextMove) -> ExecutionResult:
             for file_path in file_paths:
                 path = Path(file_path)
 
+                compile_ok = True
+                compile_error = ""
+
+                # Validate Python before modifying the target file.
+                if path.suffix.lower() == ".py":
+                    try:
+                        import ast
+
+                        ast.parse(
+                            new_code,
+                            filename=str(path),
+                        )
+
+                    except Exception as e:
+                        compile_ok = False
+                        compile_error = (
+                            f"AST validation failed: {e}"
+                        )
+
+                if not compile_ok:
+                    results.append(
+                        {
+                            "file_path": str(path),
+                            "backup": None,
+                            "compiled": False,
+                            "compile_error": compile_error,
+                            "written": False,
+                        }
+                    )
+                    continue
+
                 if path.exists():
                     backup_path = path.with_suffix(
                         path.suffix + f".bak_{int(time.time())}"
@@ -2640,54 +2872,48 @@ def default_executor(move: NextMove) -> ExecutionResult:
 
                     backup_path = None
 
-                path.write_text(
-                    new_code,
-                    encoding="utf-8",
-                )
+                try:
+                    path.write_text(
+                        new_code,
+                        encoding="utf-8",
+                    )
 
-                compile_ok = True
-                compile_error = ""
-
-                if path.suffix == ".py":
-                    try:
-                        import ast
-
-                        ast.parse(
-                            path.read_text(
-                                encoding="utf-8"
-                            )
+                    if path.suffix.lower() == ".py":
+                        py_compile.compile(
+                            str(path),
+                            doraise=True,
                         )
 
-                    except Exception as e:
-                        compile_ok = False
-                        compile_error = (
-                            f"AST validation failed: {e}"
+                except Exception as e:
+                    compile_ok = False
+                    compile_error = str(e)
+
+                    if backup_path and backup_path.exists():
+                        shutil.copy2(
+                            backup_path,
+                            path,
                         )
 
-                        if backup_path:
-                            shutil.copy2(
-                                backup_path,
-                                path,
-                            )
-
-                if compile_ok and path.suffix == ".py":
-                    try:
-                        py_compile.compile(str(path), doraise=True)
-                    except Exception as e:
-                        compile_ok = False
-                        compile_error = str(e)
-
-                        if backup_path:
-                            shutil.copy2(
-                                backup_path,
-                                path,
-                            )
+                    elif not backup_path and path.exists():
+                        try:
+                            path.unlink()
+                        except Exception:
+                            pass
 
                 results.append(
                     {
                         "file_path": str(path),
-                        "backup": str(backup_path),
-                        "compiled": compile_ok,
+                        "backup": (
+                            str(backup_path)
+                            if backup_path
+                            else None
+                        ),
+                        "written": compile_ok,
+                        "compiled": (
+                            compile_ok
+                            if path.suffix.lower() == ".py"
+                            else None
+                        ),
                         "compile_error": compile_error,
                     }
                 )
@@ -2715,83 +2941,6 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 },
                 error=first_error,
             )
-            
-        if move_type == "apply_function_fix":
-            file_paths = payload.get("file_paths") or []
-
-            if isinstance(file_paths, str):
-                file_paths = [file_paths]
-
-            file_paths = [
-                str(f).strip()
-                for f in file_paths
-                if str(f).strip()
-            ]
-
-            file_path = str(
-                payload.get("file_path") or ""
-            ).strip()
-
-            if not file_paths and file_path:
-                file_paths = [file_path]
-
-            function_name = str(
-                payload.get("function_name") or ""
-            ).strip()
-
-            replacement = str(
-                payload.get("replacement") or ""
-            )
-
-            if not file_paths or not function_name or not replacement.strip():
-                return ExecutionResult(
-                    move_id=move.id,
-                    status="failed",
-                    error="Missing required fields.",
-                )
-
-            results = []
-
-            for file_path in file_paths:
-                results.append(
-                    self._apply_function_fix_single_file(
-                        file_path=file_path,
-                        function_name=function_name,
-                        replacement=replacement,
-                    )
-                )
-
-            success = all(
-                item.get("compiled")
-                for item in results
-            )
-
-            return ExecutionResult(
-                move_id=move.id,
-                status="success" if success else "failed",
-                output={
-                    "files": results,
-                },
-            )
-
-            next_list = payload.get("next") or []
-            next_moves = []
-
-            for item in next_list:
-                if isinstance(item, dict):
-                    next_moves.append(
-                        make_move(
-                            item.get("type", "log"),
-                            item.get("payload", {}),
-                        )
-                    )
-
-            return ExecutionResult(
-                move_id=move.id,
-                status="success",
-                output={"chained": len(next_moves)},
-                next_moves=next_moves,
-            )
 
         return ExecutionResult(
             move_id=move.id,
@@ -2805,7 +2954,5 @@ def default_executor(move: NextMove) -> ExecutionResult:
             status="failed",
             error=str(e),
         )
-
-
 
 

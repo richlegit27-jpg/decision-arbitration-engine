@@ -1,0 +1,30 @@
+﻿{
+  "session_id": "execution-api-integration-test",
+  "action": "run",
+  "execution_state": {
+    "status": "running",
+    "current_index": 0,
+    "complete": false,
+    "waiting": false,
+    "goal": "API execution integration test",
+    "steps": [
+      {
+        "id": "step-1",
+        "title": "Create test file",
+        "action": "create",
+        "target_file": "C:\\Users\\Owner\\nova\\_api_execution_test.py",
+        "content": "def hello():\n    return \"created\"\n",
+        "status": "pending"
+      },
+      {
+        "id": "step-2",
+        "title": "Patch hello function",
+        "action": "patch",
+        "target_file": "C:\\Users\\Owner\\nova\\_api_execution_test.py",
+        "target_function": "hello",
+        "content": "def hello():\n    return \"patched through API\"\n",
+        "status": "pending"
+      }
+    ]
+  }
+}

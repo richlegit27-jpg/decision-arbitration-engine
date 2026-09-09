@@ -28,6 +28,11 @@ class ProjectArtifactPublisherService:
             )
         ).resolve()
 
+        self.sandbox_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
         self.uploads_dir = Path(
             uploads_dir
             or UPLOADS_DIR
@@ -84,11 +89,102 @@ class ProjectArtifactPublisherService:
             elif char.isspace():
                 cleaned.append("_")
 
-        result = "".join(cleaned).strip(
+        result = "".join(
+            cleaned
+        ).strip(
             "_.-"
         )
 
         return result or "artifact"
+
+    def _extract_result_text(
+        self,
+        result,
+    ):
+        if result is None:
+            return ""
+
+        if isinstance(
+            result,
+            str,
+        ):
+            return result.strip()
+
+        if isinstance(
+            result,
+            dict,
+        ):
+            for key in (
+                "result",
+                "output",
+                "content",
+                "message",
+                "text",
+            ):
+                value = result.get(key)
+
+                if isinstance(
+                    value,
+                    str,
+                ) and value.strip():
+                    return value.strip()
+
+            return ""
+
+        return str(
+            result
+        ).strip()
+
+    def _write_result_to_target(
+        self,
+        target_file,
+        result,
+    ):
+        target = self._resolve_sandbox_file(
+            target_file
+        )
+
+        if target is None:
+            return None
+
+        output = self._extract_result_text(
+            result
+        )
+
+        if not output:
+            return None
+
+        target.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        try:
+            target.write_text(
+                output.rstrip() + "\n",
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            print(
+                "[PROJECT ARTIFACT WRITE FAILED]",
+                target_file,
+                str(exc),
+                flush=True,
+            )
+
+            return None
+
+        print(
+            "[PROJECT ARTIFACT RESULT WRITTEN]",
+            {
+                "target_file": target_file,
+                "path": str(target),
+                "size": target.stat().st_size,
+            },
+            flush=True,
+        )
+
+        return target
 
     def _create_text_artifact(
         self,
@@ -96,9 +192,9 @@ class ProjectArtifactPublisherService:
         task,
         result,
     ):
-        output = str(
-            result or ""
-        ).strip()
+        output = self._extract_result_text(
+            result
+        )
 
         if not output:
             return None
@@ -139,6 +235,16 @@ class ProjectArtifactPublisherService:
         )
 
         size = destination.stat().st_size
+
+        if size <= 0:
+            try:
+                destination.unlink(
+                    missing_ok=True
+                )
+            except Exception:
+                pass
+
+            return None
 
         file_record = (
             self.project_workspace_service.add_file(
@@ -190,6 +296,23 @@ class ProjectArtifactPublisherService:
         if not source.is_file():
             return None
 
+        try:
+            source_size = source.stat().st_size
+        except Exception:
+            return None
+
+        if source_size <= 0:
+            print(
+                "[PROJECT ARTIFACT SKIPPING EMPTY FILE]",
+                {
+                    "target_file": target_file,
+                    "path": str(source),
+                },
+                flush=True,
+            )
+
+            return None
+
         original_name = (
             Path(target_file).name
             or source.name
@@ -219,6 +342,16 @@ class ProjectArtifactPublisherService:
         )
 
         size = destination.stat().st_size
+
+        if size <= 0:
+            try:
+                destination.unlink(
+                    missing_ok=True
+                )
+            except Exception:
+                pass
+
+            return None
 
         mime_type = (
             mimetypes.guess_type(
@@ -264,6 +397,16 @@ class ProjectArtifactPublisherService:
         file_record["generated"] = False
         file_record["source"] = "execution_file"
 
+        print(
+            "[PROJECT ARTIFACT PUBLISHED]",
+            {
+                "project_id": project_id,
+                "filename": original_name,
+                "size": size,
+            },
+            flush=True,
+        )
+
         return file_record
 
     def publish_task_artifact(
@@ -286,19 +429,75 @@ class ProjectArtifactPublisherService:
             or ""
         ).strip()
 
-        if target_file:
-            file_artifact = (
-                self._publish_existing_file(
-                    project_id,
+        if not target_file:
+            print(
+                "[PROJECT ARTIFACT SKIPPED - NO TARGET FILE]",
+                {
+                    "project_id": project_id,
+                    "task_title": task.get("title"),
+                    "task_id": task.get("id"),
+                },
+                flush=True,
+            )
+
+            return None
+
+        source = self._resolve_sandbox_file(
+            target_file
+        )
+
+        source_has_content = False
+
+        if (
+            source is not None
+            and source.is_file()
+        ):
+            try:
+                source_has_content = (
+                    source.stat().st_size > 0
+                )
+            except Exception:
+                source_has_content = False
+
+        if not source_has_content:
+            written_target = (
+                self._write_result_to_target(
                     target_file,
+                    result,
                 )
             )
 
-            if file_artifact:
-                return file_artifact
+            if written_target is None:
+                print(
+                    "[PROJECT ARTIFACT WRITE FAILED]",
+                    {
+                        "project_id": project_id,
+                        "target_file": target_file,
+                        "task_title": task.get("title"),
+                    },
+                    flush=True,
+                )
 
-        return self._create_text_artifact(
-            project_id,
-            task,
-            result,
+                return None
+
+        file_artifact = (
+            self._publish_existing_file(
+                project_id,
+                target_file,
+            )
         )
+
+        if file_artifact:
+            return file_artifact
+
+        print(
+            "[PROJECT ARTIFACT PUBLISH FAILED]",
+            {
+                "project_id": project_id,
+                "target_file": target_file,
+                "task_title": task.get("title"),
+            },
+            flush=True,
+        )
+
+        return None

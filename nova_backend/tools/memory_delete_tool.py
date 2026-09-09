@@ -28,22 +28,20 @@ class MemoryDeleteTool(NovaTool):
         memory_id="",
         **kwargs,
     ):
-        from pathlib import Path
+        from app import memory_service
 
-        from nova_backend.services.memory_service import (
-            MemoryService,
-        )
+        target = str(memory_id or "").strip()
 
-        service = MemoryService(
-            memory_file=str(
-                Path("runtime")
-                / "user_memory.json"
-            )
-        )
+        if not target:
+            return {
+                "ok": False,
+                "memory_id": "",
+                "error": "Missing memory ID.",
+            }
+
+        deleted = memory_service.delete_memory(target)
 
         return {
-            "ok": service.delete_memory(
-                memory_id
-            ),
-            "memory_id": memory_id,
+            "ok": bool(deleted),
+            "memory_id": target,
         }

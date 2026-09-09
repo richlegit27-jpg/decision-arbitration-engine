@@ -1,0 +1,164 @@
+(() => {
+    "use strict";
+
+    function getComposerState() {
+        if (window.NovaChatState?.state) {
+            window.Nova = window.Nova || {};
+            window.Nova.state = window.NovaChatState.state;
+            return window.NovaChatState.state;
+        }
+
+        window.Nova = window.Nova || {};
+
+        if (!window.Nova.state) {
+            window.Nova.state = {
+                activeSessionId: null,
+                sessions: [],
+                messages: [],
+                models: [],
+                selectedModel: null,
+                isSending: false,
+                pendingAttachments: [],
+                booted: false
+            };
+        }
+
+        return window.Nova.state;
+    }
+
+    function createLiveComposerActions() {
+        if (
+            !window.NovaComposerActions ||
+            typeof window.NovaComposerActions.createComposerActions !== "function"
+        ) {
+            console.error(
+                "[NovaComposer Bridge] createComposerActions factory unavailable"
+            );
+            return false;
+        }
+
+        const streamService = window.NovaStreamService;
+
+        if (
+            !streamService ||
+            typeof streamService.send !== "function"
+        ) {
+            return false;
+        }
+
+        const composerActionsFactory =
+            window.NovaComposerActions.createComposerActions;
+
+        const composerActionsInstance =
+            composerActionsFactory({
+                state: getComposerState(),
+                chatMessages: window.NovaChatMessages || null,
+                chatStorage: window.NovaChatStorage || null,
+                streamService: streamService,
+                attachmentsController:
+                    window.NovaAttachmentsService || null
+            });
+
+        window.NovaComposerActions = composerActionsInstance;
+
+        console.log(
+            "[NovaComposerActions] live instance initialized",
+            {
+                hasSendCurrentMessage:
+                    typeof window.NovaComposerActions.sendCurrentMessage === "function",
+
+                hasStreamService:
+                    !!window.NovaStreamService,
+
+                hasStreamSend:
+                    typeof window.NovaStreamService?.send === "function"
+            }
+        );
+
+        return true;
+    }
+
+    function waitForComposerDependencies() {
+        if (createLiveComposerActions()) {
+            return;
+        }
+
+        console.log(
+            "[NovaComposer Bridge] waiting for NovaStreamService..."
+        );
+
+        const started = Date.now();
+
+        const timer = setInterval(() => {
+            if (createLiveComposerActions()) {
+                clearInterval(timer);
+
+                console.log(
+                    "[NovaComposer Bridge] dependencies ready"
+                );
+
+                return;
+            }
+
+            if (Date.now() - started > 10000) {
+                clearInterval(timer);
+
+                console.error(
+                    "[NovaComposer Bridge] timed out waiting for NovaStreamService"
+                );
+            }
+        }, 50);
+    }
+
+    waitForComposerDependencies();
+
+    window.NovaComposer = {
+        init(config = {}) {
+            console.log("[NovaComposer Bridge] init");
+
+            if (window.NovaComposerService?.init) {
+                return window.NovaComposerService.init(config);
+            }
+        },
+
+        sendMessage(...args) {
+            if (
+                window.NovaComposerActions?.sendCurrentMessage
+            ) {
+                return window.NovaComposerActions.sendCurrentMessage(...args);
+            }
+
+            console.error(
+                "[NovaComposer Bridge] sendCurrentMessage unavailable"
+            );
+
+            return null;
+        },
+
+        stopGenerating(...args) {
+            if (
+                window.NovaComposerActions?.stopGenerating
+            ) {
+                return window.NovaComposerActions.stopGenerating(...args);
+            }
+        },
+
+        updateComposerState(...args) {
+            if (
+                window.NovaComposerInput?.updateComposerState
+            ) {
+                return window.NovaComposerInput.updateComposerState(...args);
+            }
+        },
+
+        setPendingFiles(...args) {
+            if (
+                window.NovaComposerAttachments?.setPendingFiles
+            ) {
+                return window.NovaComposerAttachments.setPendingFiles(...args);
+            }
+        }
+    };
+
+    console.log("[NovaComposer Bridge] ready");
+})();

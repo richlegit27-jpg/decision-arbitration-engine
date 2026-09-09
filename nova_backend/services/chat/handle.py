@@ -1,4 +1,4 @@
-import traceback
+﻿import traceback
 import time
 
 
@@ -27,29 +27,7 @@ def chat_handle(
         flush=True,
     )
 
-    print(
-        "DEBUG ORCHESTRATOR PLAN:",
-        brain_state.get("plan")
-        if isinstance(brain_state, dict)
-        else None,
-        flush=True,
-    )
-
-    print(
-        "DEBUG ORCHESTRATOR EXECUTION:",
-        brain_state.get("execution")
-        if isinstance(brain_state, dict)
-        else None,
-        flush=True,
-    )
-
     attachments = attachments or []
-
-    print(
-        "[CHAT_HANDLE AFTER ATTACHMENTS]",
-        round(time.perf_counter() - _t0, 3),
-        flush=True,
-    )
 
     try:
         user_text = service.safe_str(
@@ -59,53 +37,50 @@ def chat_handle(
         if not session_id:
             session_id = service._create_session()
 
-        if not isinstance(decision, dict):
+        if not isinstance(decision, dict) or not decision:
             decision = {
                 "route": "general_chat",
                 "intent": "chat",
+                "mode": "chat",
             }
 
-        try:
-            print(
-                "[CHAT_HANDLE BEFORE ROUTER]",
-                round(time.perf_counter() - _t0, 3),
-                flush=True,
-            )
-
-            if hasattr(service, "_decide_route"):
-                routed = service._decide_route(
-                    user_text=user_text,
-                    attachments=attachments,
-                    session_id=session_id,
-                )
-            else:
-                routed = service.chat_router.decide(
-                    user_text=user_text,
-                    attachments=attachments,
-                    session_id=session_id,
+            try:
+                print(
+                    "[CHAT_HANDLE ROUTER FALLBACK]",
+                    flush=True,
                 )
 
-            print(
-                "DEBUG PRIMARY ROUTE DECISION =",
-                routed,
-                flush=True,
-            )
+                if hasattr(
+                    service,
+                    "_decide_route",
+                ):
+                    routed = service._decide_route(
+                        user_text=user_text,
+                        attachments=attachments,
+                        session_id=session_id,
+                    )
+                else:
+                    routed = service.chat_router.decide(
+                        user_text=user_text,
+                        attachments=attachments,
+                        session_id=session_id,
+                    )
 
-            if isinstance(routed, dict):
-                decision.update(routed)
+                if isinstance(routed, dict):
+                    decision.update(routed)
 
-            print(
-                "[CHAT_HANDLE AFTER ROUTER]",
-                round(time.perf_counter() - _t0, 3),
-                flush=True,
-            )
+            except Exception as exc:
+                print(
+                    "[CHAT ROUTER FALLBACK FAILED]",
+                    repr(exc),
+                    flush=True,
+                )
 
-        except Exception as exc:
-            print(
-                "[CHAT ROUTER FAILED]",
-                repr(exc),
-                flush=True,
-            )
+        print(
+            "DEBUG PRIMARY ROUTE DECISION =",
+            decision,
+            flush=True,
+        )
 
         route = str(
             decision.get("route") or ""
@@ -129,7 +104,264 @@ def chat_handle(
             flush=True,
         )
 
+        # ==========================================
+        # EXECUTION ROUTE
+        # ==========================================
+
+        if route == "execution":
+
+            print(
+                "[CHAT_HANDLE EXECUTION ROUTE]",
+                {
+                    "session_id": session_id,
+                    "intent": intent,
+                    "mode": mode,
+                    "user_text": user_text,
+                },
+                flush=True,
+            )
+
+            orchestrator = getattr(
+                service,
+                "execution_orchestrator_service",
+                None,
+            )
+
+            print(
+                "[CHAT_HANDLE ORCHESTRATOR]",
+                repr(orchestrator),
+                flush=True,
+            )
+
+            if orchestrator is None:
+                raise RuntimeError(
+                    "ExecutionOrchestratorService "
+                    "is not configured."
+                )
+
+            execution_state = {}
+
+            if hasattr(
+                service,
+                "_get_execution_state",
+            ):
+                try:
+                    loaded_state = (
+                        service._get_execution_state(
+                            session_id
+                        )
+                    )
+
+                    if isinstance(
+                        loaded_state,
+                        dict,
+                    ):
+                        execution_state = loaded_state
+
+                except Exception as exc:
+                    print(
+                        "[EXECUTION STATE LOAD FAILED]",
+                        repr(exc),
+                        flush=True,
+                    )
+
+            print(
+                "[CHAT_HANDLE EXECUTION STATE]",
+                execution_state,
+                flush=True,
+            )
+
+            # ======================================
+            # EXECUTION BOOTSTRAP
+            #
+            # A new execution request has no steps
+            # yet. The orchestrator only executes
+            # existing steps, so create the plan
+            # before sending it to the orchestrator.
+            # ======================================
+
+            has_steps = bool(
+                isinstance(
+                    execution_state,
+                    dict,
+                )
+                and execution_state.get("steps")
+            )
+
+            if not has_steps:
+
+                print(
+                    "[CHAT_HANDLE EXECUTION BOOTSTRAP]",
+                    {
+                        "session_id": session_id,
+                        "user_text": user_text,
+                    },
+                    flush=True,
+                )
+
+                try:
+
+                    execution_state = (
+                        service._process_goal_and_plan(
+                            user_text,
+                            session_id,
+                        )
+                    )
+
+                except Exception as exc:
+
+                    print(
+                        "[CHAT_HANDLE PLAN BOOTSTRAP FAILED]",
+                        repr(exc),
+                        flush=True,
+                    )
+
+                    traceback.print_exc()
+
+                    execution_state = {}
+
+                print(
+                    "[CHAT_HANDLE BOOTSTRAPPED STATE]",
+                    execution_state,
+                    flush=True,
+                )
+
+                if isinstance(
+                    execution_state,
+                    dict,
+                ) and execution_state:
+
+                    try:
+
+                        service._save_execution_state(
+                            session_id,
+                            execution_state,
+                        )
+
+                    except Exception as exc:
+
+                        print(
+                            "[CHAT_HANDLE PLAN SAVE FAILED]",
+                            repr(exc),
+                            flush=True,
+                        )
+
+                    try:
+
+                        service._set_session_meta(
+                            session_id,
+                            "active_execution",
+                            execution_state,
+                        )
+
+                    except Exception as exc:
+
+                        print(
+                            "[CHAT_HANDLE ACTIVE EXECUTION SAVE FAILED]",
+                            repr(exc),
+                            flush=True,
+                        )
+
+            # ======================================
+            # VALIDATE PLAN
+            # ======================================
+
+            if not isinstance(
+                execution_state,
+                dict,
+            ):
+
+                raise RuntimeError(
+                    "Execution planner did not return "
+                    "a valid execution state."
+                )
+
+            steps = execution_state.get(
+                "steps"
+            ) or []
+
+            if not isinstance(
+                steps,
+                list,
+            ):
+
+                raise RuntimeError(
+                    "Execution planner returned "
+                    "an invalid steps collection."
+                )
+
+            if not steps:
+
+                raise RuntimeError(
+                    "Execution request could not be "
+                    "converted into an execution plan."
+                )
+
+            print(
+                "[CHAT_HANDLE EXECUTION READY]",
+                {
+                    "session_id": session_id,
+                    "goal": execution_state.get(
+                        "goal"
+                    ),
+                    "step_count": len(steps),
+                    "current_index": execution_state.get(
+                        "current_index"
+                    ),
+                },
+                flush=True,
+            )
+
+            # ======================================
+            # EXECUTION RUN
+            # ======================================
+
+            execution_result = (
+                orchestrator.process_execution(
+                    session_id=session_id,
+                    state=execution_state,
+                    command="run_step",
+                )
+            )
+
+            print(
+                "[CHAT_HANDLE EXECUTION RESULT]",
+                repr(execution_result),
+                flush=True,
+            )
+
+            if execution_result is None:
+
+                raise RuntimeError(
+                    "Execution orchestrator returned "
+                    "None after receiving a valid plan."
+                )
+
+            if isinstance(
+                execution_result,
+                dict,
+            ):
+
+                return execution_result
+
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": str(
+                        execution_result
+                    ),
+                },
+                "session_id": session_id,
+                "execution": execution_result,
+            }
+
+        # ==========================================
+        # WEB FETCH ROUTE
+        # ==========================================
+
         if route == "web_fetch":
+
             return service._execute_web_fetch(
                 user_text=user_text,
                 session_id=session_id,
@@ -137,20 +369,28 @@ def chat_handle(
                 decision=decision,
             )
 
+        # ==========================================
+        # PLANNER ROUTE
+        # ==========================================
+
         if (
             route == "planner"
             or intent == "planning"
             or mode == "planning"
-        ) and (
-            len(user_text.split()) > 3
-        ):
+        ) and len(user_text.split()) > 3:
+
             try:
-                execution_state = service._process_goal_and_plan(
-                    user_text,
-                    session_id,
+
+                execution_state = (
+                    service._process_goal_and_plan(
+                        user_text,
+                        session_id,
+                    )
                 )
 
-                decision["execution_state"] = execution_state
+                decision[
+                    "execution_state"
+                ] = execution_state
 
                 service._save_execution_state(
                     session_id,
@@ -164,29 +404,32 @@ def chat_handle(
                 )
 
             except Exception as exc:
-                print(
-                    "[PLANNER EXECUTION FAILED]",
-                    repr(exc),
-                )
 
-                service._set_session_meta(
-                    session_id,
-                    "active_execution",
-                    execution_state,
-                )
-
-            except Exception as exc:
                 print(
                     "[PLANNER EXECUTION FAILED]",
                     repr(exc),
                     flush=True,
                 )
 
-        if route == "planner" and isinstance(brain_state, dict):
-            if brain_state.get("plan"):
-                decision["brain_plan"] = brain_state["plan"]
+        if (
+            route == "planner"
+            and isinstance(
+                brain_state,
+                dict,
+            )
+            and brain_state.get("plan")
+        ):
+
+            decision[
+                "brain_plan"
+            ] = brain_state["plan"]
+
+        # ==========================================
+        # MEMORY RECALL
+        # ==========================================
 
         if route == "memory_recall":
+
             return service._execute_memory_recall(
                 decision=decision,
                 user_text=user_text,
@@ -194,33 +437,41 @@ def chat_handle(
                 attachments=attachments,
             )
 
+        # ==========================================
+        # NORMAL MODEL CHAT
+        # ==========================================
+
         print(
             "[CHAT_HANDLE BEFORE MODEL]",
-            round(time.perf_counter() - _t0, 3),
+            round(
+                time.perf_counter() - _t0,
+                3,
+            ),
             flush=True,
         )
 
-        response_text = service._run_chat_model(
-            user_text=user_text,
-            decision=decision,
-            session_id=session_id,
+        response_text = (
+            service._run_chat_model(
+                user_text=user_text,
+                decision=decision,
+                session_id=session_id,
+            )
         )
 
         print(
             "[CHAT_HANDLE AFTER MODEL]",
-            round(time.perf_counter() - _t0, 3),
-            flush=True,
-        )
-
-        print(
-            "DEBUG BEFORE FINALIZE DECISION =",
-            decision,
+            round(
+                time.perf_counter() - _t0,
+                3,
+            ),
             flush=True,
         )
 
         result = service._finalize_response(
             execution_state=(
-                decision.get("execution_state")
+                decision.get(
+                    "execution_state"
+                )
                 or {}
             ),
             session_id=session_id,
@@ -229,12 +480,17 @@ def chat_handle(
                 user_text,
                 attachments=attachments,
             ),
-            assistant_msg=service._build_assistant_message(
-                text=response_text,
-                meta={
-                    "route": "general_chat",
-                },
-                attachments=[],
+            assistant_msg=(
+                service._build_assistant_message(
+                    text=response_text,
+                    meta={
+                        "route": (
+                            route
+                            or "general_chat"
+                        ),
+                    },
+                    attachments=[],
+                )
             ),
             decision=decision,
             regenerate=regenerate,
@@ -243,13 +499,23 @@ def chat_handle(
 
         print(
             "[CHAT_HANDLE COMPLETE]",
-            round(time.perf_counter() - _t0, 3),
+            round(
+                time.perf_counter() - _t0,
+                3,
+            ),
             flush=True,
         )
 
         return result
 
     except Exception as exc:
+
+        print(
+            "[CHAT_HANDLE FAILED]",
+            repr(exc),
+            flush=True,
+        )
+
         traceback.print_exc()
 
         return {

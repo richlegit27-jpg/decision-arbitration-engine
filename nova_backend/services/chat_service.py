@@ -1,5 +1,9 @@
 ﻿from __future__ import annotations
 
+from nova_backend.services.tool_runtime_factory import (
+    build_tool_runtime,
+)
+
 import base64
 import os
 import re
@@ -8,7 +12,6 @@ import logging
 import shutil
 import tempfile
 import py_compile
-
 
 from nova_backend.services.execution_bridge_service import ExecutionBridgeService
 from nova_backend.services.chat.handlers.execution_handler import ExecutionHandler
@@ -22,6 +25,7 @@ from nova_backend.services.planner_service import PlannerService
 from nova_backend.services.project_builder_service import ProjectBuilderService
 from nova_backend.services.project_workspace_service import ProjectWorkspaceService
 from nova_backend.services.execution.service import ExecutionService
+from nova_backend.services.execution_mutation_service import ExecutionMutationService
 from nova_backend.services.intelligence.router import IntelligenceRouter
 from nova_backend.services.auto_fix.service import AutoFixService
 from nova_backend.services.error_reporting_service import ErrorReportingService
@@ -38,17 +42,12 @@ from nova_backend.services.execution_handler import (
     NextMove,
     default_executor,
 )
-from nova_backend.tools.tool_runtime_service import (
-    tool_runtime_service,
+from nova_backend.tools.executor import (
+    execute_tool,
 )
+
 from nova_backend.tools.pending_tool_approval_service import (
     pending_tool_approval_service,
-)
-from nova_backend.services.chat_execution_service import (
-    chat_execution_service,
-)
-from nova_backend.services.execution_mutation_service import (
-    ExecutionMutationService,
 )
 from nova_backend.services.chat.execution_patches import (
     install_execution_planner_runtime_patches,
@@ -62,12 +61,21 @@ from nova_backend.services.repair_execution_service import RepairExecutionServic
 from nova_backend.services.execution_orchestrator_service import ExecutionOrchestratorService
 from nova_backend.services.execution_step_service import ExecutionStepService
 from nova_backend.services.execution_approval_service import ExecutionApprovalService
+
+from nova_backend.core.execution_engine import (
+    ExecutionEngine,
+)
+
+from nova_backend.core.execution_bridge import (
+    ExecutionBridge,
+)
 from nova_backend.models.session import new_message
 from nova_backend.services.agent_service import AgentService
 from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.autonomy_service import AutonomyService
 from nova_backend.services.memory_ranker_service import MemoryRankerService
 from nova_backend.services.memory_service import MemoryService
+from nova_backend.services.memory_recall_service import MemoryRecallService
 from nova_backend.services.error_reporting_service import (
     ErrorReportingService,
 )
@@ -94,6 +102,8 @@ from nova_backend.services.recon_service import ReconService
 from nova_backend.services.session_service import SessionService
 from nova_backend.services.web_service import WebService
 from nova_backend.services.tool_service import ToolService
+from nova_backend.services.tool_executor import ToolExecutor
+from nova_backend.tools.loader import load_tools
 from nova_backend.services.intent_service import IntentService
 from nova_backend.services.execution_loop_service import ExecutionLoopService
 from nova_backend.services.brain.brain_core import BrainCore
@@ -202,6 +212,12 @@ def exec_debug(*args):
 
 class ChatService:
 
+    INTERNAL_CHAT_ACTIONS = {
+        "bug_intake",
+        "auto_fix_file",
+        "apply_pending_fix",
+    }
+
     def _observe_response_behavior(
         self,
         *args,
@@ -244,16 +260,12 @@ class ChatService:
         working_state_service=None,
         execution_state_service=None,
         runtime_uploads_normalizer_service=None,
+        chat_execution_service=None,
+        tool_executor=None,
     ):
 
         self.chat_execution_service = chat_execution_service
 
-        self.orchestrator = (
-            NovaOrchestrator(
-                execution_state_service=execution_state_service,
-                memory_service=memory_service,
-            )
-        )
         self.chat_response_cleanup_service = ChatResponseCleanupService()
         self.chat_response_policy_service = ChatResponsePolicyService()
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
@@ -268,6 +280,15 @@ class ChatService:
 
         self.execution_handler = ExecutionHandler(self)
 
+        # Wire the active ChatExecutionService to this ChatService's
+        # ExecutionHandler. The module-level ChatExecutionService singleton
+        # is created before ChatService exists, so it cannot receive the
+        # handler during its own construction.
+        if self.chat_execution_service is not None:
+            self.chat_execution_service.execution_handler = (
+                self.execution_handler
+            )
+
         if self.chat_execution_service:
             self.chat_execution_service.set_session_service(
                 session_service
@@ -277,13 +298,48 @@ class ChatService:
         self.planner_service = PlannerService(self)
         self.project_workspace_service = ProjectWorkspaceService()
         self.project_builder_service = ProjectBuilderService(
-        self.project_workspace_service
-            )
+            self.project_workspace_service
+        )
         self.intelligence_router = IntelligenceRouter(self)
+        # =========================
+        # UNIFIED TOOL RUNTIME
+        # =========================
+
+        self.tool_runtime = build_tool_runtime(
+            session_service=session_service,
+            chat_service=self,
+            attachment_service=artifact_service,
+        )
+
+        self.action_router = self.tool_runtime.get(
+            "action_router"
+        )
+
+        self.tool_executor = self.tool_runtime.get(
+            "tool_executor"
+        )
+
+        self.tool_registry = self.tool_runtime.get(
+            "tool_registry"
+        )
+
+        self.tool_bridge = self.tool_runtime.get(
+            "tool_bridge"
+        )
+
+        self.nova_tool_registry = self.tool_runtime.get(
+            "nova_tool_registry"
+        )
+
+        # =========================
+        # NOVA ORCHESTRATOR
+        # =========================
+
         self.orchestrator = (
             NovaOrchestrator(
                 execution_state_service=execution_state_service,
                 memory_service=memory_service,
+                tool_executor=self.tool_executor,
             )
         )
         self.decision_service = DecisionService(
@@ -292,12 +348,14 @@ class ChatService:
         self.auto_fix_service = AutoFixService(self)
         self.session_service = session_service
         self.memory_service = memory_service
+        self.memory_recall_service = MemoryRecallService(
+            memory_service
+        )
         self.runtime_uploads_normalizer_service = runtime_uploads_normalizer_service
         self.artifact_service = artifact_service
         self.web_service = web_service
         self.recon_service = recon_service
         self.memory_context_service = memory_context_service
-
         if working_state_service is None:
             from nova_backend.services.working_state_service import (
                 WorkingStateService,
@@ -393,11 +451,19 @@ class ChatService:
         # FORCE_CHAT_SERVICE_OPENAI_KEY_LOCK
         # Load the exact Nova .env key before creating the OpenAI client.
 
-
+        # ======= APPROVED DEBUG COMMENT INSERTED BELOW =======
+        # Debug: Initialized ChatService with tool and execution runtimes
+        #
 
         self.agent = AgentService()
         self.memory_ranker = MemoryRankerService()
         self.tools = ToolService(base_dir=os.getcwd())
+
+        # =====================================================
+        # UNIFIED NOVA TOOL RUNTIME
+        # Runtime was initialized earlier in __init__.
+        # All execution services use self.tool_executor.
+        # =====================================================
 
         # =========================
         # RESPONSE / INTENT SERVICES
@@ -431,19 +497,49 @@ class ChatService:
             ExecutionApprovalService()
         )
 
-        self.execution_step_service = ExecutionStepService(
-            safe_str=self._safe_str,
-            python_runner=self.python_runner,
-            approval_service=self.execution_approval_service,
-
+        self.execution_step_service = (
+            ExecutionStepService(
+                safe_str=self._safe_str,
+                python_runner=self.python_runner,
+                approval_service=(
+                    self.execution_approval_service
+                ),
+                tool_executor=self.tool_executor,
+            )
         )
 
-        self.execution_orchestrator_service = ExecutionOrchestratorService(
-            execution_state_service=self.execution_state_service,
-            working_state_service=self.working_state_service,
-            execution_mutation_service=self.execution_mutation_service,
-            safe_str=self._safe_str,
-            execution_step_service=self.execution_step_service,
+        self.execution_engine = (
+            ExecutionEngine(
+                step_service=self.execution_step_service,
+            )
+        )
+
+        self.execution_bridge = (
+            ExecutionBridge(
+                execution_engine=self.execution_engine,
+                execution_state_service=(
+                    self.execution_state_service
+                ),
+            )
+        )
+
+        self.execution_orchestrator_service = (
+            ExecutionOrchestratorService(
+                execution_state_service=(
+                    self.execution_state_service
+                ),
+                working_state_service=(
+                    self.working_state_service
+                ),
+                execution_mutation_service=(
+                    self.execution_mutation_service
+                ),
+                safe_str=self._safe_str,
+                execution_step_service=(
+                    self.execution_step_service
+                ),
+                execution_bridge=self.execution_bridge,
+            )
         )
 
         self.runtime = RuntimeBootstrap.build(chat_service=self)
@@ -454,6 +550,7 @@ class ChatService:
         )
 
         self.execution_service = ExecutionService(self)
+
         self.execution_bridge_service = ExecutionBridgeService(
             chat_execution_service=self.chat_execution_service,
             logger=logger,
@@ -552,6 +649,80 @@ class ChatService:
             )
             return guard_result
 
+        # ==================================================
+        # MEMORY FACT CAPTURE
+        # Extract durable user facts/preferences before the
+        # normal routing pipeline continues.
+        # ==================================================
+
+        try:
+            memory_recall = getattr(
+                self,
+                "memory_recall_service",
+                None,
+            )
+
+            if memory_recall is not None:
+                memory_fact = (
+                    memory_recall.extract_memory_fact(
+                        user_text
+                    )
+                )
+
+                if isinstance(memory_fact, dict):
+                    fact_text = str(
+                        memory_fact.get("text") or ""
+                    ).strip()
+
+                    if (
+                        fact_text
+                        and not memory_recall.memory_exists_for_session(
+                            session_id,
+                            fact_text,
+                        )
+                    ):
+                        item = self.memory_service.add_memory(
+                            {
+                                "text": fact_text,
+                                "kind": memory_fact.get(
+                                    "kind",
+                                    "note",
+                                ),
+                                "tags": memory_fact.get(
+                                    "tags",
+                                    [],
+                                ),
+                                "weight": memory_fact.get(
+                                    "weight",
+                                    1.0,
+                                ),
+                                "source": "router_auto",
+                                "session_id": session_id,
+                            }
+                        )
+
+                        print(
+                            "[MEMORY AUTO CAPTURE]",
+                            {
+                                "session_id": session_id,
+                                "memory": item,
+                            },
+                            flush=True,
+                        )
+
+                        if memory_fact.get("kind") == "profile":
+                            memory_recall.cleanup_competing_name_memories(
+                                session_id,
+                                fact_text,
+                            )
+
+        except Exception as e:
+            print(
+                "[MEMORY AUTO CAPTURE ERROR]",
+                repr(e),
+                flush=True,
+            )
+
         target_capture_result = (
             self.execution_bridge_service
             .try_execution_target_capture(
@@ -600,61 +771,41 @@ class ChatService:
         attachments = attachments or []
 
         # ==================================================
-        # NOVA TOOL RUNTIME
+        # PRIMARY ROUTE DECISION
+        # Classify before any project/mission orchestration.
         # ==================================================
 
-        tool_runtime_result = tool_runtime_service.handle_request(
+        primary_decision = self._decide_route(
             user_text=user_text,
-            approved=False,
+            attachments=attachments,
+            session_id=session_id,
         )
 
-        if tool_runtime_result.get("handled"):
+        if not isinstance(primary_decision, dict):
+            primary_decision = {
+                "route": "general_chat",
+                "mode": "chat",
+                "intent": "conversation",
+            }
 
-            print(
-                "[CHAT TOOL RUNTIME]",
-                tool_runtime_result,
-                flush=True,
-            )
+        primary_route = str(
+            primary_decision.get("route") or "general_chat"
+        ).lower()
 
-            status = tool_runtime_result.get("status")
+        print(
+            "[CHAT PRIMARY ROUTE]",
+            {
+                "route": primary_route,
+                "decision": primary_decision,
+            },
+            flush=True,
+        )
 
-            if status == "approval_required":
-
-                pending_result = (
-                    pending_tool_approval_service.set_pending(
-                        session_id=session_id,
-                        tool_runtime=tool_runtime_result,
-                    )
-                )
-
-                return {
-                    "status": "tool_approval_required",
-                    "tool_runtime": tool_runtime_result,
-                    "pending_tool": pending_result.get(
-                        "pending"
-                    ),
-                    "message": tool_runtime_result.get(
-                        "message",
-                        "Tool approval required.",
-                    ),
-                }
-
-            if status == "executed":
-
-                formatted = tool_runtime_result.get(
-                    "formatted",
-                    "",
-                )
-
-                return {
-                    "status": "tool_executed",
-                    "tool_runtime": tool_runtime_result,
-                    "response": formatted,
-                    "message": formatted,
-                }
+        # --------------------------------------------------
+        # Explicit live market requests
+        # --------------------------------------------------
 
         if self._looks_like_live_market_request(user_text):
-
             brain_state = {
                 "decision": {
                     "route": "web_fetch",
@@ -663,30 +814,68 @@ class ChatService:
                 }
             }
 
-        else:
+            primary_decision = brain_state["decision"]
+            primary_route = "web_fetch"
 
-            current_execution = self.chat_execution_service.get_state(
-                session_id
+        # --------------------------------------------------
+        # Explicit execution routes
+        # --------------------------------------------------
+
+        elif (
+            primary_route == "execution"
+            or self._maybe_lock_execution_flow(
+                user_text=user_text,
+                session_id=session_id,
             )
+        ):
+
+            print(
+                "[CHAT EXECUTION GATE]",
+                {
+                    "primary_route": primary_route,
+                    "command_trigger": self._maybe_lock_execution_flow(
+                        user_text=user_text,
+                        session_id=session_id,
+                    ),
+                    "user_text": user_text,
+                },
+                flush=True,
+            )
+
+            current_execution = (
+                self.chat_execution_service.get_state(
+                    session_id
+                )
+            )
+
             if (
-                self.chat_execution_service.is_execution_trigger(user_text)
+                self.chat_execution_service.is_execution_trigger(
+                    user_text
+                )
                 and current_execution.get("complete") is True
             ):
                 print(
                     "[CHAT HANDLE END - COMPLETE EXECUTION]",
-                    round(time.perf_counter() - _chat_handle_t0, 3),
+                    round(
+                        time.perf_counter()
+                        - _chat_handle_t0,
+                        3,
+                    ),
                     "seconds",
                     flush=True,
                 )
+
                 return {
                     "status": "complete",
                     "execution_state": current_execution,
                 }
 
-            execution_result = self._handle_execution_control(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
+            execution_result = (
+                self._handle_execution_control(
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
             )
 
             if execution_result is not None:
@@ -694,20 +883,38 @@ class ChatService:
                 if (
                     isinstance(execution_result, dict)
                     and "execution" in execution_result
-                    and "execution_state" not in execution_result
+                    and "execution_state"
+                    not in execution_result
                 ):
-                    execution_result["execution_state"] = (
-                        execution_result["execution"]
-                    )
+                    execution_result[
+                        "execution_state"
+                    ] = execution_result["execution"]
 
                 print(
                     "[CHAT HANDLE END - EXECUTION CONTROL]",
-                    round(time.perf_counter() - _chat_handle_t0, 3),
+                    round(
+                        time.perf_counter()
+                        - _chat_handle_t0,
+                        3,
+                    ),
                     "seconds",
                     flush=True,
                 )
 
                 return execution_result
+
+            brain_state = {
+                "decision": primary_decision,
+            }
+
+        # --------------------------------------------------
+        # Project/planner routes only
+        # --------------------------------------------------
+
+        elif primary_route in {
+            "project_brain",
+            "planner",
+        }:
 
             session_payload = self._get_session_payload(
                 session_id
@@ -715,8 +922,14 @@ class ChatService:
 
             print(
                 "[BEFORE ORCHESTRATOR]",
-                round(time.perf_counter() - _chat_handle_t0, 3),
-                "seconds",
+                {
+                    "route": primary_route,
+                    "seconds": round(
+                        time.perf_counter()
+                        - _chat_handle_t0,
+                        3,
+                    ),
+                },
                 flush=True,
             )
 
@@ -726,10 +939,43 @@ class ChatService:
                 session_id=session_id,
             )
 
+            if not isinstance(brain_state, dict):
+                brain_state = {}
+
+            brain_state["decision"] = primary_decision
+
             print(
                 "[AFTER ORCHESTRATOR]",
-                round(time.perf_counter() - _chat_handle_t0, 3),
+                round(
+                    time.perf_counter()
+                    - _chat_handle_t0,
+                    3,
+                ),
                 "seconds",
+                flush=True,
+            )
+
+        # --------------------------------------------------
+        # Normal chat
+        # Never enter project planning or execution.
+        # --------------------------------------------------
+
+        else:
+
+            brain_state = {
+                "decision": primary_decision,
+            }
+
+            print(
+                "[CHAT NORMAL LANE - ORCHESTRATOR SKIPPED]",
+                {
+                    "route": primary_route,
+                    "seconds": round(
+                        time.perf_counter()
+                        - _chat_handle_t0,
+                        3,
+                    ),
+                },
                 flush=True,
             )
 
@@ -739,11 +985,7 @@ class ChatService:
             session_id,
             attachments,
             brain_state=brain_state,
-            decision=(
-                brain_state.get("decision")
-                if isinstance(brain_state, dict)
-                else None
-            ),
+            decision=primary_decision,
             regenerate=regenerate,
         )
 
@@ -1321,14 +1563,77 @@ class ChatService:
 
         return text in blocked
 
-    def _build_goal(self, *args, **kwargs):
-        return self.execution_service._build_goal(*args, **kwargs)
+    def _build_goal(
+        self,
+        user_text: str,
+        session_id: str = "",
+    ) -> str:
+        return self.safe_str(
+            user_text
+        ).strip()
 
-    def _build_plan(self, *args, **kwargs):
-        return self.execution_service._build_plan(*args, **kwargs)
 
-    def _build_execution(self, *args, **kwargs):
-        return self.execution_service._build_execution(*args, **kwargs)
+    def _build_plan(
+        self,
+        goal: str,
+    ) -> list:
+        return [
+            "Inspect the current state and constraints",
+            "Choose the safest implementation path",
+            "Apply the required change",
+            "Verify the result",
+            "Summarize outcome and next move",
+        ]
+
+
+    def _build_execution(
+        self,
+        user_text: str,
+        plan,
+        decision=None,
+    ) -> dict:
+
+        execution = (
+            self.execution_service.build_planning_execution(
+                user_text=self.safe_str(
+                    user_text
+                ).strip(),
+                title="Nova Execution Plan",
+                max_steps=5,
+            )
+        )
+
+        if isinstance(plan, list) and plan:
+
+            execution["steps"] = [
+                {
+                    "id": f"step_{index + 1}",
+                    "text": self.safe_str(step),
+                    "status": "pending",
+                }
+                for index, step in enumerate(plan)
+                if self.safe_str(step)
+            ]
+
+        execution["goal"] = self.safe_str(
+            user_text
+        ).strip()
+
+        execution["route"] = (
+            decision.get("route")
+            if isinstance(decision, dict)
+            else "planner"
+        )
+
+        execution["intent"] = (
+            decision.get("intent")
+            if isinstance(decision, dict)
+            else "planning"
+        )
+
+        return self.execution_service.normalize_execution(
+            execution
+        )
 
     def _execution_mark_running(self, *args, **kwargs):
         return self.execution_service._execution_mark_running(*args, **kwargs)
@@ -1561,7 +1866,7 @@ Rules:
         if not code:
             return code
 
-        # 1. convert tabs ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ 4 spaces
+        # 1. convert tabs ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 4 spaces
         code = code.replace("\t", "    ")
 
         # 2. normalize line endings
@@ -1888,7 +2193,7 @@ Rules:
                 "type": "continue",
                 "mission": mission,
                 "next_action": "run_step",
-                "continue_request": False,
+                "continue_request": True,
                 "execution": execution_state,
             }
 
@@ -2676,25 +2981,85 @@ Rules:
         )
 
     def _get_memory_list(self):
-        if self.memory_service:
-            try:
-                if hasattr(self.memory_service, "all"):
-                    result = self.memory_service.all()
+        service = getattr(
+            self,
+            "memory_service",
+            None,
+        )
 
-                elif hasattr(self.memory_service, "list_memories"):
-                    result = self.memory_service.list_memories()
+        if not service:
+            print(
+                "[MEMORY LIST DEBUG] no memory_service",
+                flush=True,
+            )
+            return []
 
-                elif hasattr(self.memory_service, "build_list_payload"):
-                    result = self.memory_service.build_list_payload()
+        try:
+            result = None
 
-                else:
-                    result = []
+            if hasattr(
+                service,
+                "all",
+            ):
+                result = service.all()
 
-                if isinstance(result, list):
-                    return result
+            elif hasattr(
+                service,
+                "list_memories",
+            ):
+                result = service.list_memories()
 
-            except Exception as e:
-                return []
+            elif hasattr(
+                service,
+                "build_list_payload",
+            ):
+                result = service.build_list_payload()
+
+            print(
+                "[MEMORY LIST DEBUG]",
+                {
+                    "service_type": type(service).__name__,
+                    "result_type": type(result).__name__,
+                    "result_preview": repr(result)[:1000],
+                },
+                flush=True,
+            )
+
+            if isinstance(
+                result,
+                list,
+            ):
+                return result
+
+            if isinstance(
+                result,
+                dict,
+            ):
+                for key in (
+                    "items",
+                    "memories",
+                    "data",
+                    "results",
+                ):
+                    value = result.get(key)
+
+                    if isinstance(
+                        value,
+                        list,
+                    ):
+                        return value
+
+            return []
+
+        except Exception as e:
+            print(
+                "[MEMORY LIST ERROR]",
+                type(e).__name__,
+                repr(e),
+                flush=True,
+            )
+
+            return []
 
     def _get_sessions_list(self) -> list:
         try:
@@ -3231,9 +3596,9 @@ Rules:
                 "assembly news headlines today",
                 "curated for you",
                 "you're my favorite song",
-                "youÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢re my favorite song",
+                "youÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re my favorite song",
                 "introduces today's new top stars",
-                "introduces todayÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s new top stars",
+                "introduces todayÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s new top stars",
                 "gma network",
                 "kanak news odisha",
                 "odia news",
@@ -4146,7 +4511,7 @@ Rules:
             "send the code",
             "send one of these",
             "send the code and",
-            "whatÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢s the symptom",
+            "whatÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -4543,7 +4908,7 @@ Rules:
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ll return the full replacement, cleanly indented."
+                "- IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -4581,7 +4946,7 @@ Rules:
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ll return the full replacement block, cleanly indented."
+                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -4597,7 +4962,7 @@ Rules:
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ll help patch it."
+                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -4614,7 +4979,7 @@ Rules:
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ll break it down clearly."
+                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -4634,7 +4999,7 @@ Rules:
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldnÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -4704,27 +5069,15 @@ Rules:
         except Exception as e:
             exec_debug("FINAL_CLEAN_ERROR:", e)
 
-        # === EXECUTION RENDER HOOK (SAFE) ===
-        decision = self._safe_dict(decision)
-        mission = self._safe_dict(decision.get("mission"))
-        execution = mission.get("execution")
+        # ==========================================
+        # EXECUTION STEP — LIVE TOOL-FIRST PIPELINE
+        # ==========================================
 
-        if (
-            isinstance(execution, dict)
-            and self._looks_like_execution(user_text)
-        ):
-            try:
-                assistant_text = self._render_execution(
-                    execution,
-                    include_prefix=True,
-                )
-            except Exception as e:
-                exec_debug("EXECUTION_RENDER_ERROR:", e)
-
-        # === EXECUTION STEP (SAFE: SINGLE STEP ONLY) ===
         try:
             decision = self._safe_dict(decision)
-            mission = self._safe_dict(decision.get("mission"))
+            mission = self._safe_dict(
+                decision.get("mission")
+            )
             execution = mission.get("execution")
 
             if (
@@ -4743,6 +5096,7 @@ Rules:
                     "completed",
                     "done",
                 ]:
+
                     exec_result = self._execute_current_step(
                         execution=execution,
                         user_text=user_text,
@@ -4762,7 +5116,44 @@ Rules:
                         or {}
                     )
 
-                    decision["mission"]["execution"] = execution
+                    decision["mission"]["execution"] = (
+                        execution
+                    )
+
+                    step_output = self.safe_str(
+                        exec_result.get("step_output")
+                    ).strip()
+
+                    saved_artifact = (
+                        exec_result.get("saved_artifact")
+                        or {}
+                    )
+
+                    artifact_body = ""
+
+                    if isinstance(saved_artifact, dict):
+
+                        artifact_body = self.safe_str(
+                            saved_artifact.get("body")
+                        ).strip()
+
+                    # The user should see the actual
+                    # completed step result, not the stale
+                    # execution state rendered before execution.
+                    if step_output:
+
+                        assistant_text = step_output
+
+                    elif artifact_body:
+
+                        assistant_text = artifact_body
+
+                    else:
+
+                        assistant_text = self._render_execution(
+                            execution,
+                            include_prefix=True,
+                        )
 
                     self._set_session_meta(
                         session_id,
@@ -4776,20 +5167,34 @@ Rules:
                     )
 
                     try:
+
                         self._persist_execution_artifact(
                             session_id,
                             execution,
                         )
 
                     except Exception as e:
+
                         exec_debug(
                             "EXECUTION_SAVE_ERROR:",
                             e,
                         )
 
-        except Exception as e:
-            exec_debug("EXECUTION_STEP_ERROR:", e)
+                elif isinstance(execution, dict):
 
+                    # Completed executions still render
+                    # their latest persisted state.
+                    assistant_text = self._render_execution(
+                        execution,
+                        include_prefix=True,
+                    )
+
+        except Exception as e:
+
+            exec_debug(
+                "EXECUTION_STEP_ERROR:",
+                e,
+            )
         return {
             "assistant_text": assistant_text,
             "intelligence": intelligence,
@@ -4804,28 +5209,22 @@ Rules:
         intelligence=None,
     ) -> dict:
 
-        decision = decision if isinstance(decision, dict) else {}
+        decision = (
+            decision
+            if isinstance(decision, dict)
+            else {}
+        )
 
+        intelligence = (
+            intelligence
+            if isinstance(intelligence, dict)
+            else {}
+        )
 
+        text = self.safe_str(
+            user_text
+        ).lower().strip()
 
-        attachments = attachments or []
-        assistant_text = self.safe_str(assistant_text).strip()
-        intelligence = intelligence if isinstance(intelligence, dict) else {}
-
-        text = self.safe_str(user_text).lower().strip()
-
-        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
-        if self._nova_has_image_attachment_20260607(attachments):
-            decision = decision if isinstance(decision, dict) else {}
-            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
-            decision["mode"] = "image_analysis"
-            decision["confidence"] = 1.0
-            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
-            decision["save_artifact"] = False
-            decision["save_memory"] = False
-            decision["use_memory"] = False
-            decision["source_urls"] = []
-            decision["sources"] = []
         route = self.safe_str(decision.get("route")).lower()
         mode = self.safe_str(decision.get("mode")).lower()
         intent = self.safe_str(
@@ -4957,7 +5356,7 @@ Rules:
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ empty ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ global news
+        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ empty ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ global news
         if not clean_query:
             return [
                 "world news",
@@ -5201,7 +5600,7 @@ Rules:
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©cor",
+                    "furniture & dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -5224,7 +5623,7 @@ Rules:
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢*|")
+                    _low = _line.lower().strip(" :;-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:

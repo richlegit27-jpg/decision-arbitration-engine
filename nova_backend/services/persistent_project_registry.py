@@ -1,413 +1,376 @@
 ﻿from __future__ import annotations
 
-from copy import deepcopy
-from datetime import datetime, timezone
 import json
-import os
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
-import re
-from threading import RLock
-from typing import Any
-from uuid import uuid4
 
-
-SCHEMA_VERSION = 1
-
-PROJECT_COLLECTIONS = (
-    "goals",
-    "deadlines",
-    "decisions",
-    "documents",
-    "workflows",
-    "knowledge",
-)
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _clean(value: Any) -> str:
-    return str(value or "").strip()
-
-
-def _slug(value: Any) -> str:
-    normalized = re.sub(
-        r"[^a-z0-9]+",
-        "-",
-        _clean(value).lower(),
-    ).strip("-")
-
-    return normalized or "project"
+from nova_backend.services.auth_context import get_current_user_id
 
 
 class PersistentProjectRegistry:
-    """
-    Canonical Phase 8 multi-project registry.
-
-    This does not replace Nova's current-project checkpoint or Project Brain
-    operator milestones. It owns durable user/project operating-system records.
-    """
 
     def __init__(
         self,
-        path: str | Path | None = None,
-    ) -> None:
-        root = Path(__file__).resolve().parents[2]
+        base_dir: Path | None = None,
+    ):
 
-        self.path = Path(
-            path
-            or root / "data" / "nova_projects.json"
-        )
+        if base_dir is None:
 
-        self._lock = RLock()
-
-    @staticmethod
-    def empty_store() -> dict[str, Any]:
-        return {
-            "version": SCHEMA_VERSION,
-            "active_project_id": None,
-            "projects": [],
-            "updated_at": None,
-        }
-
-    @staticmethod
-    def _normalize_project(
-        project: dict[str, Any],
-    ) -> dict[str, Any]:
-        normalized = dict(project)
-
-        normalized["id"] = _clean(
-            normalized.get("id")
-        )
-        normalized["title"] = _clean(
-            normalized.get("title")
-        )
-        normalized["description"] = _clean(
-            normalized.get("description")
-        )
-        normalized["status"] = (
-            _clean(normalized.get("status"))
-            or "active"
-        )
-        normalized["created_at"] = _clean(
-            normalized.get("created_at")
-        )
-        normalized["updated_at"] = _clean(
-            normalized.get("updated_at")
-        )
-
-        metadata = normalized.get("metadata")
-        normalized["metadata"] = (
-            dict(metadata)
-            if isinstance(metadata, dict)
-            else {}
-        )
-
-        for collection in PROJECT_COLLECTIONS:
-            records = normalized.get(collection)
-
-            normalized[collection] = (
-                [
-                    dict(record)
-                    for record in records
-                    if isinstance(record, dict)
-                ]
-                if isinstance(records, list)
-                else []
+            base_dir = (
+                Path(__file__)
+                .resolve()
+                .parents[2]
             )
 
-        return normalized
+        self.base_dir = Path(base_dir)
 
-    def load(self) -> dict[str, Any]:
-        with self._lock:
-            if not self.path.exists():
-                return self.empty_store()
+        self.data_dir = (
+            self.base_dir / "data"
+        )
 
-            raw = json.loads(
-                self.path.read_text(
-                    encoding="utf-8-sig",
-                )
-            )
-
-            if not isinstance(raw, dict):
-                raise ValueError(
-                    "Project registry root must be an object"
-                )
-
-            projects = raw.get("projects")
-
-            if not isinstance(projects, list):
-                raise ValueError(
-                    "Project registry projects must be a list"
-                )
-
-            normalized_projects = [
-                self._normalize_project(project)
-                for project in projects
-                if isinstance(project, dict)
-            ]
-
-            known_ids = {
-                project["id"]
-                for project in normalized_projects
-                if project["id"]
-            }
-
-            active_project_id = _clean(
-                raw.get("active_project_id")
-            ) or None
-
-            if active_project_id not in known_ids:
-                active_project_id = (
-                    normalized_projects[0]["id"]
-                    if normalized_projects
-                    else None
-                )
-
-            return {
-                "version": SCHEMA_VERSION,
-                "active_project_id": active_project_id,
-                "projects": normalized_projects,
-                "updated_at": (
-                    _clean(raw.get("updated_at"))
-                    or None
-                ),
-            }
-
-    def _save(
-        self,
-        store: dict[str, Any],
-    ) -> dict[str, Any]:
-        store = deepcopy(store)
-        store["version"] = SCHEMA_VERSION
-        store["updated_at"] = _utc_now()
-
-        self.path.parent.mkdir(
+        self.data_dir.mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        temporary = self.path.with_name(
-            self.path.name
-            + ".tmp"
+        self.file_path = (
+            self.data_dir
+            / "nova_projects.json"
         )
 
-        temporary.write_text(
+
+    def _current_user_id(self):
+
+        user_id = get_current_user_id()
+
+        if not user_id:
+
+            return None
+
+        return str(user_id)
+
+
+    def _load(self):
+
+        if not self.file_path.exists():
+
+            return {
+                "projects": [],
+            }
+
+        try:
+
+            raw = self.file_path.read_text(
+                encoding="utf-8",
+            )
+
+            data = json.loads(raw)
+
+            if not isinstance(data, dict):
+
+                return {
+                    "projects": [],
+                }
+
+            projects = data.get(
+                "projects",
+                [],
+            )
+
+            if not isinstance(projects, list):
+
+                projects = []
+
+            return {
+                "projects": projects,
+            }
+
+        except Exception:
+
+            return {
+                "projects": [],
+            }
+
+
+    def _save(
+        self,
+        data,
+    ):
+
+        self.file_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        self.file_path.write_text(
             json.dumps(
-                store,
+                data,
                 indent=2,
                 ensure_ascii=False,
-            )
-            + "\n",
+            ),
             encoding="utf-8",
         )
 
-        os.replace(
-            temporary,
-            self.path,
+
+    def _same_owner(
+        self,
+        project,
+    ):
+
+        if not isinstance(project, dict):
+
+            return False
+
+        current_user_id = (
+            self._current_user_id()
         )
 
-        return deepcopy(store)
+        if not current_user_id:
 
-    @staticmethod
-    def _find_project(
-        store: dict[str, Any],
-        project_id: str,
-    ) -> dict[str, Any]:
-        wanted = _clean(project_id)
+            return False
 
-        for project in store["projects"]:
-            if project.get("id") == wanted:
-                return project
-
-        raise KeyError(
-            f"Unknown project: {wanted}"
+        return (
+            str(
+                project.get(
+                    "user_id",
+                    "",
+                )
+            )
+            == current_user_id
         )
 
-    def list_projects(self) -> list[dict[str, Any]]:
-        return deepcopy(
-            self.load()["projects"]
+
+    def list_projects(self):
+
+        data = self._load()
+
+        projects = data.get(
+            "projects",
+            [],
         )
+
+        return [
+            project
+            for project in projects
+            if self._same_owner(project)
+        ]
+
 
     def get_project(
         self,
-        project_id: str,
-    ) -> dict[str, Any]:
-        store = self.load()
+        project_id,
+    ):
 
-        return deepcopy(
-            self._find_project(
-                store,
-                project_id,
-            )
-        )
+        project_id = str(project_id)
 
-    def get_active_project(
-        self,
-    ) -> dict[str, Any] | None:
-        store = self.load()
-        project_id = store["active_project_id"]
+        for project in self.list_projects():
 
-        if not project_id:
-            return None
+            if (
+                str(
+                    project.get(
+                        "id",
+                        "",
+                    )
+                )
+                == project_id
+            ):
 
-        return deepcopy(
-            self._find_project(
-                store,
-                project_id,
-            )
-        )
+                return project
+
+        return None
+
 
     def create_project(
         self,
-        title: str,
-        description: str = "",
-        project_id: str = "",
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        clean_title = _clean(title)
+        project,
+    ):
 
-        if not clean_title:
-            raise ValueError(
-                "Project title is required"
+        current_user_id = (
+            self._current_user_id()
+        )
+
+        if not current_user_id:
+
+            raise PermissionError(
+                "Authentication required."
             )
 
-        with self._lock:
-            store = self.load()
+        if not isinstance(project, dict):
 
-            base_id = _slug(
-                project_id
-                or clean_title
+            project = {}
+
+        data = self._load()
+
+        project = dict(project)
+
+        project.setdefault(
+            "id",
+            "project_"
+            + uuid.uuid4().hex,
+        )
+
+        project["user_id"] = (
+            current_user_id
+        )
+
+        project.setdefault(
+            "created_at",
+            datetime.now(
+                timezone.utc,
+            ).isoformat(),
+        )
+
+        project[
+            "updated_at"
+        ] = datetime.now(
+            timezone.utc,
+        ).isoformat()
+
+        data["projects"].append(
+            project
+        )
+
+        self._save(data)
+
+        return project
+
+
+    def update_project(
+        self,
+        project_id,
+        updates,
+    ):
+
+        current_user_id = (
+            self._current_user_id()
+        )
+
+        if not current_user_id:
+
+            return None
+
+        if not isinstance(updates, dict):
+
+            updates = {}
+
+        data = self._load()
+
+        project_id = str(project_id)
+
+        for index, project in enumerate(
+            data.get(
+                "projects",
+                [],
             )
-            final_id = base_id
-            existing_ids = {
-                project.get("id")
-                for project in store["projects"]
-            }
+        ):
 
-            if final_id in existing_ids:
-                final_id = (
-                    base_id
-                    + "-"
-                    + uuid4().hex[:8]
+            if (
+                str(
+                    project.get(
+                        "id",
+                        "",
+                    )
                 )
+                != project_id
+            ):
 
-            now = _utc_now()
+                continue
 
-            project = {
-                "id": final_id,
-                "title": clean_title,
-                "description": _clean(description),
-                "status": "active",
-                "created_at": now,
-                "updated_at": now,
-                "metadata": (
-                    dict(metadata)
-                    if isinstance(metadata, dict)
-                    else {}
-                ),
+            if not self._same_owner(project):
+
+                return None
+
+            protected_fields = {
+                "id",
+                "user_id",
+                "created_at",
             }
 
-            for collection in PROJECT_COLLECTIONS:
-                project[collection] = []
+            safe_updates = {
 
-            store["projects"].append(project)
+                key: value
 
-            if not store["active_project_id"]:
-                store["active_project_id"] = final_id
+                for key, value in updates.items()
 
-            self._save(store)
+                if key
+                not in protected_fields
 
-            return deepcopy(project)
-
-    def ensure_project(
-        self,
-        title: str,
-        description: str = "",
-    ) -> dict[str, Any]:
-        wanted = _clean(title).lower()
-
-        with self._lock:
-            store = self.load()
-
-            for project in store["projects"]:
-                if _clean(project.get("title")).lower() == wanted:
-                    return deepcopy(project)
-
-            return self.create_project(
-                title=title,
-                description=description,
-            )
-
-    def set_active_project(
-        self,
-        project_id: str,
-    ) -> dict[str, Any]:
-        with self._lock:
-            store = self.load()
-            project = self._find_project(
-                store,
-                project_id,
-            )
-
-            store["active_project_id"] = project["id"]
-            self._save(store)
-
-            return deepcopy(project)
-
-    def add_record(
-        self,
-        project_id: str,
-        collection: str,
-        title: str,
-        details: str = "",
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        collection = _clean(collection).lower()
-
-        if collection not in PROJECT_COLLECTIONS:
-            raise ValueError(
-                "Unsupported project collection: "
-                + collection
-            )
-
-        clean_title = _clean(title)
-
-        if not clean_title:
-            raise ValueError(
-                "Record title is required"
-            )
-
-        with self._lock:
-            store = self.load()
-            project = self._find_project(
-                store,
-                project_id,
-            )
-            now = _utc_now()
-
-            record = {
-                "id": (
-                    collection.rstrip("s")
-                    + "-"
-                    + uuid4().hex
-                ),
-                "title": clean_title,
-                "details": _clean(details),
-                "status": "active",
-                "created_at": now,
-                "updated_at": now,
-                "metadata": (
-                    dict(metadata)
-                    if isinstance(metadata, dict)
-                    else {}
-                ),
             }
 
-            project[collection].append(record)
-            project["updated_at"] = now
+            project.update(
+                safe_updates
+            )
 
-            self._save(store)
+            project[
+                "user_id"
+            ] = current_user_id
 
-            return deepcopy(record)
+            project[
+                "updated_at"
+            ] = datetime.now(
+                timezone.utc,
+            ).isoformat()
+
+            data["projects"][index] = (
+                project
+            )
+
+            self._save(data)
+
+            return project
+
+        return None
+
+
+    def delete_project(
+        self,
+        project_id,
+    ):
+
+        current_user_id = (
+            self._current_user_id()
+        )
+
+        if not current_user_id:
+
+            return False
+
+        data = self._load()
+
+        project_id = str(project_id)
+
+        projects = data.get(
+            "projects",
+            [],
+        )
+
+        for index, project in enumerate(
+            projects
+        ):
+
+            if (
+                str(
+                    project.get(
+                        "id",
+                        "",
+                    )
+                )
+                != project_id
+            ):
+
+                continue
+
+            if not self._same_owner(project):
+
+                return False
+
+            del projects[index]
+
+            data["projects"] = projects
+
+            self._save(data)
+
+            return True
+
+        return False

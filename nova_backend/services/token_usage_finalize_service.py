@@ -100,6 +100,7 @@ def install_token_usage_finalize_wrapper(ChatService):
                     record_model_usage,
                 )
 
+                user_id = ""
                 username = ""
 
                 try:
@@ -110,6 +111,12 @@ def install_token_usage_finalize_wrapper(ChatService):
                         "nova_auth_user",
                         None,
                     ) or {}
+
+                    user_id = str(
+                        user.get("id")
+                        or user.get("user_id")
+                        or ""
+                    ).strip()
 
                     username = str(
                         user.get("username") or ""
@@ -166,10 +173,12 @@ def install_token_usage_finalize_wrapper(ChatService):
 
 
                 record_model_usage(
+                    user_id=user_id,
                     session_id=str(
                         session_id or ""
                     ),
                     username=username,
+
                     model=str(
                         model_name or "unknown"
                     ),

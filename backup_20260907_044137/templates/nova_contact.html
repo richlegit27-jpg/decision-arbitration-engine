@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contact Nova — Early access and product questions</title>
+    <meta name="description" content="Contact Nova for early access, product questions, billing questions, and project workspace updates.">
+    <link rel="stylesheet" href="/static/css/nova-contact.css?v=contact-endgame-20260711">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <meta name="theme-color" content="#8b5cf6">
+    <!-- NOVA_SOCIAL_META_20260709 -->
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/contact">
+    <meta property="og:site_name" content="Nova">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Contact Nova — Early access">
+    <meta property="og:description" content="Contact Nova for early access, product questions, billing questions, and project workspace updates.">
+    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/contact">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <meta property="og:image:type" content="image/svg+xml">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Contact Nova — Early access">
+    <meta name="twitter:description" content="Contact Nova for early access, product questions, billing questions, and project workspace updates.">
+    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <!-- /NOVA_SOCIAL_META_20260709 -->
+
+    <!-- NOVA_CONTACT_PAGE_ADMIN_LINK_STYLE_20260709 -->
+    <style>
+        .nova-admin-contact-pill-20260709 {
+            position: fixed;
+            top: max(16px, env(safe-area-inset-top));
+            right: 16px;
+            z-index: 2147483000;
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 14px;
+            border: 1px solid rgba(226,214,255,.22);
+            border-radius: 999px;
+            background: rgba(184,255,122,.94);
+            color: #101014;
+            box-shadow: 0 18px 54px rgba(0,0,0,.32);
+            font: 850 13px/1 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            text-decoration: none;
+            backdrop-filter: blur(18px);
+        }
+
+        .nova-admin-contact-pill-20260709:hover {
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 700px) {
+            .nova-admin-contact-pill-20260709 {
+                top: max(10px, env(safe-area-inset-top));
+                right: 10px;
+                min-height: 34px;
+                padding: 0 11px;
+                font-size: 12px;
+            }
+        }
+    </style>
+    <!-- /NOVA_CONTACT_PAGE_ADMIN_LINK_STYLE_20260709 -->
+
+    <!-- NOVA_CONTACT_OWNER_ADMIN_PILL_STYLE_20260709 -->
+    <style>
+        .nova-contact-owner-admin-pill-20260709 {
+            position: fixed;
+            top: max(16px, env(safe-area-inset-top));
+            right: 16px;
+            z-index: 2147483000;
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 14px;
+            border: 1px solid rgba(226,214,255,.22);
+            border-radius: 999px;
+            background: rgba(184,255,122,.94);
+            color: #101014;
+            box-shadow: 0 18px 54px rgba(0,0,0,.32);
+            font: 850 13px/1 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            text-decoration: none;
+            backdrop-filter: blur(18px);
+        }
+
+        .nova-contact-owner-admin-pill-20260709:hover {
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 700px) {
+            .nova-contact-owner-admin-pill-20260709 {
+                top: max(10px, env(safe-area-inset-top));
+                right: 10px;
+                min-height: 34px;
+                padding: 0 11px;
+                font-size: 12px;
+            }
+        }
+    </style>
+    <!-- /NOVA_CONTACT_OWNER_ADMIN_PILL_STYLE_20260709 -->
+    <link rel="stylesheet" href="/static/css/nova-public-trust.css">
+
+    <!-- NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/contact">
+    <!-- /NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
+</head>
+<body>
+
+
+
+
+
+    <!-- NOVA_CONTACT_OWNER_ADMIN_PILL_20260709 -->
+    {% if nova_show_admin_link %}
+    <a class="nova-contact-owner-admin-pill-20260709" href="/admin" aria-label="Open Nova admin dashboard">Admin</a>
+    {% endif %}
+    <!-- /NOVA_CONTACT_OWNER_ADMIN_PILL_20260709 -->
+
+    <!-- NOVA_CONTACT_PAGE_ADMIN_LINK_20260709 -->
+    {% if nova_show_admin_link %}
+    <a class="nova-admin-contact-pill-20260709" href="/admin" aria-label="Open Nova admin dashboard">Admin</a>
+    {% endif %}
+    <!-- /NOVA_CONTACT_PAGE_ADMIN_LINK_20260709 -->
+    <main class="nova-contact-shell">
+        <nav class="nova-contact-nav" aria-label="Nova contact navigation">
+            <a class="nova-contact-brand" href="/">
+                <span>N</span>
+                <div>
+                    <strong>Nova</strong>
+                    <em>Contact</em>
+                </div>
+            </a>
+
+            <div class="nova-contact-actions">
+                <a href="/">Home</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/billing">Billing</a>
+                <a class="nova-contact-access" href="#nova-contact-form-title">Request Access</a>
+            </div>
+        </nav>
+
+        <section class="nova-contact-hero">
+            <p>Request Nova Access</p>
+            <h1>Bring the project. Nova keeps the thread.</h1>
+            <span>
+                Nova is for work that lasts longer than one conversation.
+                Tell us what you are building and why keeping the project's context together matters to you.
+            </span>
+        </section>
+
+        <section class="nova-contact-grid">
+            <article class="nova-contact-card main">
+                <p>Built for continuity</p>
+                <h2>You are tired of rebuilding the same context.</h2>
+                <span>
+                    Nova is being built for builders, researchers, creators, and operators whose work
+                    carries decisions, files, history, and momentum from one conversation into the next.
+                </span>
+
+                <div class="nova-contact-buttons">
+                    <a href="#nova-contact-form-title">Request Access</a>
+                    <a href="/features">View Features</a>
+                </div>
+            </article>
+
+            <article class="nova-contact-card">
+                <p>Early access</p>
+                <h2>Early access</h2>
+                <span>Request access to follow Nova's development and be considered for early product testing.</span>
+            </article>
+
+            <article class="nova-contact-card">
+                <p>Product questions</p>
+                <h2>What Nova does</h2>
+                <span>Review the Features, Roadmap, FAQ, and Status pages to understand the product direction.</span>
+            </article>
+        </section>
+
+        <section class="nova-contact-options">
+            <div>
+                <p>Find your reason</p>
+                <h2>Tell Nova what brings you here.</h2>
+                <span>
+                    Request early access, ask a product question, raise a billing question,
+                    or send founder feedback. Pick the closest option and tell us what you need.
+                </span>
+            </div>
+
+            <div class="nova-contact-stack">
+                <a href="/features">
+                    <strong>Learn what Nova does</strong>
+                    <span>Feature overview for the project command center.</span>
+                </a>
+
+                <a href="/roadmap">
+                    <strong>See where Nova is going</strong>
+                    <span>Roadmap from prototype to real workspace.</span>
+                </a>
+
+                <a href="/billing">
+                    <strong>Check billing dashboard</strong>
+                    <span>Credits, plan, and model-tier readiness.</span>
+                </a>
+
+                <a href="/nova-status">
+                    <strong>Check system status</strong>
+                    <span>Health, billing API, and product lane readiness.</span>
+                </a>
+            </div>
+        </section>
+        <!-- NOVA_CONTACT_CAPTURE_FORM_20260709 -->
+        <section class="nova-contact-form-section" aria-labelledby="nova-contact-form-title">
+            <div class="nova-contact-form-copy">
+                <p>Request Access</p>
+                <h2 id="nova-contact-form-title">Tell us what you want to build.</h2>
+                <span>
+                    Share a little about the project, problem, or workflow you want Nova to help carry forward.
+                    Your request will be reviewed as Nova's Early Access group grows.
+                </span>
+            </div>
+
+            
+<!-- NOVA_CONTACT_TRUST_POLISH_20260709 -->
+<section class="nova-contact-trust-polish" aria-label="Early Access clarity">
+    <div class="nova-contact-trust-polish__intro">
+        <p class="nova-contact-trust-polish__eyebrow">Before you send</p>
+        <h2>A request is just a request.</h2>
+        <p>
+            Sending this form does not start a subscription or charge you.
+            It simply sends your request to the Nova team for review.
+        </p>
+    </div>
+
+    <div class="nova-contact-trust-polish__grid">
+        <article>
+            <span>What happens now</span>
+            <strong>Your request is received</strong>
+            <p>
+                We use the details you provide to understand your interest in Nova
+                and respond to your request.
+            </p>
+        </article>
+
+        <article>
+            <span>What happens next</span>
+            <strong>Your request gets reviewed</strong>
+            <p>
+                Early Access requests are reviewed as Nova continues developing
+                the product and preparing broader access.
+            </p>
+        </article>
+
+        <article>
+            <span>No automatic billing</span>
+            <strong>No card is charged here</strong>
+            <p>
+                This form is not checkout. Any future paid plan or billing step
+                will be presented separately and clearly before payment.
+            </p>
+        </article>
+    </div>
+</section>
+
+<form id="nova-contact-form-20260709" class="nova-contact-form" novalidate>
+                <input type="hidden" name="source" value="public_contact_page">
+
+                <label>
+                    Name
+                    <input name="name" type="text" autocomplete="name" maxlength="120" required>
+                </label>
+
+                <label>
+                    Email
+                    <input name="email" type="email" autocomplete="email" maxlength="180" required>
+                </label>
+
+                <label>
+                    Interest
+                    <select name="interest" required>
+                        <option value="early_access">Early access</option>
+                        <option value="product_question">Product question</option>
+                        <option value="billing_question">Billing question</option>
+                        <option value="founder_feedback">Founder feedback</option>
+                    </select>
+                </label>
+
+                <label>
+                    Message
+                    <textarea name="message" rows="5" maxlength="2000" required placeholder="What are you building, and where does your current AI workflow lose the thread?"></textarea>
+                </label>
+
+                <button type="submit">Request Access</button>
+
+                <p id="nova-contact-form-status-20260709" class="nova-contact-form-status" aria-live="polite"></p>
+            </form>
+        </section>
+        <!-- /NOVA_CONTACT_CAPTURE_FORM_20260709 -->
+
+<footer class="nova-contact-footer">
+            <span>Nova - Early Access for long-running project work</span>
+            <div>
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/faq">FAQ</a>
+                <a href="/nova-status">Status</a>
+                <a href="/billing">Billing</a>
+                <a href="/blog">Blog</a>
+                <a href="/contact">Contact</a>
+            </div>
+        
+                <a href="/privacy">Privacy</a>
+                <a href="/terms">Terms</a>
+        </footer>
+    </main>
+
+    <script src="/static/js/nova-contact.js?v=contact-form-capture-20260709"></script>
+
+
+
+
+<!-- NOVA_PUBLIC_HOME_CANONICAL_LINKS_20260709 -->
+</body>
+</html>
+
+
+
+
+
+

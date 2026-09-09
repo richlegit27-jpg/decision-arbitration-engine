@@ -70,6 +70,7 @@ def _empty_ledger() -> Dict[str, Any]:
             "total_tokens": 0,
             "calls": 0,
         },
+        "by_user": {},
         "by_session": {},
         "by_model": {},
     }
@@ -100,6 +101,7 @@ def load_usage_ledger() -> Dict[str, Any]:
         "total_tokens": 0,
         "calls": 0,
     })
+    data.setdefault("by_user", {})
     data.setdefault("by_session", {})
     data.setdefault("by_model", {})
 
@@ -198,8 +200,29 @@ def record_model_usage(
         totals["total_tokens"] = int(totals.get("total_tokens", 0)) + final_total
         totals["calls"] = int(totals.get("calls", 0)) + 1
 
-        _add_to_bucket(ledger.setdefault("by_session", {}), session_id or "unknown", final_input, final_output, final_total)
-        _add_to_bucket(ledger.setdefault("by_model", {}), model or "unknown", final_input, final_output, final_total)
+        _add_to_bucket(
+            ledger.setdefault("by_user", {}),
+            user_id or username or "unknown",
+            final_input,
+            final_output,
+            final_total,
+        )
+
+        _add_to_bucket(
+            ledger.setdefault("by_session", {}),
+            session_id or "unknown",
+            final_input,
+            final_output,
+            final_total,
+        )
+
+        _add_to_bucket(
+            ledger.setdefault("by_model", {}),
+            model or "unknown",
+            final_input,
+            final_output,
+            final_total,
+        )
 
         # Keep the file from growing forever during early dev.
         max_events = int(os.environ.get("NOVA_USAGE_MAX_EVENTS", "5000"))

@@ -81,7 +81,9 @@ from nova_backend.core.project_bridge import (
 from nova_backend.core.nova_state import (
     NovaState,
 )
-
+from nova_backend.core.execution_plan_normalizer import (
+    ExecutionPlanNormalizer,
+)
 
 class NovaOrchestrator:
 
@@ -151,7 +153,9 @@ class NovaOrchestrator:
 
 
         self.execution_step_service = (
-            ExecutionStepService()
+            ExecutionStepService(
+                tool_executor=self.tool_executor,
+            )
         )
 
 
@@ -160,6 +164,9 @@ class NovaOrchestrator:
                 step_service=self.execution_step_service,
             )
         )
+        self.execution_plan_normalizer = (
+            ExecutionPlanNormalizer()
+            )
 
 
         self.execution_bridge = (
@@ -247,6 +254,13 @@ class NovaOrchestrator:
             self.planner_bridge.create_plan(
                 user_text,
                 state["context"],
+            )
+        )
+
+
+        state["plan"] = (
+            self.execution_plan_normalizer.normalize(
+                state["plan"]
             )
         )
 

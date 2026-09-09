@@ -2195,3 +2195,171 @@ Traceback (most recent call last):
     self.active_execution_cache.get(session_id)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 AttributeError: 'ChatService' object has no attribute 'active_execution_cache'
+
+
+===== CHAT FAILURE =====
+IndentationError('unexpected indent', ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 114, 12, '            if isinstance(routed, dict):\n', 114, -1))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2777, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 576, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 114
+    if isinstance(routed, dict):
+IndentationError: unexpected indent
+
+
+===== CHAT FAILURE =====
+IndentationError('unexpected indent', ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 114, 12, '            if isinstance(routed, dict):\n', 114, -1))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2777, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 576, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 114
+    if isinstance(routed, dict):
+IndentationError: unexpected indent
+
+
+===== CHAT FAILURE =====
+IndentationError('unexpected indent', ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 114, 12, '            if isinstance(routed, dict):\n', 114, -1))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2777, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 576, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 114
+    if isinstance(routed, dict):
+IndentationError: unexpected indent
+
+
+===== CHAT FAILURE =====
+TypeError("'NoneType' object does not support item assignment")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2777, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 869, in handle
+    response["brain_state"] = brain_state
+    ~~~~~~~~^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object does not support item assignment
+
+
+===== CHAT FAILURE =====
+TypeError("'NoneType' object does not support item assignment")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2777, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 869, in handle
+    response["brain_state"] = brain_state
+    ~~~~~~~~^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object does not support item assignment
+
+
+===== CHAT FAILURE =====
+IndentationError('expected an indented block after function definition on line 4', ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 13, 1, '_t0 = time.perf_counter()\n', 13, 4))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2777, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 576, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 13
+    _t0 = time.perf_counter()
+    ^^^
+IndentationError: expected an indented block after function definition on line 4
+
+
+===== CHAT FAILURE =====
+IndentationError('expected an indented block after function definition on line 4', ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 13, 1, '_t0 = time.perf_counter()\n', 13, 4))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2777, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 576, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 13
+    _t0 = time.perf_counter()
+    ^^^
+IndentationError: expected an indented block after function definition on line 4

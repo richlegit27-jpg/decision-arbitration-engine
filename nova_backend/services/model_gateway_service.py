@@ -231,14 +231,20 @@ def _nova_extract_response_text(response: Any) -> str:
 
     return ""
 
-
 def _nova_pop_internal_kwargs(
     kwargs: Dict[str, Any],
-) -> Tuple[str, str, bool]:
+) -> Tuple[str, str, str, bool]:
     provided_username = (
         kwargs.pop("nova_username", None)
         or kwargs.pop("_nova_username", None)
         or kwargs.pop("billing_username", None)
+        or ""
+    )
+
+    provided_user_id = (
+        kwargs.pop("nova_user_id", None)
+        or kwargs.pop("_nova_user_id", None)
+        or kwargs.pop("billing_user_id", None)
         or ""
     )
 
@@ -260,6 +266,7 @@ def _nova_pop_internal_kwargs(
             "NOVA_MODEL_GATEWAY_BILLING_ENFORCED",
             "1",
         )
+
         enforce = (
             str(raw).strip().lower()
             not in {
@@ -271,6 +278,7 @@ def _nova_pop_internal_kwargs(
         )
 
     authenticated_username = ""
+    authenticated_user_id = ""
     request_session_id = ""
     has_flask_request = False
 
@@ -297,11 +305,32 @@ def _nova_pop_internal_kwargs(
                     auth_user.get("username")
                     or ""
                 ).strip()
+
+                authenticated_user_id = str(
+                    auth_user.get("id")
+                    or auth_user.get("user_id")
+                    or ""
+                ).strip()
+
             else:
                 authenticated_username = str(
                     getattr(
                         auth_user,
                         "username",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+                authenticated_user_id = str(
+                    getattr(
+                        auth_user,
+                        "id",
+                        "",
+                    )
+                    or getattr(
+                        auth_user,
+                        "user_id",
                         "",
                     )
                     or ""
@@ -346,7 +375,10 @@ def _nova_pop_internal_kwargs(
         enforce
         and payments_live
         and has_flask_request
-        and not authenticated_username
+        and (
+            not authenticated_username
+            or not authenticated_user_id
+        )
     ):
         raise RuntimeError(
             "Nova billing blocked model call: "
@@ -359,7 +391,13 @@ def _nova_pop_internal_kwargs(
         or os.environ.get(
             "NOVA_DEFAULT_USERNAME"
         )
-        or "richard"
+        or ""
+    )
+
+    user_id = (
+        authenticated_user_id
+        or provided_user_id
+        or ""
     )
 
     session_id = (
@@ -368,18 +406,20 @@ def _nova_pop_internal_kwargs(
         or ""
     )
 
-    username = (
-        str(username or "richard")
-        .strip()
-        .lower()
-        or "richard"
-    )
+    username = str(
+        username or ""
+    ).strip().lower()
+
+    user_id = str(
+        user_id or ""
+    ).strip()
 
     session_id = str(
         session_id or ""
     ).strip()
 
     return (
+        user_id,
         username,
         session_id,
         bool(enforce),
@@ -411,6 +451,7 @@ def _nova_preflight_credits(username: str, model: str) -> None:
 
 
 def _nova_consume_and_record_usage(
+    user_id: str,
     username: str,
     session_id: str,
     model: str,
@@ -419,8 +460,14 @@ def _nova_consume_and_record_usage(
     enforce: bool,
 ) -> Dict[str, Any]:
     input_text = _nova_messages_text(messages)
-    output_text = _nova_extract_response_text(response)
-    provider_usage = _nova_extract_provider_usage(response)
+
+    output_text = _nova_extract_response_text(
+        response
+    )
+
+    provider_usage = _nova_extract_provider_usage(
+        response
+    )
 
     input_tokens = int(
         provider_usage.get("input_tokens")
@@ -445,9 +492,12 @@ def _nova_consume_and_record_usage(
 
     if enforce:
         try:
-            from nova_backend.services.billing_service import consume_usage
+            from nova_backend.services.billing_service import (
+                consume_usage,
+            )
 
             billing_result = consume_usage(
+                user_id=user_id,
                 username=username,
                 model=model,
                 input_tokens=input_tokens,
@@ -457,7 +507,9 @@ def _nova_consume_and_record_usage(
             if not billing_result.get("ok"):
                 try:
                     print(
-                        "[NOVA BILLING WARNING] usage consume failed after successful model response:",
+                        "[NOVA BILLING WARNING] "
+                        "usage consume failed after "
+                        "successful model response:",
                         billing_result,
                     )
                 except Exception:
@@ -465,6 +517,7 @@ def _nova_consume_and_record_usage(
 
         except RuntimeError:
             raise
+
         except Exception as exc:
             billing_result = {
                 "ok": False,
@@ -473,9 +526,13 @@ def _nova_consume_and_record_usage(
             }
 
     try:
-        from nova_backend.services.usage_ledger_service import record_model_usage
+        from nova_backend.services.usage_ledger_service import (
+            record_model_usage,
+        )
 
         record_model_usage(
+            user_id=user_id,
+            username=username,
             session_id=session_id,
             route="model_gateway",
             model=model,
@@ -485,16 +542,30 @@ def _nova_consume_and_record_usage(
             output_tokens=output_tokens,
             provider_usage=provider_usage,
         )
+
     except Exception:
         pass
 
     try:
-        setattr(response, "_nova_billing", billing_result)
-        setattr(response, "_nova_usage_tokens", {
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": input_tokens + output_tokens,
-        })
+        setattr(
+            response,
+            "_nova_billing",
+            billing_result,
+        )
+
+        setattr(
+            response,
+            "_nova_usage_tokens",
+            {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": (
+                    input_tokens
+                    + output_tokens
+                ),
+            },
+        )
+
     except Exception:
         pass
 
@@ -524,7 +595,11 @@ def chat_completions_create(*args, **kwargs):
         ),
     )
 
-    username, session_id, enforce = _nova_pop_internal_kwargs(kwargs)
+    user_id, username, session_id, enforce = (
+        _nova_pop_internal_kwargs(
+            kwargs
+        )
+    )
 
     model = str(
         kwargs.get("model")
@@ -550,16 +625,39 @@ def chat_completions_create(*args, **kwargs):
 
     client = OpenAI()
 
-    response = client.chat.completions.create(
-        *args,
-        **kwargs,
-    )
+    try:
+        response = client.chat.completions.create(
+            *args,
+            **kwargs,
+        )
+
+    except Exception as error:
+        print(
+            "MODEL GATEWAY EXECUTION ERROR =",
+            repr(error),
+            flush=True,
+        )
+
+        print(
+            "MODEL GATEWAY FAILED MODEL =",
+            model,
+            flush=True,
+        )
+
+        print(
+            "MODEL GATEWAY FAILED INPUT =",
+            messages,
+            flush=True,
+        )
+
+        raise
 
     _nova_consume_and_record_usage(
+        user_id=user_id,
         username=username,
         session_id=session_id,
         model=model,
-        messages=messages,
+        messages=model_input,
         response=response,
         enforce=enforce,
     )
@@ -573,7 +671,8 @@ def responses_create(*args, **kwargs):
             kwargs.get("input")
         ),
     )
-    username, session_id, enforce = (
+
+    user_id, username, session_id, enforce = (
         _nova_pop_internal_kwargs(
             kwargs
         )
@@ -601,6 +700,18 @@ def responses_create(*args, **kwargs):
             f"OpenAI client is unavailable: {error}"
         ) from error
 
+    print(
+        "MODEL GATEWAY DEBUG MODEL =",
+        model,
+        flush=True,
+    )
+
+    print(
+        "MODEL GATEWAY DEBUG INPUT =",
+        model_input,
+        flush=True,
+    )
+
     client = OpenAI()
     response = client.responses.create(
         *args,
@@ -608,6 +719,7 @@ def responses_create(*args, **kwargs):
     )
 
     _nova_consume_and_record_usage(
+        user_id=user_id,
         username=username,
         session_id=session_id,
         model=model,

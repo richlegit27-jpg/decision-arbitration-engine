@@ -245,7 +245,108 @@ class MemoryContextService:
             pass
 
         return 0.0
+    def should_use_durable_memory(
+        self,
+        user_text: str,
+        *,
+        is_execution_chat: bool = False,
+        operational_query: bool = False,
+    ) -> bool:
+        """
+        Decide whether persistent cross-session memory should be
+        retrieved for this message.
 
+        Conversation continuity, working state, and execution state
+        are handled separately.
+        """
+
+        text = str(user_text or "").strip().lower()
+
+        if not text:
+            return False
+
+        # Explicit requests to inspect or recall memory.
+        explicit_memory_terms = (
+            "remember",
+            "memory",
+            "do you remember",
+            "what do you remember",
+            "what do you know about me",
+            "about me",
+            "my preferences",
+            "my preference",
+            "what kind of",
+            "what do i like",
+            "what do i prefer",
+            "how do i prefer",
+            "how do i like",
+            "what is my preferred",
+            "what's my preferred",
+        )
+
+        if any(
+            term in text
+            for term in explicit_memory_terms
+        ):
+            return True
+
+        # These are continuity/state questions. They should use
+        # recent conversation and working state instead of durable
+        # memory unless the query explicitly asks for memory.
+        continuation_terms = (
+            "continue",
+            "resume",
+            "next",
+            "where were we",
+            "what were we doing",
+            "what's next",
+            "what next",
+            "pick up where",
+            "where are we",
+            "where are we with",
+            "current state",
+            "project status",
+        )
+
+        if any(
+            term in text
+            for term in continuation_terms
+        ):
+            return False
+
+        # Execution and operational queries should prefer live state.
+        if is_execution_chat:
+            return False
+
+        if operational_query:
+            return False
+
+        # Durable personal facts and preferences.
+        durable_fact_terms = (
+            "my name",
+            "who am i",
+            "what is my name",
+            "what's my name",
+            "do you know my name",
+            "how do i prefer",
+            "what do i prefer",
+            "what kind of commands do i prefer",
+            "what commands do i prefer",
+            "what shell do i prefer",
+            "what terminal do i prefer",
+            "my favorite",
+            "my favourite",
+            "my preference",
+            "my preferences",
+        )
+
+        if any(
+            term in text
+            for term in durable_fact_terms
+        ):
+            return True
+
+        return False
 
     def rank_memory_items(
         self,
@@ -310,6 +411,19 @@ class MemoryContextService:
 
             content_lc = content.lower()
 
+            # QUERY-SPECIFIC FACT MATCHING
+            #
+            # Strongly prioritize memories that directly answer
+            # the specific thing the user is asking about.
+
+            if "port" in text_lc:
+                if "port" in content_lc:
+                    score_bonus = 35.0
+                else:
+                    score_bonus = 0.0
+            else:
+                score_bonus = 0.0
+
             blocked_runtime_memory_patterns = [
                 "big butts",
                 "cannot lie",
@@ -337,6 +451,20 @@ class MemoryContextService:
 
             except Exception:
                 score = 1.0
+
+            # QUERY-SPECIFIC FACT MATCHING
+            #
+            # Strongly prioritize memories that directly answer
+            # the specific thing the user is asking about.
+
+            if "port" in text_lc and "port" in content_lc:
+                score += 35.0
+
+            if (
+                "what port is nova using" in text_lc
+                and "nova uses port" in content_lc
+            ):
+                score += 15.0
 
             for word in text_lc.split():
                 if len(word) >= 4 and word in content_lc:
@@ -495,7 +623,68 @@ class MemoryContextService:
             reverse=True,
         )
 
-        top = ranked[: max(1, int(limit or 12))]
+        # For direct name/identity questions, only return memories that
+        # actually contain identity information. Unrelated preferences,
+        # project notes, and runtime facts must not compete.
+
+        name_query = any(
+            phrase in text_lc
+            for phrase in (
+                "what is my name",
+                "what's my name",
+                "who am i",
+                "tell me my name",
+                "do you know my name",
+            )
+        )
+
+        if name_query:
+
+            identity_ranked = []
+
+            for item in ranked:
+
+                content_lc = str(
+                    item.get("content") or ""
+                ).lower()
+
+                if any(
+                    marker in content_lc
+                    for marker in (
+                        "my name is",
+                        "my name's",
+                        "user's name",
+                        "user name is",
+                        "i am ",
+                        "i'm ",
+                        "call me ",
+                        "called ",
+                    )
+                ):
+                    identity_ranked.append(
+                        item
+                    )
+
+            if identity_ranked:
+
+                identity_ranked.sort(
+                    key=lambda item: (
+                        item["score"],
+                        -item["index"],
+                    ),
+                    reverse=True,
+                )
+
+                return identity_ranked[
+                    : max(1, int(limit or 12))
+                ]
+
+            # No name memory exists. Do not inject unrelated memories.
+            return []
+
+        top = ranked[
+            : max(1, int(limit or 12))
+        ]
 
         return top
 

@@ -11,15 +11,82 @@ class ExecutionOrchestratorService:
         safe_str=None,
         execution_step_service=None,
         approval_service=None,
+        execution_bridge=None,
     ):
-        self.execution_state_service = execution_state_service
-        self.working_state_service = working_state_service
+
+        self.execution_state_service = (
+            execution_state_service
+        )
+
+        self.working_state_service = (
+            working_state_service
+        )
+
         self.execution_mutation_service = (
             execution_mutation_service
         )
+
         self._safe_str = safe_str
-        self.execution_step_service = execution_step_service
-        self.approval_service = approval_service
+
+        self.execution_step_service = (
+            execution_step_service
+        )
+
+        self.approval_service = (
+            approval_service
+        )
+
+        self.execution_bridge = (
+            execution_bridge
+        )
+
+    def _step_is_complete(self, step):
+        """
+        Return True only when an actual execution step is terminally
+        completed.
+        """
+        if not isinstance(step, dict):
+            return False
+
+        status = self._safe_str(
+            step.get("status")
+        ).strip().lower()
+
+        return status in {
+            "complete",
+            "completed",
+            "done",
+        }
+
+    def _all_steps_complete(self, steps):
+        """
+        NOVA_EXECUTION_STEP_TRUTH_V1
+
+        The step list is authoritative. A stale current_index, status,
+        or complete flag must never complete an execution while any
+        real step remains unfinished.
+        """
+        if not isinstance(steps, list) or not steps:
+            return False
+
+        return all(
+            self._step_is_complete(step)
+            for step in steps
+        )
+
+    def _first_unfinished_step_index(self, steps):
+        """
+        Derive execution position from actual step statuses instead of
+        trusting persisted current_index.
+        """
+        if not isinstance(steps, list):
+            return 0
+
+        for index, step in enumerate(steps):
+            if not self._step_is_complete(step):
+                return index
+
+        return len(steps)
 
     def process_execution(
         self,
@@ -426,7 +493,13 @@ class ExecutionOrchestratorService:
 
         steps = execution_state.get("steps") or []
 
-        if not steps:
+        if (
+            not steps
+            and command not in {
+                "run_step",
+                "run step",
+            }
+        ):
             return None
 
         current_index = int(
@@ -557,19 +630,10 @@ class ExecutionOrchestratorService:
             ] = denied_step
 
             execution_state = (
-                self.execution_mutation_service.cancel(
-                    execution_state
+                self.execution_mutation_service.mark_approval_denied(
+                    execution_state,
+                    error="Execution approval denied.",
                 )
-            )
-
-            execution_state[
-                "approval_required"
-            ] = False
-            execution_state[
-                "approval_status"
-            ] = "denied"
-            execution_state["error"] = (
-                "Execution approval denied."
             )
 
             execution_state = (
@@ -688,17 +752,17 @@ class ExecutionOrchestratorService:
                     "execution": execution_state,
                 }
 
-            while current_index < len(steps) and self._safe_str(
-                steps[current_index].get("status")
-            ).lower().strip() in {
-                "completed",
-                "done",
-            }:
-                current_index += 1
+            # Derive the current position from the actual step list.
+            # Never trust a stale persisted current_index.
+            current_index = (
+                self._first_unfinished_step_index(
+                    steps
+                )
+            )
 
             execution_state["current_index"] = current_index
 
-            if current_index >= len(steps):
+            if self._all_steps_complete(steps):
 
                 execution_state = (
                     self.execution_mutation_service.mark_complete(
@@ -767,7 +831,17 @@ class ExecutionOrchestratorService:
             ) or current_index >= len(refreshed_steps):
                 refreshed_steps = steps
 
-            if current_index >= len(refreshed_steps):
+            # Re-derive from refreshed step truth before deciding
+            # whether the execution is actually complete.
+            current_index = (
+                self._first_unfinished_step_index(
+                    refreshed_steps
+                )
+            )
+
+            execution_state["current_index"] = current_index
+
+            if self._all_steps_complete(refreshed_steps):
                 execution_state = (
                     self.execution_mutation_service.mark_complete(
                         execution_state,
@@ -833,9 +907,10 @@ class ExecutionOrchestratorService:
                 execution_state.get("continue_request")
                 or command == "continue"
             ):
-                execution_state.pop(
-                    "continue_request",
-                    None,
+                execution_state = (
+                    self.execution_mutation_service.clear_continue_request(
+                        execution_state
+                    )
                 )
 
                 execution_state = (
@@ -1093,11 +1168,14 @@ class ExecutionOrchestratorService:
                 )
             )
 
+            steps = execution_state.get("steps") or []
 
-            next_index = (
-                execution_state[
-                    "current_index"
-                ]
+            next_index = int(
+                execution_state.get(
+                    "current_index",
+                    len(steps),
+                )
+                or 0
             )
 
             if next_index >= len(steps):
@@ -1126,7 +1204,11 @@ class ExecutionOrchestratorService:
                     self.execution_mutation_service.mark_running(
                         execution_state,
                         step_index=next_index,
-                        current_step=next_step,
+                        current_step=(
+                            next_step.get("title")
+                            or next_step.get("action")
+                            or ""
+                        ),
                         waiting=True,
                     )
                 )
@@ -1140,7 +1222,10 @@ class ExecutionOrchestratorService:
                 "ok": True,
                 "assistant_message": {
                     "role": "assistant",
-                    "text": (f"Completed step: " f"{step.get('title')}"),
+                    "text": (
+                        f"Completed step: "
+                        f"{step.get('title')}"
+                    ),
                 },
                 "execution": execution_state,
                 "step_output": result,
@@ -1151,415 +1236,165 @@ class ExecutionOrchestratorService:
         # =========================
         if command == "run_all":
 
-            outputs = []
-            loop_guard = 0
+            if not self.execution_bridge:
 
-            while True:
-
-                loop_guard += 1
-                if loop_guard > 100:
-                    return {
-                        "ok": False,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": "Execution stopped because the run_all loop guard was reached.",
-                        },
-                        "execution": execution_state,
-                    }
-
-                current_index = int(execution_state.get("current_index", 0) or 0)
-
-                if current_index >= len(steps):
-                    execution_state = (
-                        self.execution_mutation_service.mark_complete(
-                            execution_state,
-                        )
-                    )
-
-                    break
-
-                step = steps[current_index]
-
-                # =============================================
-                # NOVA CONTEXT-AWARE EXECUTION
-                # =============================================
-
-                execution_context = (
-                    self._build_execution_context(
-                        execution_state
-                    )
-                )
-
-                step["execution_context"] = (
-                    execution_context
-                )
-
-                step["previous_results"] = (
-                    execution_context.get(
-                        "completed_steps",
-                        [],
-                    )
-                )
-
-                step["previous_failures"] = (
-                    execution_context.get(
-                        "failed_steps",
-                        [],
-                    )
-                )
-
-                step["tool_results"] = (
-                    execution_context.get(
-                        "tool_results",
-                        [],
-                    )
-                )
-
-                execution_state = (
-                    self.execution_mutation_service.mark_step_running(
-                        execution_state,
-                        step_index=current_index,
-                        step=step,
-                    )
-                )
-
-                step = dict(
-                    execution_state["steps"][current_index]
-                )
-
-                execution_state = (
-                    self.execution_mutation_service.mark_running(
-                        execution_state,
-                        step_index=current_index,
-                        current_step=step.get("title") or "",
-                        waiting=False,
-                    )
-                )
-
-                self._save_active_execution(
-                    session_id,
-                    execution_state,
-                )
-
-                print(
-                    "DEBUG RUN_ALL STEP SENT TO EXECUTOR =",
-                    {
-                        "title": step.get("title"),
-                        "action": step.get("action"),
-                        "target_file": step.get("target_file"),
-                        "content_length": len(
-                            step.get("content") or ""
+                return {
+                    "ok": False,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "Execution bridge is not available."
                         ),
-                        "full_step": step,
                     },
-                    flush=True,
-                )
+                    "execution": execution_state,
+                }
 
-                result = self.execution_step_service.execute_step_logic(
-                    session_id=session_id,
-                    step=step,
-                )
+            goal = self._safe_str(
+                execution_state.get("goal")
+            )
 
-                step_status = self._safe_str(
-                    step.get("status")
-                ).lower().strip()
+            steps = (
+                execution_state.get("steps")
+                or []
+            )
 
-                if step_status == "waiting_approval":
-                    approval_reason = self._safe_str(
-                        step.get("error")
-                        or (
-                            "Approval required "
-                            "before execution."
-                        )
-                    )
+            if not goal or not steps:
 
-                    step_title = self._safe_str(
-                        step.get("title")
-                        or "current step"
-                    )
-
-                    execution_state["steps"][
-                        current_index
-                    ] = dict(step)
-
-                    execution_state = (
-                        self.execution_mutation_service.mark_waiting_approval(
-                            execution_state,
-                            step_index=current_index,
-                            reason=approval_reason,
-                        )
-                    )
-
-                    execution_state = (
-                        self.execution_mutation_service.append_history(
-                            execution_state,
-                            (
-                                "waiting approval: "
-                                f"{step_title}"
-                            ),
-                        )
-                    )
-
-                    self._save_active_execution(
-                        session_id,
-                        execution_state,
-                    )
-
-                    return {
-                        "ok": True,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": (
-                                "Approval required: "
-                                f"{step_title}. "
-                                f"{approval_reason}"
-                            ),
-                        },
-                        "execution": execution_state,
-                        "step_output": "",
-                    }
-
-                if step_status in {
-                    "failed",
-                    "blocked",
-                }:
-                    step_error = self._safe_str(
-                        step.get("error")
-                        or "Execution step failed."
-                    )
-
-                    step_title = self._safe_str(
-                        step.get("title")
-                        or "current step"
-                    )
-
-                    execution_state["steps"][
-                        current_index
-                    ] = dict(step)
-
-                    execution_state = (
-                        self.execution_mutation_service.mark_failed(
-                            execution_state,
-                            step_index=current_index,
-                            error=step_error,
-                        )
-                    )
-
-                    execution_state = (
-                        self.execution_mutation_service.append_history(
-                            execution_state,
-                            (
-                                f"failed: {step_title}: "
-                                f"{step_error}"
-                            ),
-                        )
-                    )
-
-                    execution_event = (
-                        self._build_execution_event(
-                            "step_failed",
-                            execution_state,
-                            step=step,
-                            message=(
-                                f"Failed step: {step_title}: "
-                                f"{step_error}"
-                            ),
-                        )
-                    )
-
-                    execution_event["error"] = step_error
-
-                    self._append_execution_event(
-                        execution_state,
-                        execution_event,
-                    )
-
-                    recovery_strategy = (
-                        self._build_recovery_strategy(
-                            execution_state
-                        )
-                    )
-
-                    execution_state["recovery_strategy"] = (
-                        recovery_strategy
-                    )
-
-                    recovery_event = (
-                        self._build_execution_event(
-                            "recovery_started",
-                            execution_state,
-                            step=step,
-                            message=(
-                                "Recovery strategy started: "
-                                f"{recovery_strategy.get('strategy')}"
-                            ),
-                        )
-                    )
-
-                    recovery_event["strategy"] = (
-                        recovery_strategy
-                    )
-
-                    self._append_execution_event(
-                        execution_state,
-                        recovery_event,
-                    )
-
-                    if self._should_retry_step(
-                        execution_state,
-                        step,
-                    ):
-                        retry_count = int(
-                            step.get(
-                                "recovery_retry_count",
-                                0,
-                            )
-                            or 0
-                        ) + 1
-
-                        step["recovery_retry_count"] = (
-                            retry_count
-                        )
-
-                        step["status"] = "pending"
-                        step["error"] = None
-
-                        execution_state["steps"][
-                            current_index
-                        ] = dict(step)
-
-                        execution_state["current_index"] = (
-                            current_index
-                        )
-
-                        execution_state = (
-                            self.execution_mutation_service.append_history(
-                                execution_state,
-                                (
-                                    "recovery retry "
-                                    f"{retry_count}: {step_title}"
-                                ),
-                            )
-                        )
-
-                        self._save_active_execution(
-                            session_id,
-                            execution_state,
-                        )
-
-                        continue
-
-                    execution_state = (
-                        self.execution_mutation_service.append_history(
-                            execution_state,
-                            (
-                                "recovery strategy prepared: "
-                                f"{recovery_strategy.get('strategy')}"
-                            ),
-                        )
-                    )
-
-                    self._save_active_execution(
-                        session_id,
-                        execution_state,
-                    )
-
-                    return {
-                        "ok": False,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": (
-                                f"Step failed: {step_title}. "
-                                f"{step_error}"
-                            ),
-                        },
-                        "execution": execution_state,
-                        "step_output": step.get(
-                            "result",
-                            "",
+                return {
+                    "ok": False,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "Execution cannot run because "
+                            "the plan is incomplete."
                         ),
-                    }
+                    },
+                    "execution": execution_state,
+                }
 
-                if result:
-                    step["result"] = result
+            plan = {
+                "goal": goal,
+                "steps": steps,
+                "status": (
+                    execution_state.get("status")
+                    or "pending"
+                ),
+            }
 
-                execution_state["steps"][current_index] = dict(step)
-
-                steps = execution_state["steps"]
-
-                step_title = self._safe_str(step.get("title"))
-
-                execution_state = (
-                    self.execution_mutation_service.append_history(
-                        execution_state,
-                        f"completed: {step_title}",
-                    )
-                )
-                execution_event = (
-                    self._build_execution_event(
-                        "step_completed",
-                        execution_state,
-                        step=step,
-                        message=f"Completed step: {step_title}",
-                    )
-                )
-
-                execution_event["result"] = step.get(
-                    "result"
-                )
-
-                self._append_execution_event(
-                    execution_state,
-                    execution_event,
-                )
-
-                execution_state = (
-                    self.execution_mutation_service.advance_after_step_completion(
-                        execution_state,
-                        completed_index=current_index,
-                    )
-                )
-
-                outputs.append(f"Completed step: {step_title}")
-
-                if execution_state["current_index"] >= len(steps):
-                    execution_state = (
-                        self.execution_mutation_service.mark_complete(
-                            execution_state,
-                        )
-                    )
-                    break
-
-            completion_event = (
-                self._build_execution_event(
-                    "execution_completed",
-                    execution_state,
-                    message=(
-                        "Execution completed successfully."
-                    ),
+            bridge_result = (
+                self.execution_bridge.execute(
+                    plan=plan,
+                    session_id=session_id,
                 )
             )
 
-            completion_event["outputs"] = outputs
+            if not isinstance(
+                bridge_result,
+                dict,
+            ):
 
-            self._append_execution_event(
-                execution_state,
-                completion_event,
+                return {
+                    "ok": False,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "Execution bridge returned "
+                            "no result."
+                        ),
+                    },
+                    "execution": execution_state,
+                }
+
+            bridge_output = (
+                bridge_result.get("output")
+                or {}
             )
 
-            self._save_active_execution(
+            if not isinstance(
+                bridge_output,
+                dict,
+            ):
+
+                bridge_output = {}
+
+            output_steps = (
+                bridge_output.get("steps")
+                or steps
+            )
+
+            execution_state["steps"] = (
+                output_steps
+            )
+
+            execution_state["status"] = (
+                bridge_output.get("status")
+                or (
+                    "failed"
+                    if not bridge_result.get("status")
+                    == "completed"
+                    else "complete"
+                )
+            )
+
+            execution_state["current_index"] = len(
+                output_steps
+            )
+
+            if bridge_output.get("error"):
+
+                execution_state["error"] = (
+                    bridge_output.get("error")
+                )
+
+            self._save_execution_state(
                 session_id,
                 execution_state,
             )
 
+            bridge_ok = (
+                bridge_result.get("status")
+                == "completed"
+                and execution_state.get("status")
+                in {
+                    "complete",
+                    "completed",
+                }
+            )
+
+            message_text = ""
+
+            if bridge_ok:
+
+                message_text = (
+                    "Execution completed successfully."
+                )
+
+            else:
+
+                message_text = self._safe_str(
+                    execution_state.get("error")
+                )
+
+                if not message_text:
+
+                    message_text = (
+                        "Execution failed."
+                    )
+
             return {
-                "ok": True,
+                "ok": bridge_ok,
                 "assistant_message": {
                     "role": "assistant",
-                    "text": "\n".join(outputs),
+                    "text": message_text,
                 },
                 "execution": execution_state,
+                "bridge_result": bridge_result,
             }
+
+
+        # =========================
+        # CANCEL
+        # =========================
 
         # =========================
         # CANCEL
@@ -1652,4 +1487,6 @@ class ExecutionOrchestratorService:
                 session_id=session_id,
                 execution_state=execution_state,
             )
+
+
 

@@ -1,9 +1,12 @@
 ﻿<!doctype html>
+
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Nova Login</title>
+
 <style>
   :root{
     color-scheme:dark;
@@ -79,7 +82,11 @@
   }
 
   .tab-btn.active{
-    background:linear-gradient(135deg, rgba(124,199,255,0.24), rgba(88,240,199,0.22));
+    background:linear-gradient(
+      135deg,
+      rgba(124,199,255,0.24),
+      rgba(88,240,199,0.22)
+    );
     border-color:rgba(124,199,255,0.38);
   }
 
@@ -118,6 +125,20 @@
   input:focus{
     border-color:rgba(94,163,255,0.42);
     box-shadow:0 0 0 3px rgba(94,163,255,0.14);
+  }
+
+  .forgot-password{
+    display:inline-block;
+    width:max-content;
+    color:#9bc9ff;
+    text-decoration:none;
+    font-size:0.9rem;
+    font-weight:700;
+    margin-top:-4px;
+  }
+
+  .forgot-password:hover{
+    text-decoration:underline;
   }
 
   .submit-btn{
@@ -160,94 +181,276 @@
     opacity:0.85;
   }
 </style>
+
 </head>
+
 <body>
+
   <div class="login-shell">
-    <div class="kicker">Nova Access</div>
-    <h1>Enter Nova</h1>
-    <p class="subtext">Real local account system. Create a user once, then log in normally.</p>
 
-    <div class="tabs">
-      <button id="loginTabBtn" class="tab-btn" type="button">Sign in</button>
-      <button id="registerTabBtn" class="tab-btn" type="button">Create account</button>
-    </div>
+```
+<div class="kicker">Nova Access</div>
 
-    <div id="loginPanel" class="panel">
-      <form id="loginForm">
-        <label>
-          Username
-          <input id="loginUsername" type="text" name="username" value="{{ prefill_username or '' }}" autocomplete="username" required>
-        </label>
+<h1>Enter Nova</h1>
 
-        <label>
-          Password
-          <input id="loginPassword" type="password" name="password" autocomplete="current-password" required>
-        </label>
+<p class="subtext">
+  Create your Nova account or sign in to continue.
+</p>
 
-        <div id="authMessage" class="message error"></div>
+<div class="tabs">
 
-        <button class="submit-btn" type="submit">Sign in</button>
-      </form>
-    </div>
+  <button
+    id="loginTabBtn"
+    class="tab-btn"
+    type="button"
+  >
+    Sign in
+  </button>
 
-    <div id="registerPanel" class="panel">
-      <form id="registerForm">
-        <label>
-          Username
-          <input id="registerUsername" type="text" name="username" value="{{ prefill_register_username or '' }}" autocomplete="username" required>
-        </label>
+  <button
+    id="registerTabBtn"
+    class="tab-btn"
+    type="button"
+  >
+    Create account
+  </button>
 
-        <label>
-          Password
-          <input id="registerPassword" type="password" name="password" autocomplete="new-password" required>
-        </label>
+</div>
 
-        <button class="submit-btn" type="submit">Create account</button>
-      </form>
-    </div>
 
-    <div class="note">
-      Username rules: 3 to 32 chars, lowercase letters, numbers, underscore, dash.<br>
-      Password rules: minimum 8 chars.
-    </div>
+<!-- LOGIN -->
+
+<div
+  id="loginPanel"
+  class="panel"
+>
+
+  <form id="loginForm">
+
+    <label>
+      Username or email
+
+      <input
+        id="loginUsername"
+        type="text"
+        name="username"
+        value="{{ prefill_username or '' }}"
+        autocomplete="username"
+        required
+      >
+    </label>
+
+    <label>
+      Password
+
+      <input
+        id="loginPassword"
+        type="password"
+        name="password"
+        autocomplete="current-password"
+        required
+      >
+    </label>
+
+    <a
+      class="forgot-password"
+      href="/forgot-password"
+    >
+      Forgot password?
+    </a>
+
+    <div
+      id="authMessage"
+      class="message"
+    ></div>
+
+    <button
+      class="submit-btn"
+      type="submit"
+    >
+      Sign in
+    </button>
+
+  </form>
+
+</div>
+
+
+<!-- REGISTER -->
+
+<div
+  id="registerPanel"
+  class="panel"
+>
+
+  <form id="registerForm">
+
+    <label>
+      Username
+
+      <input
+        id="registerUsername"
+        type="text"
+        name="username"
+        value="{{ prefill_register_username or '' }}"
+        autocomplete="username"
+        minlength="3"
+        maxlength="32"
+        required
+      >
+    </label>
+
+
+    <label>
+      Email address
+
+      <input
+        id="registerEmail"
+        type="email"
+        name="email"
+        autocomplete="email"
+        required
+      >
+    </label>
+
+
+    <label>
+      Confirm email address
+
+      <input
+        id="registerEmailConfirm"
+        type="email"
+        name="email_confirm"
+        autocomplete="email"
+        required
+      >
+    </label>
+
+
+    <label>
+      Password
+
+      <input
+        id="registerPassword"
+        type="password"
+        name="password"
+        autocomplete="new-password"
+        minlength="8"
+        required
+      >
+    </label>
+
+
+    <label>
+      Confirm password
+
+      <input
+        id="registerPasswordConfirm"
+        type="password"
+        name="password_confirm"
+        autocomplete="new-password"
+        minlength="8"
+        required
+      >
+    </label>
+
+
+    <div
+      id="registerMessage"
+      class="message"
+    ></div>
+
+
+    <button
+      class="submit-btn"
+      type="submit"
+    >
+      Create account
+    </button>
+
+  </form>
+
+</div>
+
+
+<div class="note">
+  Username: 3–32 characters using lowercase letters,
+  numbers, underscores, or dashes.<br>
+  Password: minimum 8 characters.<br>
+  Your email is used for account recovery.
+</div>
+```
+
   </div>
 
-<script src="{{ url_for('static', filename='js/auth.js') }}?v=auth-redirect-regex-20260610184746"></script>
+<script
+  src="{{ url_for('static', filename='js/auth.js') }}?v=auth-production-registration-20260908"
+></script>
+
 <script>
 (() => {
   "use strict";
 
-  const loginTabBtn = document.getElementById("loginTabBtn");
-  const registerTabBtn = document.getElementById("registerTabBtn");
-  const loginPanel = document.getElementById("loginPanel");
-  const registerPanel = document.getElementById("registerPanel");
-  const authMessage = document.getElementById("authMessage");
-  const activeTab = "{{ active_tab or 'login' }}";
+  const loginTabBtn =
+    document.getElementById("loginTabBtn");
+
+  const registerTabBtn =
+    document.getElementById("registerTabBtn");
+
+  const loginPanel =
+    document.getElementById("loginPanel");
+
+  const registerPanel =
+    document.getElementById("registerPanel");
+
+  const activeTab =
+    "{{ active_tab or 'login' }}";
+
 
   function showTab(tabName){
-    const isLogin = tabName === "login";
 
-    loginTabBtn.classList.toggle("active", isLogin);
-    registerTabBtn.classList.toggle("active", !isLogin);
-    loginPanel.classList.toggle("active", isLogin);
-    registerPanel.classList.toggle("active", !isLogin);
+    const isLogin =
+      tabName === "login";
 
-    if(authMessage){
-      authMessage.className = "message";
-      authMessage.textContent = "";
-    }
+    loginTabBtn.classList.toggle(
+      "active",
+      isLogin
+    );
+
+    registerTabBtn.classList.toggle(
+      "active",
+      !isLogin
+    );
+
+    loginPanel.classList.toggle(
+      "active",
+      isLogin
+    );
+
+    registerPanel.classList.toggle(
+      "active",
+      !isLogin
+    );
+
   }
 
-  loginTabBtn.addEventListener("click", () => showTab("login"));
-  registerTabBtn.addEventListener("click", () => showTab("register"));
+
+  loginTabBtn.addEventListener(
+    "click",
+    () => showTab("login")
+  );
+
+
+  registerTabBtn.addEventListener(
+    "click",
+    () => showTab("register")
+  );
+
 
   showTab(activeTab);
+
 })();
 </script>
+
 </body>
 </html>
-
-
-
-
-

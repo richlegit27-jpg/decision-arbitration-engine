@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
@@ -46,6 +46,8 @@ def register_project_routes(
         "/api/projects/build",
         methods=["POST"],
     )
+
+
     def build_project():
         data = request.get_json(
             silent=True
@@ -132,6 +134,259 @@ def register_project_routes(
         )
 
     @project_bp.route(
+        "/api/projects/<project_id>/phases",
+        methods=["GET"],
+    )
+    def list_project_phases(
+        project_id,
+    ):
+        phases = (
+            project_workspace_service
+            .list_phases(
+                project_id
+            )
+        )
+
+        if phases is None:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Project not found",
+                }
+            ), 404
+
+        return jsonify(
+            {
+                "ok": True,
+                "phases": phases,
+            }
+        )
+
+
+    @project_bp.route(
+        "/api/projects/<project_id>/phases",
+        methods=["POST"],
+    )
+    def add_project_phase(
+        project_id,
+    ):
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        title = str(
+            data.get(
+                "title",
+                "",
+            )
+        ).strip()
+
+        if not title:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Phase title is required",
+                }
+            ), 400
+
+        phase = (
+            project_workspace_service
+            .add_phase(
+                project_id,
+                title,
+                data.get(
+                    "description",
+                    "",
+                ),
+                data.get(
+                    "status",
+                    "planned",
+                ),
+                data.get(
+                    "order",
+                ),
+                data.get(
+                    "goal",
+                    "",
+                ),
+                data.get(
+                    "milestone",
+                    "",
+                ),
+            )
+        )
+
+        if not phase:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Project not found",
+                }
+            ), 404
+
+        return jsonify(
+            {
+                "ok": True,
+                "phase": phase,
+            }
+        ), 201
+
+
+    @project_bp.route(
+        "/api/projects/<project_id>/phases/<phase_id>",
+        methods=["GET"],
+    )
+    def get_project_phase(
+        project_id,
+        phase_id,
+    ):
+        phase = (
+            project_workspace_service
+            .get_phase(
+                project_id,
+                phase_id,
+            )
+        )
+
+        if not phase:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Phase not found",
+                }
+            ), 404
+
+        return jsonify(
+            {
+                "ok": True,
+                "phase": phase,
+            }
+        )
+
+
+    @project_bp.route(
+        "/api/projects/<project_id>/phases/<phase_id>",
+        methods=["PATCH"],
+    )
+    def update_project_phase(
+        project_id,
+        phase_id,
+    ):
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        allowed_fields = {
+            "title",
+            "description",
+            "status",
+            "order",
+            "goal",
+            "milestone",
+        }
+
+        updates = {
+            key: value
+            for key, value in data.items()
+            if key in allowed_fields
+        }
+
+        if not updates:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "No valid phase updates supplied",
+                }
+            ), 400
+
+        phase = (
+            project_workspace_service
+            .update_phase(
+                project_id,
+                phase_id,
+                updates,
+            )
+        )
+
+        if not phase:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Phase not found",
+                }
+            ), 404
+
+        return jsonify(
+            {
+                "ok": True,
+                "phase": phase,
+            }
+        )
+
+
+    @project_bp.route(
+        "/api/projects/<project_id>/phases/<phase_id>",
+        methods=["DELETE"],
+    )
+    def delete_project_phase(
+        project_id,
+        phase_id,
+    ):
+        deleted = (
+            project_workspace_service
+            .delete_phase(
+                project_id,
+                phase_id,
+            )
+        )
+
+        if not deleted:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Phase not found",
+                }
+            ), 404
+
+        return jsonify(
+            {
+                "ok": True,
+                "deleted": True,
+                "phase_id": phase_id,
+            }
+        )
+
+
+    @project_bp.route(
+        "/api/projects/<project_id>/tasks/intelligence",
+        methods=["GET"],
+    )
+    def get_project_task_intelligence(
+        project_id,
+    ):
+        intelligence = (
+            project_workspace_service
+            .get_task_intelligence(
+                project_id
+            )
+        )
+
+        if intelligence is None:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Project not found",
+                }
+            ), 404
+
+        return jsonify(
+            {
+                "ok": True,
+                "intelligence": intelligence,
+            }
+        )
+
+    @project_bp.route(
         "/api/projects/<project_id>/tasks/<task_id>",
         methods=["PATCH"],
     )
@@ -187,9 +442,110 @@ def register_project_routes(
         )
 
     @project_bp.route(
+        "/api/projects/<project_id>/tasks",
+        methods=["POST"],
+    )
+    def add_project_task(
+        project_id,
+    ):
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        task = (
+            project_workspace_service
+            .add_task(
+                project_id,
+                data.get(
+                    "title",
+                    "New Task",
+                ),
+                data.get(
+                    "priority",
+                    "medium",
+                ),
+                data.get(
+                    "description",
+                    "",
+                ),
+                data.get(
+                    "action",
+                    "",
+                ),
+                data.get(
+                    "target_file",
+                    "",
+                ),
+                data.get(
+                    "content",
+                    "",
+                ),
+                data.get(
+                    "command",
+                    "",
+                ),
+            )
+        )
+
+        if not task:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Project not found",
+                }
+            ), 404
+
+        return jsonify(
+            {
+                "ok": True,
+                "task": task,
+            }
+        )
+
+    @project_bp.route(
+        "/api/projects/<project_id>/tasks/<task_id>",
+        methods=["DELETE"],
+    )
+    def delete_project_task(
+        project_id,
+        task_id,
+    ):
+        deleted = (
+            project_workspace_service
+            .delete_task(
+                project_id,
+                task_id,
+            )
+        )
+
+        if not deleted:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Task not found",
+                }
+            ), 404
+
+        project_workspace_service.add_activity(
+            project_id,
+            "Task deleted",
+            task_id,
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "deleted": True,
+                "task_id": task_id,
+            }
+        )
+
+    @project_bp.route(
         "/api/projects/<project_id>/activate",
         methods=["POST"],
     )
+
+
     def activate_project(project_id):
         result = (
             project_workspace_service
@@ -318,3 +674,7 @@ def register_project_routes(
         )
 
     app.register_blueprint(project_bp)
+
+
+
+

@@ -28,6 +28,7 @@ class ExecutionEngine:
         )
 
         if not steps:
+
             steps = [
                 {
                     "id": 1,
@@ -37,6 +38,7 @@ class ExecutionEngine:
             ]
 
         else:
+
             normalized_steps = []
 
             for index, step in enumerate(
@@ -83,7 +85,9 @@ class ExecutionEngine:
         }
 
 
-        self.executions[execution_id] = execution
+        self.executions[execution_id] = (
+            execution
+        )
 
         return execution
 
@@ -102,6 +106,7 @@ class ExecutionEngine:
     def advance(
         self,
         execution_id,
+        session_id="",
     ):
 
         execution = self.get(
@@ -109,6 +114,7 @@ class ExecutionEngine:
         )
 
         if not execution:
+
             return {}
 
 
@@ -130,7 +136,7 @@ class ExecutionEngine:
         if self.step_service:
 
             self.step_service.execute_step_logic(
-                session_id="",
+                session_id=session_id,
                 step=step,
             )
 
@@ -194,31 +200,131 @@ class ExecutionEngine:
         self,
         goal,
         steps=None,
+        session_id="",
     ):
-        """
-        Universal execution entry point.
-
-        Creates an execution plan and advances
-        through the initial execution lifecycle.
-        """
 
         execution = self.create_plan(
             goal=goal,
             steps=steps,
         )
 
+        if not execution:
+
+            return {
+                "status": "failed",
+                "error": (
+                    "Could not create execution plan."
+                ),
+            }
+
+
+        return self.advance(
+            execution["id"],
+            session_id=session_id,
+        )
+
+
+    def run_all(
+        self,
+        goal,
+        steps=None,
+        session_id="",
+    ):
+
+        execution = self.create_plan(
+            goal=goal,
+            steps=steps,
+        )
 
         if not execution:
 
             return {
                 "status": "failed",
-                "error": "Could not create execution plan.",
+                "error": (
+                    "Could not create execution plan."
+                ),
             }
 
 
-        execution = self.advance(
-            execution["id"]
-        )
+        execution_id = execution["id"]
+
+
+        while True:
+
+            execution = self.get(
+                execution_id
+            )
+
+            if not execution:
+
+                return {
+                    "status": "failed",
+                    "error": (
+                        "Execution disappeared during run."
+                    ),
+                }
+
+
+            status = (
+                execution.get("status")
+                or ""
+            ).lower()
+
+
+            if status in (
+                "complete",
+                "completed",
+                "failed",
+            ):
+
+                break
+
+
+            current_step = int(
+                execution.get(
+                    "current_step",
+                    0,
+                )
+                or 0
+            )
+
+            steps_list = (
+                execution.get("steps")
+                or []
+            )
+
+
+            if current_step >= len(
+                steps_list
+            ):
+
+                execution["status"] = "complete"
+
+                break
+
+
+            execution = self.advance(
+                execution_id,
+                session_id=session_id,
+            )
+
+
+            if not execution:
+
+                return {
+                    "status": "failed",
+                    "error": (
+                        "Execution disappeared during advance."
+                    ),
+                }
+
+
+            if (
+                execution.get("status")
+                == "failed"
+            ):
+
+                break
 
 
         return execution

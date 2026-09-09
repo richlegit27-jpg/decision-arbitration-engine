@@ -22,16 +22,31 @@ def plan_tool_request(
         or "delete memory" in text
         or "remove memory" in text
     ):
-        match = re.search(
-            r"memory_[a-zA-Z0-9]+",
+        memory_id = ""
+
+        explicit_match = re.search(
+            r"\bmemory_[a-zA-Z0-9_-]+\b",
             original_text,
         )
+
+        if explicit_match:
+            memory_id = explicit_match.group(0)
+
+        else:
+            command_match = re.search(
+                r"(?:delete|remove)\s+memory\s+(.+)$",
+                original_text,
+                re.IGNORECASE,
+            )
+
+            if command_match:
+                memory_id = command_match.group(1).strip()
 
         return {
             "ok": True,
             "tool": "memory_delete",
             "payload": {
-                "memory_id": match.group(0) if match else "",
+                "memory_id": memory_id,
             },
         }
 
@@ -337,17 +352,24 @@ def plan_tool_request(
     for prefix in [
         "delete file ",
         "remove file ",
+        "delete ",
+        "remove ",
     ]:
         if text.startswith(prefix):
-            return {
-                "ok": True,
-                "tool": "file_delete",
-                "payload": {
-                    "path": original_text[
-                        len(prefix):
-                    ].strip(),
-                },
-            }
+
+            path = original_text[
+                len(prefix):
+            ].strip()
+
+            if path:
+
+                return {
+                    "ok": True,
+                    "tool": "file_delete",
+                    "payload": {
+                        "path": path,
+                    },
+                }
 
     # DIRECTORY CREATE
     for prefix in [

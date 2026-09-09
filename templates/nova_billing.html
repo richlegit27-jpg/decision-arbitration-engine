@@ -1,6 +1,8 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
+
 <head>
+
     <meta charset="utf-8">
 
     <meta
@@ -8,16 +10,16 @@
         content="width=device-width, initial-scale=1"
     >
 
-    <title>Nova Billing | Plans, credits, and payment status</title>
+    <title>Nova Billing</title>
 
     <meta
         name="description"
-        content="Understand Nova plans, credits, usage, and payment status. Live paid upgrades and model-tier purchasing are not active yet."
+        content="Manage your Nova plan, credits, usage, and subscription."
     >
 
     <link
         rel="stylesheet"
-        href="/static/css/nova-billing.css?v=billing-endgame-20260711"
+        href="/static/css/nova-billing.css?v=billing-live-20260908"
     >
 
     <link
@@ -26,152 +28,81 @@
         type="image/svg+xml"
     >
 
-    <link
-        rel="manifest"
-        href="/static/site.webmanifest"
-    >
-
-    <meta
-        name="theme-color"
-        content="#8b5cf6"
-    >
-
-
-    <!-- NOVA_SOCIAL_META_20260709 -->
-
-    <meta
-        property="og:site_name"
-        content="Nova"
-    >
-
-    <meta
-        property="og:type"
-        content="website"
-    >
-
-    <meta
-        property="og:title"
-        content="Nova Billing"
-    >
-
-    <meta
-        property="og:description"
-        content="Nova plans, credits, usage, and clear payment status."
-    >
-
-    <meta
-        property="og:url"
-        content="{{ request.url_root.rstrip('/') }}/billing"
-    >
-
-    <meta
-        property="og:image"
-        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
-    >
-
-    <meta
-        property="og:image:type"
-        content="image/svg+xml"
-    >
-
-    <meta
-        name="twitter:card"
-        content="summary_large_image"
-    >
-
-    <meta
-        name="twitter:title"
-        content="Nova Billing"
-    >
-
-    <meta
-        name="twitter:description"
-        content="Nova plans, credits, usage, and clear payment status."
-    >
-
-    <meta
-        name="twitter:image"
-        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
-    >
-
-    <!-- /NOVA_SOCIAL_META_20260709 -->
-
-
-    <!-- NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
-
-    <link
-        rel="canonical"
-        href="{{ request.url_root.rstrip('/') }}/billing"
-    >
-
-    <!-- /NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
 </head>
 
 <body>
+
     <main class="nova-billing-shell">
+
         <nav
             class="nova-billing-nav"
             aria-label="Nova billing navigation"
         >
+
             <a
                 class="nova-billing-brand"
                 href="/"
                 aria-label="Nova home"
             >
+
                 <span>N</span>
 
                 <div>
                     <strong>Nova</strong>
                     <em>Billing</em>
                 </div>
+
             </a>
 
-
             <div class="nova-billing-actions">
+
                 <a href="/">Home</a>
-                <a href="/about">About</a>
+
                 <a href="/features">Features</a>
+
                 <a href="/roadmap">Roadmap</a>
+
                 <a href="/faq">FAQ</a>
 
-                <a
-                    href="/contact#nova-contact-form-title"
-                >
-                    Request Access
-                </a>
             </div>
+
         </nav>
 
 
         <section class="nova-billing-hero">
+
             <div>
+
                 <p class="nova-billing-kicker">
                     Plans and usage
                 </p>
 
                 <h1>
-                    Clear usage now. Paid billing later.
+                    Choose the Nova plan that fits your workflow.
                 </h1>
 
                 <span>
-                    Nova can show plan, credit, and usage information today.
-                    Live payment collection, paid upgrades, and user-selectable
-                    model billing are not active yet.
+                    Manage your plan, usage credits, and subscription
+                    from one place.
                 </span>
+
             </div>
 
 
             <aside class="nova-billing-status-card">
-                <p>Account status</p>
 
-                <strong>
-                    {{ status_label }}
+                <p>Current plan</p>
+
+                <strong id="billing-current-plan">
+                    Loading...
                 </strong>
 
-                <span>
-                    {{ plan_label }} plan
+                <span id="billing-account-status">
+                    Checking account
                 </span>
+
             </aside>
+
         </section>
 
 
@@ -179,65 +110,80 @@
             class="nova-billing-grid"
             aria-label="Nova account usage"
         >
+
             <article class="nova-billing-card primary">
+
                 <p>Current plan</p>
 
-                <h2>
-                    {{ plan_label }}
+                <h2 id="billing-plan-label">
+                    --
                 </h2>
 
                 <span>
-                    The current account plan label used by Nova.
+                    Your active Nova subscription plan.
                 </span>
+
             </article>
 
 
             <article class="nova-billing-card">
+
                 <p>Credits remaining</p>
 
-                <h2>
-                    {{ credits_label }}
+                <h2 id="billing-credits">
+                    --
                 </h2>
 
                 <span>
-                    Available usage credits shown for the current account.
+                    Available Nova usage credits.
                 </span>
+
             </article>
 
 
             <article class="nova-billing-card">
+
                 <p>Monthly allowance</p>
 
-                <h2>
-                    {{ monthly_credits_label }}
+                <h2 id="billing-monthly-credits">
+                    --
                 </h2>
 
                 <span>
-                    The monthly credit allowance currently associated with the account.
+                    Credits available during your billing period.
                 </span>
+
             </article>
+
         </section>
 
 
         <section class="nova-usage-panel">
+
             <div class="nova-usage-head">
+
                 <div>
+
                     <p>Usage</p>
 
                     <h2>
-                        {{ used_credits_label }} credits used
+                        <span id="billing-used-credits">
+                            --
+                        </span>
+                        credits used
                     </h2>
 
-                    <span>
-                        {{ credits_label }} credits remain from the current
-                        {{ monthly_credits_label }} credit allowance.
+                    <span id="billing-usage-description">
+                        Loading account usage...
                     </span>
+
                 </div>
 
 
-                <strong>
-                    {{ usage_percent_raw }}%
+                <strong id="billing-usage-percent">
+                    0%
                 </strong>
+
             </div>
 
 
@@ -245,37 +191,49 @@
                 class="nova-usage-bar"
                 aria-label="Nova usage progress"
             >
+
                 <span
-                    style="width: {{ usage_percent_raw }}%;"
+                    id="billing-usage-bar"
+                    style="width: 0%;"
                 ></span>
+
             </div>
 
 
             <div class="nova-usage-meta">
-                <span>Usage consumed</span>
-                <span>Credits remaining</span>
-            </div>
-        </section>
 
+                <span>Usage consumed</span>
+
+                <span>Credits remaining</span>
+
+            </div>
+
+        </section>
 
 
         <section class="nova-tier-section">
+
             <div class="nova-section-head">
+
                 <p>Nova Plans</p>
 
                 <h2>
-                    Choose the plan that fits your workflow.
+                    Upgrade when you need more Nova.
                 </h2>
 
                 <span>
-                    Nova plans provide different usage limits
+                    Plans provide different monthly usage limits
                     for conversations, projects, and advanced AI work.
                 </span>
+
             </div>
 
 
             <div class="nova-tier-grid">
+
+
                 <article>
+
                     <strong>Free</strong>
 
                     <h3>
@@ -283,143 +241,30 @@
                     </h3>
 
                     <p>
-                        Try Nova with basic AI assistance,
-                        planning, and everyday tasks.
-                    </p>
-
-                    <em>
-                        Current
-                    </em>
-                </article>
-
-
-                <article class="featured">
-                    <strong>Plus</strong>
-
-                    <h3>
-                        $10 / month
-                    </h3>
-
-                    <p>
-                        More credits for coding, projects,
-                        writing, and longer conversations.
-                    </p>
-
-                    <button
-                        type="button"
-                        onclick="window.location.href='/api/billing/checkout?plan=plus'"
-                    >
-                        Upgrade
-                    </button>
-                </article>
-
-
-                <article>
-                    <strong>Pro</strong>
-
-                    <h3>
-                        $25 / month
-                    </h3>
-
-                    <p>
-                        Higher limits for heavy users,
-                        advanced workflows, and large projects.
-                    </p>
-
-                    <button
-                        type="button"
-                        onclick="window.location.href='/api/billing/checkout?plan=pro'"
-                    >
-                        Upgrade
-                    </button>
-                </article>
-            </div>
-        </section>
-                <article>
-                    <strong>Free</strong>
-
-                    <h3>
-                        $0 / month
-                    </h3>
-
-                    <p>
-                        Try Nova with basic AI assistance,
-                        planning, and everyday tasks.
-                    </p>
-
-                    <em>
-                        Current
-                    </em>
-                </article>
-
-
-                <article class="featured">
-                    <strong>Plus</strong>
-
-                    <h3>
-                        $10 / month
-                    </h3>
-
-                    <p>
-                        More credits for coding, projects,
-                        writing, and longer conversations.
-                    </p>
-
-                    <button
-                        type="button"
-                        onclick="window.location.href='/api/billing/checkout?plan=plus'"
-                    >
-                        Upgrade
-                    </button>
-                </article>
-
-
-                <article>
-                    <strong>Pro</strong>
-
-                    <h3>
-                        $25 / month
-                    </h3>
-
-                    <p>
-                        Higher limits for heavy users,
-                        advanced workflows, and large projects.
-                    </p>
-
-                    <button
-                        type="button"
-                        onclick="window.location.href='/api/billing/checkout?plan=pro'"
-                    >
-                        Upgrade
-                    </button>
-                </article>
-            </div>
-        </section>
-
-            <div class="nova-tier-grid">
-
-                <article>
-                    <strong>Free</strong>
-
-                    <h3>
-                        $0 / month
-                    </h3>
-
-                    <p>
-                        Try Nova with basic AI assistance and limited monthly usage.
+                        Get started with Nova for everyday
+                        AI assistance and planning.
                     </p>
 
                     <ul>
+
                         <li>10,000 credits/month</li>
+
                         <li>Basic chat</li>
-                        <li>Writing and planning help</li>
+
+                        <li>Writing and planning</li>
+
                     </ul>
 
-                    <em>Current</em>
+                    <em id="billing-free-status">
+                        Available
+                    </em>
+
                 </article>
 
 
+
                 <article class="featured">
+
                     <strong>Plus</strong>
 
                     <h3>
@@ -427,22 +272,36 @@
                     </h3>
 
                     <p>
-                        More usage for everyday AI work, projects, and productivity.
+                        More usage for projects, coding,
+                        writing, and longer conversations.
                     </p>
 
                     <ul>
+
                         <li>500,000 credits/month</li>
+
                         <li>Higher usage limits</li>
+
                         <li>Project assistance</li>
+
                     </ul>
 
-                    <button type="button">
-                        Upgrade
+                    <button
+                        type="button"
+                        class="billing-upgrade-button"
+                        data-plan="plus"
+                    >
+
+                        Upgrade to Plus
+
                     </button>
+
                 </article>
 
 
+
                 <article>
+
                     <strong>Pro</strong>
 
                     <h3>
@@ -450,72 +309,96 @@
                     </h3>
 
                     <p>
-                        Built for heavy users building projects with Nova.
+                        Built for heavy users working on
+                        larger projects and advanced workflows.
                     </p>
 
                     <ul>
+
                         <li>2,000,000 credits/month</li>
+
                         <li>Priority usage</li>
+
                         <li>Advanced workflows</li>
+
                     </ul>
 
                     <button
                         type="button"
-                        onclick="window.location.href='/api/billing/checkout?plan=plus'"
+                        class="billing-upgrade-button"
+                        data-plan="pro"
                     >
-                        Upgrade
+
+                        Upgrade to Pro
+
                     </button>
+
                 </article>
 
+
             </div>
+
         </section>
 
 
         <section class="nova-billing-cta">
+
             <div>
-                <p>Early access</p>
+
+                <p>Need help?</p>
 
                 <h2>
-                    Interested in Nova before paid plans go live?
+                    Questions about your Nova plan?
                 </h2>
 
                 <span>
-                    Request access and tell us what kind of project
-                    you want Nova to help keep together.
+                    Contact us and we can help with billing,
+                    plans, or account questions.
                 </span>
+
             </div>
 
 
-            <a
-                href="/contact#nova-contact-form-title"
-            >
-                Request Access
+            <a href="/contact">
+
+                Contact Nova
+
             </a>
+
         </section>
 
 
         <footer class="nova-billing-footer">
+
             <span>
-                Nova Billing ? Payments are not live
+                Nova Billing
             </span>
 
             <div>
+
                 <a href="/">Home</a>
-                <a href="/about">About</a>
+
                 <a href="/features">Features</a>
+
                 <a href="/roadmap">Roadmap</a>
+
                 <a href="/faq">FAQ</a>
-                <a href="/blog">Blog</a>
-                <a href="/contact">Contact</a>
+
                 <a href="/privacy">Privacy</a>
+
                 <a href="/terms">Terms</a>
+
             </div>
+
         </footer>
+
     </main>
 
 
     <script
-        src="/static/js/nova-billing.js?v=billing-endgame-20260711"
+        src="/static/js/nova-billing.js?v=billing-live-20260908"
     ></script>
+
 </body>
+
 </html>

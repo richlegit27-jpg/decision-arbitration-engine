@@ -290,6 +290,17 @@ class ExecutionGuardService:
         action = commands[clean]
 
         if action == "run_all":
+
+            if (
+                self.chat_service
+                and hasattr(
+                    self.chat_service,
+                    "execution_orchestrator_service",
+                )
+                and self.chat_service.execution_orchestrator_service
+            ):
+                return None
+
             state = self.chat_execution_service.run_all(
                 session_id
             )

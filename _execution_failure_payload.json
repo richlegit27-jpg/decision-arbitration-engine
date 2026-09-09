@@ -1,0 +1,34 @@
+{
+  "action": "run",
+  "session_id": "execution-failure-test",
+  "execution_state": {
+    "id": "execution-failure-test-1",
+    "status": "ready",
+    "steps": [
+      {
+        "id": "step-1",
+        "title": "Successfully update first",
+        "status": "pending",
+        "target_file": "C:\\Users\\Owner\\nova\\_execution_failure_test.py",
+        "target_function": "first",
+        "content": "def first():\n    return \"first updated successfully\""
+      },
+      {
+        "id": "step-2",
+        "title": "Attempt invalid second update",
+        "status": "pending",
+        "target_file": "C:\\Users\\Owner\\nova\\_execution_failure_test.py",
+        "target_function": "second",
+        "content": "def second(\n    return \"this is invalid python\""
+      }
+    ],
+    "type": "execution_run",
+    "title": "Execution Failure Test",
+    "goal": "Verify successful steps persist and invalid steps fail safely",
+    "current_step": "",
+    "result": "",
+    "error": "",
+    "history": [],
+    "meta": {}
+  }
+}

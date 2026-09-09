@@ -1,4 +1,4 @@
-class ActionRouter:
+﻿class ActionRouter:
     """
     Nova Unified Action Layer
     Replaces scattered API endpoints with one controlled system.
@@ -12,9 +12,13 @@ class ActionRouter:
     # =========================================================
     # MAIN ENTRY
     # =========================================================
+
     def execute(self, action_type: str, payload: dict):
         if not action_type:
-            return {"ok": False, "error": "Missing action_type"}
+            return {
+                "ok": False,
+                "error": "Missing action_type",
+            }
 
         action_type = action_type.lower().strip()
 
@@ -35,9 +39,16 @@ class ActionRouter:
         handler = routes.get(action_type)
 
         if not handler:
-            return {"ok": False, "error": f"Unknown action: {action_type}"}
+            return {
+                "ok": False,
+                "error": f"Unknown action: {action_type}",
+            }
 
         return handler(payload)
+
+    # =========================================================
+    # CHAT
+    # =========================================================
 
     def _chat_send(self, payload):
         return self.chat_service.handle(
@@ -47,32 +58,37 @@ class ActionRouter:
             regenerate=bool(payload.get("regenerate", False)),
         )
 
+    # =========================================================
+    # SESSIONS
+    # =========================================================
+
     def _session_rename(self, payload):
-        return self.session_service.rename_session(
+        return self.session_service.rename(
             session_id=payload["session_id"],
-            title=payload["title"]
+            title=payload["title"],
         )
 
     def _session_pin(self, payload):
-        return self.session_service.pin_session(
+        return self.session_service.pin(
             session_id=payload["session_id"],
-            pinned=payload.get("pinned", True)
+            pinned=payload.get("pinned", True),
         )
 
     def _session_delete(self, payload):
-        return self.session_service.delete_session(
-            session_id=payload["session_id"]
+        return self.session_service.delete(
+            session_id=payload["session_id"],
         )
 
     # =========================================================
     # ATTACHMENTS
     # =========================================================
+
     def _attachment_upload(self, payload):
         return self.attachment_service.upload(
-            file=payload["file"]
+            file=payload["file"],
         )
 
     def _attachment_analyze(self, payload):
         return self.attachment_service.analyze(
-            file_id=payload["file_id"]
+            file_id=payload["file_id"],
         )

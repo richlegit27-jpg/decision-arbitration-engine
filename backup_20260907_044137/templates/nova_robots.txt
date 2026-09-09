@@ -1,0 +1,12 @@
+﻿User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /uploads/
+Disallow: /mobile
+Disallow: /richard-login
+
+Sitemap: {{ base_url }}/sitemap.xml
+
+# NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709
+# Canonical public homepage is /. Preview route remains available for owner/release checks.

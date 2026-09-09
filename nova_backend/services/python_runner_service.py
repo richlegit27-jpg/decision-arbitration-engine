@@ -18,7 +18,7 @@ class PythonRunnerService:
     ):
         self.sandbox_dir = Path(
             sandbox_dir
-            or r"C:\Users\Owner\nova\nova_backend\sandbox"
+            or r"C:\Users\Owner\nova"
         ).resolve()
 
         self.sandbox_dir.mkdir(

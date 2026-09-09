@@ -13,7 +13,10 @@ class LoginPageRouteService:
             return render_template(
                 "login.html",
                 active_tab="login",
-                prefill_username=request.args.get("username", ""),
+                prefill_username=request.args.get(
+                    "username",
+                    "",
+                ),
                 prefill_register_username="",
             )
 
@@ -22,7 +25,20 @@ class LoginPageRouteService:
                 "login.html",
                 active_tab="register",
                 prefill_username="",
-                prefill_register_username=request.args.get("username", ""),
+                prefill_register_username=request.args.get(
+                    "username",
+                    "",
+                ),
+            )
+
+        def forgot_password_page():
+            return render_template(
+                "forgot_password.html",
+            )
+
+        def reset_password_page():
+            return render_template(
+                "reset_password.html",
             )
 
         if not route_exists("/login"):
@@ -41,8 +57,28 @@ class LoginPageRouteService:
                 methods=["GET"],
             )
 
+        if not route_exists("/forgot-password"):
+            app.add_url_rule(
+                "/forgot-password",
+                "nova_forgot_password_page_20260908",
+                forgot_password_page,
+                methods=["GET"],
+            )
+
+        if not route_exists("/reset-password"):
+            app.add_url_rule(
+                "/reset-password",
+                "nova_reset_password_page_20260908",
+                reset_password_page,
+                methods=["GET"],
+            )
+
         def logout_page():
-            session.pop("nova_user_id", None)
+            session.pop(
+                "nova_user_id",
+                None,
+            )
+
             return redirect("/login")
 
         if not route_exists("/logout"):

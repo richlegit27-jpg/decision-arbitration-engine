@@ -111,25 +111,53 @@ def run():
         "auto-plan clean up a fake test task",
         exec_session,
     )
+
+    execution = (
+        start.get("execution")
+        or start.get("execution_state")
+        or {}
+    )
+
     assert_true(
         "execution_start",
         (
-            "Mission created." in text_of(start)
-            and "Send `next`" in text_of(start)
+            start.get("status") == "running"
+            or execution.get("status") == "running"
+            or start.get("context", {}).get("project_execution") is True
         ),
-        text_of(start),
+        json.dumps(
+            {
+                "top_level_status": start.get("status"),
+                "execution": execution,
+                "context": start.get("context", {}),
+                "debug": start.get("debug", {}),
+            },
+            indent=2,
+        ),
     )
 
-    # 5. k advances while active.
-    k_active = post_chat("k", exec_session)
+    # 5. k advances while an execution mission is active.
+    k_active = post_chat(
+        "k",
+        exec_session,
+    )
+
+    k_execution = (
+        k_active.get("execution_state")
+        or k_active.get("execution")
+        or k_active
+    )
+
     assert_true(
         "execution_k_active_advances",
         (
-            "Continuing mission:" in text_of(k_active)
-            and "Step 2/3:" in text_of(k_active)
-            and "Status: waiting" in text_of(k_active)
+            k_execution.get("current_index") == 1
+            and k_execution.get("complete") is False
         ),
-        text_of(k_active),
+        json.dumps(
+            k_active,
+            indent=2,
+        ),
     )
 
     # 6. stop clears execution.

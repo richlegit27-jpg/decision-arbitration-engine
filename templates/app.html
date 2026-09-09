@@ -4764,7 +4764,7 @@ function wire() {
                         user: null,
                         checked_at: new Date().toISOString()
                     };
-                    refreshAuthStatus();
+                    window.location.replace("/login");
                 });
             }
         } else {
@@ -4815,7 +4815,7 @@ renderAuthWidget(data || {});
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", refreshAuthStatus);
     } else {
-        refreshAuthStatus();
+        
     }
 
     setInterval(refreshAuthStatus, 60000);
@@ -6562,24 +6562,18 @@ console.log("[Nova Force New Chat] cleared chat");
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
 <script src="/static/js/nova-sessions-v2.js"></script>
-
 <script src="/static/js/nova-chat-stream.js"></script>
-
 <script src="/static/js/chat-state.js"></script>
-
 <script src="/static/js/chat-messages.js"></script>
 <script src="/static/js/tool-approval-actions.js"></script>
 <script src="/static/js/chat-service.js"></script>
 <script src="/static/js/chat-ui.js"></script>
 <script src="/static/js/chat-actions.js"></script>
 <script src="/static/js/chat-events.js"></script>
-
 <script src="/static/js/composer-input.js"></script>
 <script src="/static/js/composer-attachments.js"></script>
 <script src="/static/js/composer-reactive.js"></script>
-
 <script src="/static/js/composer-actions.js"></script>
 
 <script>
@@ -6601,11 +6595,11 @@ console.log(
 </script>
 
 <script src="/static/js/nova-composer-bridge.js"></script>
-
 <script src="/static/js/chat-orchestrator.js"></script>
 <script src="/static/js/chat-bootstrap.js"></script>
 <script src="/static/js/app-state.js"></script>
 <script src="/static/js/nova-api.js"></script>
+<script src="/static/js/nova-execution.js"></script>
 <script src="/static/js/app-api.js"></script>
 <script src="/static/js/nova-desktop-projects.js"></script>
 <script src="/static/js/nova-project-execution-controls.js"></script>

@@ -6,6 +6,61 @@ def register_tool_approval_routes(
     chat_service,
 ):
 
+    @app.get("/api/tools")
+    def list_tools():
+
+        try:
+            from nova_backend.tools.executor import (
+                list_registered_tools,
+            )
+
+            return jsonify(
+                list_registered_tools()
+            )
+
+        except Exception as exc:
+
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": str(exc),
+                }
+            ), 500
+
+
+    @app.get("/api/tools/<tool_name>")
+    def get_tool(tool_name):
+
+        try:
+            from nova_backend.tools.executor import (
+                get_tool_metadata,
+            )
+
+            result = get_tool_metadata(
+                tool_name
+            )
+
+            status_code = (
+                200
+                if result.get("ok")
+                else 404
+            )
+
+            return jsonify(
+                result
+            ), status_code
+
+        except Exception as exc:
+
+            return jsonify(
+                {
+                    "ok": False,
+                    "tool": tool_name,
+                    "error": str(exc),
+                }
+            ), 500
+
+
     @app.post("/api/tools/approve")
     def approve_tool():
 

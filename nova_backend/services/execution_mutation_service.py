@@ -267,6 +267,7 @@ class ExecutionMutationService:
         execution_state["complete"] = False
         execution_state["waiting"] = False
         execution_state["lock"] = False
+        execution_state["_execution_processing"] = False
 
         execution_state["current_index"] = step_index
 
@@ -285,6 +286,37 @@ class ExecutionMutationService:
 
         return execution_state
 
+    def mark_approval_denied(
+        self,
+        execution_state,
+        error="",
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        execution_state["approval_required"] = False
+        execution_state["approval_status"] = "denied"
+
+        execution_state["status"] = "cancelled"
+        execution_state["complete"] = False
+        execution_state["waiting"] = False
+        execution_state["lock"] = False
+        execution_state["_execution_processing"] = False
+
+        execution_state["current_step"] = ""
+        execution_state["current_step_title"] = ""
+
+        execution_state["next_moves"] = []
+
+        execution_state["error"] = str(
+            error
+            or "Execution approval denied."
+        )
+
+        return execution_state
+
+
     def advance_after_step_completion(
         self,
         execution_state,
@@ -302,6 +334,42 @@ class ExecutionMutationService:
 
         execution_state["waiting"] = False
         execution_state["_execution_processing"] = False
+
+        return execution_state
+
+    def mark_waiting_next_step(
+        self,
+        execution_state,
+        step_index=0,
+        current_step=None,
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        execution_state["status"] = "running"
+        execution_state["complete"] = False
+        execution_state["waiting"] = True
+        execution_state["lock"] = False
+        execution_state["_execution_processing"] = False
+
+        execution_state["current_index"] = step_index
+        execution_state["current_step_index"] = step_index
+
+        if current_step is not None:
+            execution_state["current_step"] = current_step
+
+            if isinstance(current_step, dict):
+                execution_state["current_step_title"] = (
+                    current_step.get("title")
+                    or current_step.get("name")
+                    or current_step.get("action")
+                    or ""
+                )
+            else:
+                execution_state["current_step_title"] = (
+                    str(current_step)
+                )
 
         return execution_state
 
@@ -363,6 +431,22 @@ class ExecutionMutationService:
 
         return execution_state
 
+    def clear_continue_request(
+        self,
+        execution_state,
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        execution_state.pop(
+            "continue_request",
+            None,
+        )
+
+        return execution_state
+
+
     def append_history(
         self,
         execution_state,
@@ -399,6 +483,7 @@ class ExecutionMutationService:
         )
 
         execution_state["failure_count"] = failure_count
+        execution_state["_execution_processing"] = False
 
         steps = execution_state.get("steps") or []
 
@@ -442,6 +527,7 @@ class ExecutionMutationService:
         execution_state["status"] = "cancelled"
         execution_state["waiting"] = False
         execution_state["lock"] = False
+        execution_state["_execution_processing"] = False
         execution_state["next_moves"] = []
 
         execution_state["current_step"] = ""
@@ -462,6 +548,7 @@ class ExecutionMutationService:
         execution_state["waiting"] = False
         execution_state["complete"] = False
         execution_state["active"] = False
+        execution_state["_execution_processing"] = False
 
         execution_state["steps"] = []
         execution_state["plan"] = []

@@ -1,0 +1,18 @@
+{
+  "session_id": "execution-http-test",
+  "action": "run_step",
+  "execution_state": {
+    "id": "execution-http-test-1",
+    "status": "ready",
+    "steps": [
+      {
+        "id": "step-1",
+        "title": "Fix hello through HTTP",
+        "status": "pending",
+        "target_file": "C:\\Users\\Owner\\nova\\_execution_http_test.py",
+        "target_function": "hello",
+        "content": "def hello():\n    return \"updated through HTTP execution stream\""
+      }
+    ]
+  }
+}

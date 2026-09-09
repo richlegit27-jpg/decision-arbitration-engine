@@ -87,12 +87,12 @@ class ExecutionBridge:
 
 
             output = (
-                self.execution_engine.run(
+                self.execution_engine.run_all(
                     goal=goal,
                     steps=steps,
+                    session_id=session_id,
                 )
             )
-
 
             result["output"] = output
 

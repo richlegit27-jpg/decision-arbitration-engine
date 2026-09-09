@@ -90,13 +90,13 @@ class BrainPipeline:
                 pipeline_state["brain"] = brain_state
 
 
-            if self.planner_bridge:
+            if (
+                isinstance(brain_state, dict)
+                and brain_state.get("plan")
+            ):
 
                 pipeline_state["plan"] = (
-                    self.planner_bridge.create_plan(
-                        user_text,
-                        context,
-                    )
+                    brain_state["plan"]
                 )
 
 

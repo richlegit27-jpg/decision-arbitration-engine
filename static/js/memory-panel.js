@@ -1,346 +1,341 @@
-﻿window.NovaMemoryPanel = {
-  open: () => {
-    const panel = document.getElementById("memoryPanel");
-    if (panel) {
-      panel.classList.add("open");
-    }
-  },
+(function () {
+    "use strict";
 
-  close: () => {
-    const panel = document.getElementById("memoryPanel");
-    if (panel) {
-      panel.classList.remove("open");
-    }
-  },
+    const API_BASE = "";
 
-  refresh: () => {
-    window.dispatchEvent(new Event("nova:memory-changed"));
-  }
-};
-
-document.addEventListener("DOMContentLoaded", () => {
-  const body = document.body;
-  const memoryPanel = document.getElementById("memoryPanel");
-  if (!memoryPanel) return;
-
-  const openBtn =
-    document.getElementById("memoryToggleBtnTop") ||
-    document.getElementById("toggleMemoryBtn") ||
-    document.getElementById("openMemoryBtn");
-
-  const closeBtn =
-    document.getElementById("closeMemoryBtn") ||
-    document.getElementById("closeMemoryPanelBtn");
-
-  const memoryForm = document.getElementById("memoryForm");
-  const memoryKind = document.getElementById("memoryKind");
-  const memoryValue = document.getElementById("memoryValue");
-  const memoryList = document.getElementById("memoryList");
-  const memoryEmpty = document.getElementById("memoryEmpty");
-  const refreshMemoryBtn = document.getElementById("refreshMemoryBtn");
-  const memoryStatusText = document.getElementById("memoryStatusText");
-
-  function isMobile() {
-    return window.innerWidth <= 980;
-  }
-
-  function setMemoryStatus(text) {
-    if (memoryStatusText) {
-      memoryStatusText.textContent = String(text || "Memory panel ready.");
-    }
-  }
-
-  function getNovaApp() {
-    return window.NovaApp || null;
-  }
-
-async function getMemoryItems() {
-    const app = getNovaApp();
-
-    if (!app) return [];
-
-    if (typeof app.getMemory === "function") {
-        const result = await app.getMemory();
-
-        return result.items || [];
+    function $(id) {
+        return document.getElementById(id);
     }
 
-    return [];
-}
+    const panel = $("memoryPanel");
+    const list = $("memoryList");
+    const openButton = $("btnOpenMemory");
+    const closeButton = $("closeMemoryPanelBtn");
+    const deleteAllButton = $("deleteAllMemoryBtn");
 
-  function openMemoryPanel() {
-    if (isMobile()) {
-      body.classList.add("mobile-right-open");
-      body.classList.remove("mobile-left-open");
-      body.classList.add("panel-open");
-    } else {
-      body.classList.add("memory-open");
+    async function request(url, options = {}) {
+        const response = await fetch(
+            API_BASE + url,
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(options.headers || {})
+                },
+                ...options
+            }
+        );
+
+        let payload = null;
+
+        try {
+            payload = await response.json();
+        } catch (error) {
+            payload = null;
+        }
+
+        if (!response.ok) {
+            const message =
+                payload?.error ||
+                payload?.message ||
+                `Request failed (${response.status})`;
+
+            throw new Error(message);
+        }
+
+        return payload;
     }
 
-    memoryPanel.setAttribute("aria-hidden", "false");
-  }
+    function getMemoryItems(payload) {
+        if (!payload) {
+            return [];
+        }
 
-  function closeMemoryPanel() {
-    body.classList.remove("mobile-right-open", "panel-open", "memory-open");
-    memoryPanel.setAttribute("aria-hidden", "true");
-  }
+        if (Array.isArray(payload.data?.memory)) {
+            return payload.data.memory;
+        }
 
-  function toggleMemoryPanel() {
-    const isHidden = memoryPanel.getAttribute("aria-hidden") === "true";
+        if (Array.isArray(payload.data?.items)) {
+            return payload.data.items;
+        }
 
-    if (isMobile()) {
-      if (body.classList.contains("mobile-right-open") || !isHidden) {
-        closeMemoryPanel();
-      } else {
-        openMemoryPanel();
-      }
-      return;
+        if (Array.isArray(payload.memory)) {
+            return payload.memory;
+        }
+
+        if (Array.isArray(payload.items)) {
+            return payload.items;
+        }
+
+        return [];
     }
 
-    if (body.classList.contains("memory-open") || !isHidden) {
-      closeMemoryPanel();
-    } else {
-      openMemoryPanel();
-    }
-  }
+    function createMemoryItem(memory) {
+        const item = document.createElement("div");
 
-  function formatTime(value) {
-    if (!value) return "";
-    try {
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return "";
-      return date.toLocaleString([], {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    } catch {
-      return "";
-    }
-  }
+        item.className = "memory-item";
+        item.dataset.memoryId = memory.id || "";
 
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-  }
+        const content = document.createElement("div");
+        content.className = "memory-item-content";
 
-async function renderMemory() {
-    const items = await getMemoryItems();
-console.log("[MEMORY RENDER]", items.map(x => x.id));
+        const text = document.createElement("div");
+        text.className = "memory-item-text";
+        text.textContent = memory.text || "";
 
-    if (memoryEmpty) {
-      memoryEmpty.style.display = items.length ? "none" : "";
-    }
+        const meta = document.createElement("div");
+        meta.className = "memory-item-meta";
 
-    if (!items.length) {
-      memoryList.innerHTML = "";
-      setMemoryStatus("No saved memory yet.");
-      return;
-    }
+        const parts = [];
 
-    memoryList.innerHTML = items
-      .map((item) => {
-        return `
-          <div class="memory-item" data-memory-id="${escapeHtml(item.id || "")}">
-            <div class="memory-item-main">
-              <div class="memory-item-kind">${escapeHtml(item.kind || "memory")}</div>
-              <div class="memory-item-value">${escapeHtml(item.value || item.text || "")}</div>
-              <div class="memory-item-meta">${escapeHtml(
-                formatTime(item.updated_at || item.created_at || "")
-              )}</div>
-            </div>
+        if (memory.kind) {
+            parts.push(memory.kind);
+        }
 
-            <div class="memory-item-actions">
-              <button
-                type="button"
-                class="memory-delete-btn"
-                data-delete-memory="${escapeHtml(item.id || "")}"
-                title="Delete memory"
-                aria-label="Delete memory"
-              >
-                âœ•
-              </button>
-            </div>
-          </div>
-        `;
-      })
-      .join("");
+        if (memory.source) {
+            parts.push(memory.source);
+        }
 
-    setMemoryStatus(`Loaded ${items.length} memory item${items.length === 1 ? "" : "s"}.`);
-  }
+        meta.textContent = parts.join(" · ");
 
-  async function refreshMemory() {
-    const app = getNovaApp();
-    if (!app || typeof app.loadMemory !== "function") {
-      setMemoryStatus("Memory system not ready.");
-      return;
+        content.appendChild(text);
+
+        if (meta.textContent) {
+            content.appendChild(meta);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "memory-item-actions";
+
+        const deleteButton = document.createElement("button");
+
+        deleteButton.type = "button";
+        deleteButton.className = "memory-delete-btn";
+        deleteButton.textContent = "Delete";
+
+        deleteButton.addEventListener(
+            "click",
+            async function () {
+                await deleteMemory(memory.id);
+            }
+        );
+
+        actions.appendChild(deleteButton);
+
+        item.appendChild(content);
+        item.appendChild(actions);
+
+        return item;
     }
 
-    try {
-      setMemoryStatus("Refreshing memory...");
-      await app.loadMemory();
-      renderMemory();
-    } catch (error) {
-      console.error(error);
-      setMemoryStatus("Memory refresh failed.");
-    }
-  }
+    function renderMemory(items) {
+        if (!list) {
+            return;
+        }
 
-  async function saveMemory() {
-    const app = getNovaApp();
-    if (!app || typeof app.addMemory !== "function") {
-      setMemoryStatus("Memory system not ready.");
-      return;
-    }
+        list.innerHTML = "";
 
-    const kind = String(memoryKind?.value || "memory").trim();
-    const value = String(memoryValue?.value || "").trim();
+        if (!items.length) {
+            const empty = document.createElement("div");
 
-    if (!value) {
-      setMemoryStatus("Enter a memory value first.");
-      memoryValue?.focus();
-      return;
-    }
+            empty.className = "memory-empty";
+            empty.textContent = "No saved memories.";
 
-    try {
-      setMemoryStatus("Saving memory...");
+            list.appendChild(empty);
 
-await app.addMemory(kind, value);
+            return;
+        }
 
-      if (memoryValue) {
-        memoryValue.value = "";
-      }
-
-await renderMemory();
-setMemoryStatus("Memory saved.");
-    } catch (error) {
-
-      console.error(error);
-      setMemoryStatus("Memory save failed.");
-      if (window.NovaToast?.error) {
-        window.NovaToast.error(error.message || "Could not save memory.");
-      }
-    }
-  }
-
-  async function removeMemory(id) {
-    const app = getNovaApp();
-    if (!app || typeof app.deleteMemory !== "function") {
-      setMemoryStatus("Memory system not ready.");
-      return;
+        items.forEach(function (memory) {
+            list.appendChild(
+                createMemoryItem(memory)
+            );
+        });
     }
 
-    if (!id) return;
+    async function loadMemory() {
+        if (!list) {
+            return [];
+        }
 
-    const ok = window.confirm("Delete this memory?");
-    if (!ok) return;
+        list.innerHTML = "";
 
-try {
-  setMemoryStatus("Deleting memory...");
+        const loading = document.createElement("div");
 
-  await app.deleteMemory(id);
+        loading.className = "memory-loading";
+        loading.textContent = "Loading memory...";
 
-  await renderMemory();
+        list.appendChild(loading);
 
-  setMemoryStatus("Memory deleted.");
+        try {
+            const payload = await request(
+                "/api/memory",
+                {
+                    method: "GET"
+                }
+            );
 
-} catch (error) {
-  console.error(error);
-  setMemoryStatus("Delete failed.");
+            const items = getMemoryItems(payload);
 
-  if (window.NovaToast?.error) {
-    window.NovaToast.error(error.message || "Could not delete memory.");
-  }
-}
+            renderMemory(items);
 
-}
- 
-if (openBtn) {
+            return items;
 
-    openBtn.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleMemoryPanel();
-    });
-  }
+        } catch (error) {
+            console.error(
+                "Failed to load memory:",
+                error
+            );
 
-  if (closeBtn) {
-    closeBtn.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      closeMemoryPanel();
-    });
-  }
+            list.innerHTML = "";
 
-  if (memoryForm) {
-    memoryForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      await saveMemory();
-    });
-  }
+            const failure = document.createElement("div");
 
-  if (refreshMemoryBtn) {
-    refreshMemoryBtn.addEventListener("click", async () => {
-      await refreshMemory();
-    });
-  }
+            failure.className = "memory-error";
+            failure.textContent =
+                "Failed to load memory.";
 
-  if (memoryList) {
-    memoryList.addEventListener("click", async (event) => {
-      const btn = event.target.closest("[data-delete-memory]");
-      if (!btn) return;
+            list.appendChild(failure);
 
-      const id = btn.getAttribute("data-delete-memory");
-      await removeMemory(id);
-    });
-  }
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      closeMemoryPanel();
+            return [];
+        }
     }
-  });
 
-  document.addEventListener("click", (event) => {
-    if (!isMobile()) return;
+    async function deleteMemory(memoryId) {
+        if (!memoryId) {
+            return;
+        }
 
-    const target = event.target;
-    const clickedOpenBtn = openBtn && openBtn.contains(target);
-    const clickedCloseBtn = closeBtn && closeBtn.contains(target);
-    const insidePanel = memoryPanel.contains(target);
+        try {
+            const payload = await request(
+                "/api/memory/delete",
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        id: memoryId
+                    })
+                }
+            );
 
-    if (clickedOpenBtn || clickedCloseBtn || insidePanel) return;
+            if (
+                payload?.ok === false
+            ) {
+                throw new Error(
+                    payload.error ||
+                    payload.message ||
+                    "Failed to delete memory."
+                );
+            }
 
-    if (body.classList.contains("mobile-right-open")) {
-      closeMemoryPanel();
+            await loadMemory();
+
+        } catch (error) {
+            console.error(
+                "Failed to delete memory:",
+                error
+            );
+
+            alert(
+                error.message ||
+                "Failed to delete memory."
+            );
+        }
     }
-  });
 
-  window.addEventListener("resize", () => {
-    if (!isMobile()) {
-      body.classList.remove("mobile-right-open", "panel-open");
+    async function deleteAllMemory() {
+        const confirmed = window.confirm(
+            "Delete all saved memories?"
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const payload = await request(
+                "/api/memory/clear",
+                {
+                    method: "POST",
+                    body: JSON.stringify({})
+                }
+            );
+
+            if (
+                payload?.ok === false
+            ) {
+                throw new Error(
+                    payload.error ||
+                    payload.message ||
+                    "Failed to clear memories."
+                );
+            }
+
+            renderMemory([]);
+
+        } catch (error) {
+            console.error(
+                "Failed to clear memories:",
+                error
+            );
+
+            alert(
+                error.message ||
+                "Failed to clear memories."
+            );
+        }
     }
-  });
 
-  window.addEventListener("nova:memory-changed", () => {
-    renderMemory();
-  });
+    function openPanel() {
+        if (!panel) {
+            return;
+        }
 
-if (!body.classList.contains("memory-open") && !body.classList.contains("mobile-right-open")) {
-  memoryPanel.setAttribute("aria-hidden", "true");
-}
+        panel.classList.add("open");
+        panel.classList.remove("hidden");
 
-window.NovaMemoryPanel = {
-  open: openMemoryPanel,
-  close: closeMemoryPanel,
-  refresh: renderMemory
-};
+        panel.style.display = "";
 
-renderMemory();
-});
+        loadMemory();
+    }
+
+    function closePanel() {
+        if (!panel) {
+            return;
+        }
+
+        panel.classList.remove("open");
+        panel.classList.add("hidden");
+    }
+
+    if (openButton) {
+        openButton.addEventListener(
+            "click",
+            openPanel
+        );
+    }
+
+    if (closeButton) {
+        closeButton.addEventListener(
+            "click",
+            closePanel
+        );
+    }
+
+    if (deleteAllButton) {
+        deleteAllButton.addEventListener(
+            "click",
+            deleteAllMemory
+        );
+    }
+
+    window.NovaMemoryPanel = {
+        open: openPanel,
+        close: closePanel,
+        load: loadMemory,
+        deleteMemory: deleteMemory,
+        deleteAll: deleteAllMemory
+    };
+
+    console.log(
+        "Nova memory panel ready."
+    );
+})();

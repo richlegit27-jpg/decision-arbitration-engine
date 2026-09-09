@@ -1,4 +1,4 @@
-class DecisionService:
+﻿class DecisionService:
 
     def __init__(self, chat_service):
         self.chat_service = chat_service
@@ -144,6 +144,70 @@ class DecisionService:
                 "save_artifact": False,
                 "save_memory": False,
                 "use_memory": False,
+                "prompt": user_text,
+            }
+
+        execution_action_prefixes = (
+            "create ",
+            "make ",
+            "write ",
+            "edit ",
+            "modify ",
+            "update ",
+            "delete ",
+            "remove ",
+            "rename ",
+            "move ",
+            "copy ",
+            "run ",
+            "start ",
+            "stop ",
+            "restart ",
+            "install ",
+            "uninstall ",
+        )
+
+        execution_action_terms = (
+            " file",
+            " folder",
+            " directory",
+            ".py",
+            ".js",
+            ".json",
+            ".txt",
+            ".md",
+            ".html",
+            ".css",
+            ".ps1",
+            "command",
+            "script",
+            "process",
+            "function",
+            "class",
+            "endpoint",
+            "service",
+        )
+
+        is_execution_action = (
+            lower_text.startswith(execution_action_prefixes)
+            and any(
+                term in lower_text
+                for term in execution_action_terms
+            )
+        )
+
+        if is_execution_action:
+            return {
+                "route": "execution",
+                "mode": "execution",
+                "intent": "task_execution",
+                "confidence": 0.95,
+                "reasons": [
+                    "explicit_execution_action",
+                ],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": True,
                 "prompt": user_text,
             }
 

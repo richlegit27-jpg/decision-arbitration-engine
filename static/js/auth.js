@@ -1,313 +1,742 @@
-﻿/* notepad C:\Users\Owner\nova\static\js\auth.js */
-
-(() => {
+﻿(() => {
 "use strict";
+const API_BASE = "";
 
-document.addEventListener("DOMContentLoaded", () => {
-  const el = {
-    loginForm: document.getElementById("loginForm"),
-    registerForm: document.getElementById("registerForm"),
-    logoutBtn: document.getElementById("logoutBtn"),
-    authStatusText: document.getElementById("authStatusText"),
-    authUsernameText: document.getElementById("authUsernameText"),
-    loginUsername: document.getElementById("loginUsername"),
-    loginPassword: document.getElementById("loginPassword"),
-    registerUsername: document.getElementById("registerUsername"),
-    registerPassword: document.getElementById("registerPassword"),
-    changePasswordForm: document.getElementById("changePasswordForm"),
-    currentPassword: document.getElementById("currentPassword"),
-    newPassword: document.getElementById("newPassword"),
-    authMessage: document.getElementById("authMessage"),
-  };
+function getEl(id) {
+    return document.getElementById(id);
+}
 
-  function escapeHtml(value) {
-    return String(value || "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-  }
+async function apiFetch(path, options = {}) {
 
-  function setMessage(text, type = "info") {
-    if (!el.authMessage) return;
-    el.authMessage.className = `message ${type}`;
-    el.authMessage.innerHTML = escapeHtml(text);
-  }
+    const response = await fetch(
+        API_BASE + path,
+        {
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                ...(options.headers || {}),
+            },
+            ...options,
+        }
+    );
 
-  function clearMessage() {
-    if (!el.authMessage) return;
-    el.authMessage.className = "message";
-    el.authMessage.innerHTML = "";
-  }
-
-  async function apiFetch(url, options = {}) {
-    const isFormData = options.body instanceof FormData;
-
-    const headers = {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      ...(options.headers || {}),
-    };
-
-    const response = await fetch(url, {
-      credentials: "include",
-      ...options,
-      headers,
-    });
-
-    let data = null;
-    const contentType = response.headers.get("content-type") || "";
+    let data = {};
 
     try {
-      if (contentType.includes("application/json")) {
         data = await response.json();
-      } else {
-        const text = await response.text();
-        data = text ? { message: text } : null;
-      }
-    } catch (_) {
-      data = null;
+    } catch (error) {
+        data = {};
     }
 
     if (!response.ok) {
-      const message =
-        (data && (data.error || data.detail || data.message)) ||
-        `Request failed: ${response.status}`;
-      const error = new Error(message);
-      error.status = response.status;
-      error.payload = data;
-      throw error;
+
+        const message =
+            data.error ||
+            data.message ||
+            "Something went wrong.";
+
+        throw new Error(message);
     }
 
     return data;
-  }
+}
 
-  function renderAuthState(data) {
-    const authenticated = Boolean(data && data.authenticated);
-        // NOVA_AUTH_USER_SHAPE_FIX_20260610
-    const user = data && data.user ? data.user : {};
-    const username = authenticated ? String(user.username || data.username || "") : "";
+async function login(
+    username,
+    password
+) {
 
-    document.body.dataset.authenticated = authenticated ? "true" : "false";
+    return await apiFetch(
+        "/api/auth/login",
+        {
+            method: "POST",
 
-    if (el.authStatusText) {
-      el.authStatusText.textContent = authenticated ? "Logged in" : "Logged out";
-    }
-
-    if (el.authUsernameText) {
-      el.authUsernameText.textContent = authenticated ? username : "Guest";
-    }
-
-    if (el.logoutBtn) {
-      el.logoutBtn.disabled = !authenticated;
-    }
-
-    const userChip = document.getElementById("userMenuToggleBtn");
-    if (userChip) {
-      const nameNode = userChip.querySelector(".user-name");
-      if (nameNode) {
-        nameNode.textContent = authenticated ? username : "Guest";
-      }
-    }
-
-    const menuUsername = document.querySelector(".user-menu-username");
-    if (menuUsername) {
-      menuUsername.textContent = authenticated ? username : "Guest";
-    }
-  }
-
-  async function refreshAuthStatus() {
-    try {
-      const data = await apiFetch("/api/auth/status", {
-        method: "GET",
-      });
-
-      const username =
-        data && typeof data.username === "string"
-          ? data.username
-          : data && data.user && typeof data.user.username === "string"
-            ? data.user.username
-            : "";
-
-      renderAuthState({
-        authenticated: Boolean(data && data.authenticated),
-        username,
-      });
-
-      return data;
-    } catch (_) {
-      renderAuthState({
-        authenticated: false,
-        username: "",
-      });
-      return null;
-    }
-  }
-
-  async function login(username, password) {
-    clearMessage();
-
-    const data = await apiFetch("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({
-        username,
-        password,
-      }),
-    });
-
-    await refreshAuthStatus();
-    setMessage("Login successful.", "success");
-    return data;
-  }
-
-  async function register(username, password) {
-    clearMessage();
-
-    const data = await apiFetch("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({
-        username,
-        password,
-      }),
-    });
-
-    await refreshAuthStatus();
-    setMessage("Registration successful.", "success");
-    return data;
-  }
-
-  async function logout() {
-    clearMessage();
-
-    await apiFetch("/api/auth/logout", {
-      method: "POST",
-    });
-
-    renderAuthState({
-      authenticated: false,
-      username: "",
-    });
-
-    setMessage("Logged out.", "success");
-  }
-
-  async function changePassword(currentPassword, newPassword) {
-    clearMessage();
-
-    const data = await apiFetch("/api/auth/change-password", {
-      method: "POST",
-      body: JSON.stringify({
-        current_password: currentPassword,
-        new_password: newPassword,
-      }),
-    });
-
-    setMessage(data.message || "Password changed successfully.", "success");
-    return data;
-  }
-
-  if (el.loginForm) {
-    el.loginForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      const username = el.loginUsername ? el.loginUsername.value.trim() : "";
-      const password = el.loginPassword ? el.loginPassword.value : "";
-
-      if (!username || !password) {
-        setMessage("Username and password are required.", "error");
-        return;
-      }
-
-      try {
-        const data = await login(username, password);
-        if (el.loginPassword) el.loginPassword.value = "";
-        
-        // NOVA_AUTH_SUCCESS_REDIRECT_REGEX_20260610
-        if (data && data.authenticated) {
-          window.location.href = "/app";
-          return;
+            body: JSON.stringify({
+                username,
+                password,
+            }),
         }
-window.location.href = data.redirect_to || "/app";
-      } catch (error) {
-        setMessage(error.message, "error");
-      }
-    });
-  }
+    );
+}
 
-  if (el.registerForm) {
-    el.registerForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
+async function register(
+    username,
+    email,
+    password
+) {
 
-      const username = el.registerUsername ? el.registerUsername.value.trim() : "";
-      const password = el.registerPassword ? el.registerPassword.value : "";
+    return await apiFetch(
+        "/api/auth/register",
+        {
+            method: "POST",
 
-      if (!username || !password) {
-        setMessage("Username and password are required.", "error");
-        return;
-      }
-
-      try {
-        const data = await register(username, password);
-        if (el.registerPassword) el.registerPassword.value = "";
-        
-        // NOVA_AUTH_SUCCESS_REDIRECT_REGEX_20260610
-        if (data && data.authenticated) {
-          window.location.href = "/app";
-          return;
+            body: JSON.stringify({
+                username,
+                email,
+                password,
+            }),
         }
-window.location.href = data.redirect_to || "/app";
-      } catch (error) {
-        setMessage(error.message, "error");
-      }
-    });
-  }
+    );
+}
 
-  if (el.logoutBtn) {
-    el.logoutBtn.addEventListener("click", async () => {
-      try {
-        await logout();
-        window.location.href = "/login";
-      } catch (error) {
-        setMessage(error.message, "error");
-      }
-    });
-  }
+async function logout() {
 
-  if (el.changePasswordForm) {
-    el.changePasswordForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
+    return await apiFetch(
+        "/api/auth/logout",
+        {
+            method: "POST",
+        }
+    );
+}
 
-      const currentPassword = el.currentPassword ? el.currentPassword.value : "";
-      const newPassword = el.newPassword ? el.newPassword.value : "";
+async function forgotPassword(email) {
 
-      if (!currentPassword || !newPassword) {
-        setMessage("Current password and new password are required.", "error");
-        return;
-      }
+    return await apiFetch(
+        "/api/auth/forgot-password",
+        {
+            method: "POST",
 
-      try {
-        await changePassword(currentPassword, newPassword);
+            body: JSON.stringify({
+                email,
+            }),
+        }
+    );
+}
 
-        if (el.currentPassword) el.currentPassword.value = "";
-        if (el.newPassword) el.newPassword.value = "";
-      } catch (error) {
-        setMessage(error.message, "error");
-      }
-    });
-  }
+async function resetPassword(
+    token,
+    newPassword
+) {
 
-  refreshAuthStatus();
+    return await apiFetch(
+        "/api/auth/reset-password",
+        {
+            method: "POST",
 
-  window.NovaAuth = {
-    refreshAuthStatus,
+            body: JSON.stringify({
+                token,
+                new_password: newPassword,
+            }),
+        }
+    );
+}
+
+async function getAuthStatus() {
+
+    return await apiFetch(
+        "/api/auth/status",
+        {
+            method: "GET",
+        }
+    );
+}
+
+
+/*
+------------------------------------------------
+PUBLIC NOVA AUTH API
+------------------------------------------------
+*/
+
+window.NovaAuth = {
+
     login,
+
     register,
+
     logout,
-    changePassword,
-  };
-});
+
+    forgotPassword,
+
+    resetPassword,
+
+    getAuthStatus,
+
+};
+
+
+/*
+------------------------------------------------
+PAGE ELEMENTS
+------------------------------------------------
+*/
+
+const el = {
+
+    loginForm:
+        getEl("loginForm"),
+
+    loginUsername:
+        getEl("loginUsername"),
+
+    loginPassword:
+        getEl("loginPassword"),
+
+    registerForm:
+        getEl("registerForm"),
+
+    registerUsername:
+        getEl("registerUsername"),
+
+    registerEmail:
+        getEl("registerEmail"),
+
+    registerEmailConfirm:
+        getEl("registerEmailConfirm"),
+
+    registerPassword:
+        getEl("registerPassword"),
+
+    registerPasswordConfirm:
+        getEl("registerPasswordConfirm"),
+
+    authMessage:
+        getEl("authMessage"),
+
+    registerMessage:
+        getEl("registerMessage"),
+
+    forgotPasswordForm:
+        getEl("forgotPasswordForm"),
+
+    forgotEmail:
+        getEl("forgotEmail"),
+
+    resetPasswordForm:
+        getEl("resetPasswordForm"),
+
+    resetToken:
+        getEl("resetToken"),
+
+    resetPassword:
+        getEl("resetPassword"),
+
+    resetPasswordConfirm:
+        getEl("resetPasswordConfirm"),
+
+};
+
+
+/*
+------------------------------------------------
+MESSAGE HELPERS
+------------------------------------------------
+*/
+
+function setMessage(
+    target,
+    message,
+    type = "error"
+) {
+
+    if (!target) {
+        return;
+    }
+
+    target.textContent =
+        message || "";
+
+    target.className =
+        "message " + type;
+}
+
+function clearMessage(target) {
+
+    if (!target) {
+        return;
+    }
+
+    target.textContent = "";
+
+    target.className =
+        "message";
+}
+
+
+/*
+------------------------------------------------
+LOGIN
+------------------------------------------------
+*/
+
+if (el.loginForm) {
+
+    el.loginForm.addEventListener(
+        "submit",
+        async (event) => {
+
+            event.preventDefault();
+
+            clearMessage(
+                el.authMessage
+            );
+
+            const username =
+                el.loginUsername
+                    ?.value
+                    .trim() || "";
+
+            const password =
+                el.loginPassword
+                    ?.value || "";
+
+            if (!username || !password) {
+
+                setMessage(
+                    el.authMessage,
+                    "Username or email and password are required.",
+                    "error"
+                );
+
+                return;
+            }
+
+            const submitButton =
+                el.loginForm.querySelector(
+                    'button[type="submit"]'
+                );
+
+            const originalText =
+                submitButton?.textContent;
+
+            try {
+
+                if (submitButton) {
+
+                    submitButton.disabled =
+                        true;
+
+                    submitButton.textContent =
+                        "Signing in...";
+                }
+
+                await login(
+                    username,
+                    password
+                );
+
+                setMessage(
+                    el.authMessage,
+                    "Signed in successfully.",
+                    "success"
+                );
+
+                window.location.href =
+                    "/app";
+
+            } catch (error) {
+
+                setMessage(
+                    el.authMessage,
+                    error.message ||
+                    "Unable to sign in.",
+                    "error"
+                );
+
+            } finally {
+
+                if (submitButton) {
+
+                    submitButton.disabled =
+                        false;
+
+                    submitButton.textContent =
+                        originalText ||
+                        "Sign in";
+                }
+            }
+        }
+    );
+}
+
+
+/*
+------------------------------------------------
+REGISTER
+------------------------------------------------
+*/
+
+if (el.registerForm) {
+
+    el.registerForm.addEventListener(
+        "submit",
+        async (event) => {
+
+            event.preventDefault();
+
+            clearMessage(
+                el.registerMessage
+            );
+
+            const username =
+                el.registerUsername
+                    ?.value
+                    .trim() || "";
+
+            const email =
+                el.registerEmail
+                    ?.value
+                    .trim()
+                    .toLowerCase() || "";
+
+            const emailConfirm =
+                el.registerEmailConfirm
+                    ?.value
+                    .trim()
+                    .toLowerCase() || "";
+
+            const password =
+                el.registerPassword
+                    ?.value || "";
+
+            const passwordConfirm =
+                el.registerPasswordConfirm
+                    ?.value || "";
+
+
+            if (
+                !username ||
+                !email ||
+                !emailConfirm ||
+                !password ||
+                !passwordConfirm
+            ) {
+
+                setMessage(
+                    el.registerMessage,
+                    "All fields are required.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            if (
+                email !== emailConfirm
+            ) {
+
+                setMessage(
+                    el.registerMessage,
+                    "Email addresses do not match.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            if (
+                password !== passwordConfirm
+            ) {
+
+                setMessage(
+                    el.registerMessage,
+                    "Passwords do not match.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            if (
+                password.length < 8
+            ) {
+
+                setMessage(
+                    el.registerMessage,
+                    "Password must be at least 8 characters.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            const usernamePattern =
+                /^[a-z0-9_-]{3,32}$/;
+
+            if (
+                !usernamePattern.test(
+                    username
+                )
+            ) {
+
+                setMessage(
+                    el.registerMessage,
+                    "Username must be 3–32 lowercase letters, numbers, underscores, or dashes.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            const submitButton =
+                el.registerForm.querySelector(
+                    'button[type="submit"]'
+                );
+
+            const originalText =
+                submitButton?.textContent;
+
+
+            try {
+
+                if (submitButton) {
+
+                    submitButton.disabled =
+                        true;
+
+                    submitButton.textContent =
+                        "Creating account...";
+                }
+
+
+                await register(
+                    username,
+                    email,
+                    password
+                );
+
+
+                setMessage(
+                    el.registerMessage,
+                    "Account created successfully. Entering Nova...",
+                    "success"
+                );
+
+
+                setTimeout(
+                    () => {
+
+                        window.location.href =
+                            "/app";
+
+                    },
+                    500
+                );
+
+
+            } catch (error) {
+
+                setMessage(
+                    el.registerMessage,
+                    error.message ||
+                    "Unable to create account.",
+                    "error"
+                );
+
+
+            } finally {
+
+                if (submitButton) {
+
+                    submitButton.disabled =
+                        false;
+
+                    submitButton.textContent =
+                        originalText ||
+                        "Create account";
+                }
+            }
+
+        }
+    );
+}
+
+
+/*
+------------------------------------------------
+FORGOT PASSWORD
+------------------------------------------------
+*/
+
+if (el.forgotPasswordForm) {
+
+    el.forgotPasswordForm.addEventListener(
+        "submit",
+        async (event) => {
+
+            event.preventDefault();
+
+            const messageTarget =
+                getEl("authMessage") ||
+                getEl("forgotPasswordMessage");
+
+            clearMessage(
+                messageTarget
+            );
+
+            const email =
+                el.forgotEmail
+                    ?.value
+                    .trim()
+                    .toLowerCase() || "";
+
+            if (!email) {
+
+                setMessage(
+                    messageTarget,
+                    "Email address is required.",
+                    "error"
+                );
+
+                return;
+            }
+
+            try {
+
+                const result =
+                    await forgotPassword(
+                        email
+                    );
+
+                setMessage(
+                    messageTarget,
+                    result.message ||
+                    "If an account exists for that email, a password reset link has been sent.",
+                    "success"
+                );
+
+            } catch (error) {
+
+                setMessage(
+                    messageTarget,
+                    error.message ||
+                    "Unable to process password reset.",
+                    "error"
+                );
+            }
+        }
+    );
+}
+
+
+/*
+------------------------------------------------
+RESET PASSWORD
+------------------------------------------------
+*/
+
+if (el.resetPasswordForm) {
+
+    el.resetPasswordForm.addEventListener(
+        "submit",
+        async (event) => {
+
+            event.preventDefault();
+
+            const messageTarget =
+                getEl("authMessage") ||
+                getEl("resetPasswordMessage");
+
+            clearMessage(
+                messageTarget
+            );
+
+            const token =
+                el.resetToken
+                    ?.value
+                    .trim() || "";
+
+            const password =
+                el.resetPassword
+                    ?.value || "";
+
+            const passwordConfirm =
+                el.resetPasswordConfirm
+                    ?.value || "";
+
+
+            if (
+                !token ||
+                !password ||
+                !passwordConfirm
+            ) {
+
+                setMessage(
+                    messageTarget,
+                    "All fields are required.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            if (
+                password !== passwordConfirm
+            ) {
+
+                setMessage(
+                    messageTarget,
+                    "Passwords do not match.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            if (
+                password.length < 8
+            ) {
+
+                setMessage(
+                    messageTarget,
+                    "Password must be at least 8 characters.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            try {
+
+                const result =
+                    await resetPassword(
+                        token,
+                        password
+                    );
+
+                setMessage(
+                    messageTarget,
+                    result.message ||
+                    "Password reset successfully.",
+                    "success"
+                );
+
+                setTimeout(
+                    () => {
+
+                        window.location.href =
+                            "/login";
+
+                    },
+                    1000
+                );
+
+            } catch (error) {
+
+                setMessage(
+                    messageTarget,
+                    error.message ||
+                    "Unable to reset password.",
+                    "error"
+                );
+            }
+
+        }
+    );
+}
+
+
+console.log(
+    "[NOVA AUTH] Production authentication loaded."
+);
 })();
-
-
 
 

@@ -1,4 +1,4 @@
-﻿
+
 from __future__ import annotations
 
 
@@ -29,8 +29,14 @@ EXECUTION_TRIGGER_WORDS = {
     "run step",
     "execute",
     "go",
-}
 
+    "run all",
+    "run all steps",
+    "execute all",
+    "execute all steps",
+    "start execution",
+    "continue execution",
+}
 
 DEFAULT_EXECUTION_STATE_PATH = Path("C:/Users/Owner/nova/data/nova_execution_state.json")
 
@@ -76,7 +82,22 @@ class ChatExecutionService:
             user_text
         )
 
-        return clean in EXECUTION_TRIGGER_WORDS
+        if clean in EXECUTION_TRIGGER_WORDS:
+            return True
+
+        execution_phrases = (
+            "run all",
+            "run all steps",
+            "execute all",
+            "execute all steps",
+            "start execution",
+            "continue execution",
+        )
+
+        return any(
+            phrase in clean
+            for phrase in execution_phrases
+        )
 
     def attach_mission(
         self,
@@ -108,7 +129,10 @@ class ChatExecutionService:
             safe_session_id
         )
 
-        if isinstance(existing, dict):
+        if (
+            steps is None
+            and isinstance(existing, dict)
+        ):
 
             if (
                 existing.get("complete") is True
@@ -317,110 +341,61 @@ class ChatExecutionService:
                 ),
             }
 
-        ignored_commands = {
-            "next",
-            "continue",
-            "go",
-            "run",
-            "advance",
-        }
-
         steps = state.get("steps") or []
 
-        current_index = int(
-            state.get("current_index") or 0
+        # Normalize legacy step status values only.
+        # ExecutionHandler remains the authoritative owner of
+        # current_index, current_step, and execution status.
+        normalized_steps = []
+
+        for raw_step in steps:
+
+            if not isinstance(raw_step, dict):
+                normalized_steps.append(raw_step)
+                continue
+
+            step_copy = dict(raw_step)
+
+            status = str(
+                step_copy.get("status") or "pending"
+            ).strip().lower()
+
+            if status == "complete":
+                status = "completed"
+
+            step_copy["status"] = status
+
+            normalized_steps.append(step_copy)
+
+        state["steps"] = normalized_steps
+
+        execution_result = (
+            self.execution_handler.run_next_move(
+                action="run_step",
+                session_id=safe_session_id,
+                execution_state=state,
+            )
         )
 
-        if current_index >= len(steps):
-            state["status"] = "complete"
-            state["waiting"] = False
-            state["complete"] = True
-            state["current_step"] = None
+        returned_state = None
 
-        else:
-            current_step = steps[current_index]
-
-            if (
-                isinstance(current_step, dict)
-                and current_step.get("status")
-                in {
-                    "completed",
-                    "complete",
-                }
-            ):
-                next_index = current_index + 1
-
-                if next_index >= len(steps):
-                    state["current_index"] = next_index
-                    state["current_step"] = None
-                    state["status"] = "complete"
-                    state["waiting"] = False
-                    state["complete"] = True
-
-                else:
-                    next_step = steps[next_index]
-
-                    if isinstance(next_step, dict):
-                        next_step = dict(next_step)
-
-                        if (
-                            not next_step.get("status")
-                            or next_step.get("status")
-                            == "pending"
-                        ):
-                            next_step["status"] = "active"
-
-                        steps[next_index] = next_step
-
-                    state["steps"] = steps
-                    state["current_index"] = next_index
-                    state["current_step"] = next_step
-                    state["status"] = "running"
-                    state["waiting"] = False
-                    state["complete"] = False
-
-            else:
-                state["current_step"] = current_step
-
-                if (
-                    isinstance(current_step, dict)
-                    and current_step.get("next_action")
-                    == "request_target"
-                ):
-                    state["status"] = "waiting"
-                    state["waiting"] = True
-
-                else:
-                    state["status"] = "running"
-                    state["waiting"] = False
-
-                state["complete"] = False
-
-
-            execution_result = (
-                self.execution_handler.run_next_step(
-                    action="run_step",
-                    session_id=safe_session_id,
-                    execution_state=state,
-                )
+        if isinstance(
+            execution_result,
+            dict,
+        ):
+            returned_state = execution_result.get(
+                "execution_state"
             )
 
-            returned_state = None
+        if isinstance(
+            returned_state,
+            dict,
+        ):
+            state = returned_state
 
-            if isinstance(
-                execution_result,
-                dict,
-            ):
-                returned_state = execution_result.get(
-                    "execution_state"
-                )
-
-            if isinstance(
-                returned_state,
-                dict,
-            ):
-                state = returned_state
-                steps = state.get("steps") or []
+        self._states[
+            safe_session_id
+        ] = state
 
         task_type = state.get(
             "task_type",
@@ -842,6 +817,53 @@ class ChatExecutionService:
             temp_path.replace(self.state_path)
         except Exception:
             logger.exception("[ChatExecutionService] failed to save execution state")
+    def _save_execution_state(
+        self,
+        session_id: str,
+        execution_state: dict,
+    ) -> None:
+        """
+        Persist execution state through the canonical
+        ChatExecutionService state store.
+        """
+
+        safe_session_id = self._safe_session_id(
+            session_id
+        )
+
+        state = (
+            dict(execution_state)
+            if isinstance(execution_state, dict)
+            else {}
+        )
+
+        self._states[safe_session_id] = state
+
+        self._sync_state_to_session(
+            safe_session_id,
+            state,
+        )
+
+        execution_state_service = getattr(
+            self,
+            "execution_state_service",
+            None,
+        )
+
+        if execution_state_service:
+            try:
+                execution_state_service.save_execution_state(
+                    safe_session_id,
+                    state,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[ChatExecutionService] "
+                    "execution_state_service save failed: %s",
+                    exc,
+                )
+
+        self._save_states()
 
     def _normalize_steps(
         self,
@@ -1424,3 +1446,31 @@ except Exception as _nova_execution_empty_complete_error_20260630:
 
 # Shared execution service instance for imports across Nova.
 chat_execution_service = ChatExecutionService()
+
+# Wire the shared runtime execution handler after the service singleton
+# exists. This avoids requiring ExecutionHandler during class definition
+# and keeps the handler connected to the same shared service instance.
+try:
+    from nova_backend.services.execution_handler import ExecutionHandler
+
+    if getattr(
+        chat_execution_service,
+        "execution_handler",
+        None,
+    ) is None:
+        chat_execution_service.execution_handler = ExecutionHandler(
+            service=chat_execution_service,
+        )
+
+    _nova_boot_log_20260701(
+        "[NOVA_CHAT_EXECUTION_HANDLER_WIRED]",
+        type(
+            chat_execution_service.execution_handler
+        ).__name__,
+    )
+
+except Exception as _nova_chat_execution_handler_wire_error:
+    print(
+        "[NOVA_CHAT_EXECUTION_HANDLER_WIRE_FAILED]",
+        _nova_chat_execution_handler_wire_error,
+    )

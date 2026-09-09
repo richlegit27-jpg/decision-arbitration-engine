@@ -50,28 +50,31 @@ def _planned_plans() -> List[Dict[str, Any]]:
             "id": "free",
             "label": "Free",
             "status": "local_active",
-            "monthly_credits": 1000,
+            "monthly_credits": 10000,
             "stripe_price_env": "",
             "stripe_price_configured": False,
         },
         {
-            "id": "standard",
-            "label": "Standard",
+            "id": "plus",
+            "label": "Plus",
             "status": "planned",
-            "monthly_credits": 10000,
-            "stripe_price_env": "NOVA_STRIPE_STANDARD_PRICE_ID",
-            "stripe_price_configured": _configured_env("NOVA_STRIPE_STANDARD_PRICE_ID"),
+            "monthly_credits": 500000,
+            "stripe_price_env": "NOVA_STRIPE_PLUS_PRICE_ID",
+            "stripe_price_configured": _configured_env(
+                "NOVA_STRIPE_PLUS_PRICE_ID"
+            ),
         },
         {
             "id": "pro",
             "label": "Pro",
             "status": "planned",
-            "monthly_credits": 50000,
+            "monthly_credits": 2000000,
             "stripe_price_env": "NOVA_STRIPE_PRO_PRICE_ID",
-            "stripe_price_configured": _configured_env("NOVA_STRIPE_PRO_PRICE_ID"),
+            "stripe_price_configured": _configured_env(
+                "NOVA_STRIPE_PRO_PRICE_ID"
+            ),
         },
     ]
-
 
 def _usage_enforcement_status() -> Dict[str, Any]:
     services = ROOT / "nova_backend" / "services"

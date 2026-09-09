@@ -28,6 +28,28 @@ class TerminalExecuteTool(NovaTool):
 
     requires_confirmation = True
 
+    def run(
+        self,
+        **kwargs,
+    ):
+        command = kwargs.get("command")
+
+        path = (
+            kwargs.get("path")
+            or kwargs.get("cwd")
+        )
+
+        timeout = kwargs.get(
+            "timeout",
+            30,
+        )
+
+        return self.execute(
+            command=command,
+            path=path,
+            timeout=timeout,
+        )
+
     def execute(
         self,
         command: str,

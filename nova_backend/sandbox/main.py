@@ -1,6 +1,1 @@
-def main():
-    print("Application started")
-
-
-if __name__ == "__main__":
-    main()
+Created file: C:\Users\Owner\nova\main.py

@@ -16,7 +16,16 @@ from nova_backend.services.state_route_service import StateRouteService
 from nova_backend.services.attachment_service import attachment_service
 from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.services.image_vision_service import ImageVisionService
-from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    redirect,
+)
 from flask_cors import CORS
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -164,6 +173,9 @@ from nova_backend.services.attachment_utils_service import (
 )
 from nova_backend.services.execution_stream_service import (
     ExecutionStreamService,
+)
+from nova_backend.services.execution_engine_service import (
+    ExecutionEngineService,
 )
 from nova_backend.services.coding_judgment_service import (
     get_coding_judgment_answer,
@@ -356,6 +368,9 @@ from nova_backend.services.login_page_route_service import (
 from nova_backend.services.local_auth_route_service import (
     LocalAuthRouteService,
 )
+from nova_backend.services.password_reset_service import (
+    PasswordResetService,
+)
 from nova_backend.services.google_auth_service import (
     GoogleAuthService,
 )
@@ -435,6 +450,7 @@ project_execution_handler = (
         default_executor=default_executor
     )
 )
+
 chat_execution_service.execution_handler = (
     project_execution_handler
 )
@@ -490,9 +506,14 @@ chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
 chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
+import logging
+execution_logger = logging.getLogger(
+    "nova.execution"
+)
 execution_bridge_service = ExecutionBridgeService(
-    chat_execution_service,
-    None,
+    chat_execution_service=chat_execution_service,
+    logger=execution_logger,
+    chat_service=None,
 )
 execution_guard_service = ExecutionGuardService(
     chat_execution_service
@@ -793,6 +814,9 @@ register_project_routes(
     chat_execution_service=chat_execution_service,
 )
 
+
+
+
 print("[NOVA_PROJECT_ROUTES_20260901] installed")
 
 session_route_service.install_routes(
@@ -925,8 +949,32 @@ chat_service = ChatService(
     memory_context_service=memory_context_service,
     working_state_service=working_state_service,
     execution_state_service=execution_state_service,
+    chat_execution_service=chat_execution_service,
 )
 
+execution_bridge_service = (
+    chat_service.execution_bridge_service
+)
+
+project_execution_handler.execution_step_service = (
+    chat_service.execution_step_service
+)
+chat_execution_service.execution_handler = (
+    project_execution_handler
+)
+
+print(
+    "CHAT EXECUTION SERVICE PROJECT HANDLER REWIRED:",
+    type(
+        chat_execution_service.execution_handler
+    ).__name__,
+)
+
+print(
+    "PROJECT EXECUTION HANDLER WIRED:",
+    project_execution_handler.execution_step_service
+    is not None,
+)
 register_tool_approval_routes(
     app,
     chat_service,
@@ -934,11 +982,9 @@ register_tool_approval_routes(
 
 print("[NOVA_TOOL_APPROVAL_ROUTES] installed")
 
-execution_service = ExecutionService()
-
 execution_route_service = ExecutionRouteService(
     working_state_service=working_state_service,
-    execution_service=execution_service,
+    execution_service=chat_execution_service,
 )
 attachment_action_service = AttachmentActionService(
     upload_route_service=upload_route_service,
@@ -948,7 +994,7 @@ attachment_action_service = AttachmentActionService(
 )
 tool_runtime = build_tool_runtime(
     session_service=session_service,
-    chat_service=chat_service,
+    chat_service=None,
     attachment_service=attachment_action_service,
 )
 
@@ -962,6 +1008,84 @@ action_router = tool_runtime["action_router"]
 tool_executor = tool_runtime["tool_executor"]
 tool_registry = tool_runtime["tool_registry"]
 tool_bridge = tool_runtime["tool_bridge"]
+
+# ==========================================
+# UNIFIED TOOL RUNTIME OWNERSHIP
+# ==========================================
+
+chat_service.tool_runtime = tool_runtime
+chat_service.action_router = action_router
+chat_service.tool_executor = tool_executor
+chat_service.tool_registry = tool_registry
+chat_service.tool_bridge = tool_bridge
+chat_service.nova_tool_registry = tool_runtime.get(
+    "nova_tool_registry"
+)
+
+# Keep the execution step service synchronized
+# with the application's authoritative tool executor.
+if getattr(
+    chat_service,
+    "execution_step_service",
+    None,
+) is not None:
+    chat_service.execution_step_service.tool_executor = (
+        tool_executor
+    )
+
+# Keep the execution orchestrator synchronized with
+# the same authoritative execution step service.
+if getattr(
+    chat_service,
+    "execution_orchestrator_service",
+    None,
+) is not None:
+    chat_service.execution_orchestrator_service.execution_step_service = (
+        chat_service.execution_step_service
+    )
+
+# Keep the already-created legacy orchestrator synchronized
+# with the application's authoritative tool executor.
+if getattr(chat_service, "orchestrator", None) is not None:
+    chat_service.orchestrator.tool_executor = tool_executor
+
+print()
+print("=" * 70)
+print("NOVA TOOL RUNTIME IDENTITY CHECK")
+print("=" * 70)
+
+print(
+    "APP EXECUTOR == CHAT EXECUTOR:",
+    tool_executor is chat_service.tool_executor,
+)
+
+print(
+    "CHAT EXECUTOR == ORCHESTRATOR EXECUTOR:",
+    tool_executor
+    is getattr(
+        chat_service.orchestrator,
+        "tool_executor",
+        None,
+    ),
+)
+
+print(
+    "HAS ACTION ROUTER:",
+    chat_service.action_router is not None,
+)
+
+print(
+    "HAS TOOL REGISTRY:",
+    chat_service.tool_registry is not None,
+)
+
+print(
+    "HAS TOOL BRIDGE:",
+    chat_service.tool_bridge is not None,
+)
+
+print("=" * 70)
+print()
 
 from nova_backend.services.mission_orchestrator import (
     MissionOrchestrator,
@@ -980,7 +1104,7 @@ install_chat_service_runtime_patches()
 project_brain_general_intelligence_priority_service = (
     ProjectBrainGeneralIntelligencePriorityService(
         execution_state_service=execution_state_service,
-        chat_service=chat_service,
+        chat_service=None,
     )
 )
 project_brain_general_intelligence_priority_service.install(app)
@@ -1017,12 +1141,19 @@ image_command_service = ImageCommandService(
 
 execution_stream_service = ExecutionStreamService(
     session_service=session_service,
-    chat_service=chat_service,
+    chat_service=None,
     default_executor=default_executor,
     next_move_class=NextMove,
     update_execution_state_safe=update_execution_state_safe,
 )
 
+execution_engine_service = ExecutionEngineService(
+    session_service=session_service,
+    execution_service=chat_execution_service,
+    default_executor=default_executor,
+    next_move_class=NextMove,
+    update_execution_state_safe=update_execution_state_safe,
+)
 
 execution_fix_service = ExecutionFixService(
     session_service=session_service,
@@ -1035,9 +1166,9 @@ execution_stream_route_service = ExecutionStreamRouteService(
     session_service=session_service,
     execution_service=chat_execution_service,
     execution_stream_service=execution_stream_service,
+    execution_engine_service=execution_engine_service,
     execution_fix_service=execution_fix_service,
 )
-
 
 # =========================
 # RUNTIME BINDING
@@ -1073,7 +1204,13 @@ project_execution_controller = ProjectExecutionController(
     ),
 )
 local_auth_route_service.install_routes()
+password_reset_service = PasswordResetService(
+    app,
+    request,
+    jsonify,
+)
 
+password_reset_service.install_routes()
 google_auth_service = GoogleAuthService(
     app
 )
@@ -1467,6 +1604,7 @@ def api_chat_route():
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
+            auth_user_id=auth_user_id,
         )
 
         print(
@@ -1716,20 +1854,45 @@ def api_fetch():
 
 
 # CASUAL_CHAT_GUARD_20260604
+# CASUAL_CHAT_GUARD_20260604
 @app.before_request
 def _nova_casual_chat_guard():
 
+    from flask import request, jsonify
+
+    if request.path == "/api/chat" and request.method == "POST":
+        print(
+            "[HOOK 1 BEFORE JSON]",
+            repr(
+                request.get_data(
+                    cache=True,
+                    as_text=True,
+                )
+            ),
+            flush=True,
+        )
 
     try:
-        from flask import request, jsonify
 
         if request.path != "/api/chat" or request.method != "POST":
             return None
 
-        payload = request.get_json(silent=True) or {}
-        user_text = str(payload.get("user_text") or "").strip()
-        # NOVA_AUTO_PLAN_EXECUTION_START_GUARD_20260607
+        payload = request.get_json(
+            silent=True
+        ) or {}
 
+        print(
+            "[HOOK 1 AFTER JSON]",
+            repr(payload),
+            flush=True,
+        )
+
+        user_text = str(
+            payload.get("user_text")
+            or ""
+        ).strip()
+
+        # NOVA_AUTO_PLAN_EXECUTION_START_GUARD_20260607
 
         chat_guard_result = chat_guard_service.handle_casual_chat_guard(
             payload,
@@ -1881,9 +2044,30 @@ def api_chat():
         _nova_payload = data
 
 
-        execution_guard_result = execution_guard_service.handle(
-            _nova_payload
+        print(
+            "[NOVA CHECKPOINT 1 BEFORE EXECUTION GUARD]",
+            {
+                "payload": repr(_nova_payload),
+                "user_text": repr(user_text),
+                "session_id": repr(session_id),
+            },
+            flush=True,
         )
+
+        execution_guard_result = (
+            execution_guard_service.handle(
+                _nova_payload
+            )
+        )
+
+        print(
+            "[NOVA CHECKPOINT 2 AFTER EXECUTION GUARD]",
+            repr(execution_guard_result),
+            flush=True,
+        )
+
+        if execution_guard_result:
+            return jsonify(execution_guard_result)
 
         if execution_guard_result:
             return jsonify(execution_guard_result)
@@ -1902,7 +2086,13 @@ def api_chat():
             flush=True,
         )
 
-        _nova_user_text = _nova_chat_context["user_text"]
+        _nova_user_text = (
+            str(
+                _nova_chat_context.get("user_text")
+                or user_text
+                or ""
+            ).strip()
+        )
 
         _nova_session_id = (
             session_id
@@ -2108,15 +2298,16 @@ def api_chat():
     except Exception as _nova_api_image_gate_error:
         print("[NOVA_API_CHAT_IMAGE_VISION_GATE] failed:", _nova_api_image_gate_error)
 
-    # NOVA_DURABLE_EXECUTION_TOP_GUARD_20260607
     try:
         from nova_backend.services.execution_top_guard_service import (
             execution_top_guard_service,
         )
 
         _nova_execution_result = execution_top_guard_service.handle(
-            payload=request.get_json(silent=True) or {},
+            payload=data,
             session_id=session_id,
+            chat_execution_service=chat_execution_service,
+            execution_bridge_service=execution_bridge_service,
         )
 
         if _nova_execution_result.get("handled"):
@@ -2139,23 +2330,98 @@ def api_chat():
         }
     )
 
-    _nova_user_text_lower = str(user_text or "").strip().lower()
-    requested_session_id = str(data.get("session_id") or "").strip()
+    _nova_user_text_lower = str(
+        user_text or ""
+    ).strip().lower()
+
+    requested_session_id = str(
+        data.get("session_id") or ""
+    ).strip()
+
     session_id = requested_session_id
 
     # NOVA_EMPTY_SESSION_CREATE_GUARD_EXACT_20260610
-    # Normalize attachments before session creation so blank frontend pings do not create stored sessions.
+    # Normalize attachments before session creation so blank frontend
+    # pings do not create stored sessions.
 
-    attachments = normalize_attachments(data.get("attachments"))
+    attachments = normalize_attachments(
+        data.get("attachments")
+    )
 
     print(
-        "[EMPTY GUARD DEBUG]",
-        {
-            "user_text": repr(user_text),
-            "data": data,
-            "attachments": attachments,
-            "session_id": session_id,
-        },
+        "=" * 70,
+        flush=True,
+    )
+
+    print(
+        "[NOVA LIVE EMPTY GUARD REACHED]",
+        flush=True,
+    )
+
+    print(
+        "PID:",
+        os.getpid(),
+        flush=True,
+    )
+
+    print(
+        "APP FILE:",
+        __file__,
+        flush=True,
+    )
+
+    print(
+        "REQUEST JSON:",
+        repr(
+            request.get_json(
+                silent=True
+            )
+        ),
+        flush=True,
+    )
+
+    print(
+        "DATA:",
+        repr(data),
+        flush=True,
+    )
+
+    print(
+        "USER TEXT:",
+        repr(user_text),
+        flush=True,
+    )
+
+    print(
+        "SESSION ID:",
+        repr(session_id),
+        flush=True,
+    )
+
+    print(
+        "REQUESTED SESSION ID:",
+        repr(requested_session_id),
+        flush=True,
+    )
+
+    print(
+        "ATTACHMENTS:",
+        repr(attachments),
+        flush=True,
+    )
+
+    print(
+        "EMPTY CONDITION:",
+        (
+            not user_text
+            and not attachments
+        ),
+        flush=True,
+    )
+
+    print(
+        "=" * 70,
+        flush=True,
     )
 
     if not user_text and not attachments:
@@ -2164,7 +2430,6 @@ def api_chat():
                 session_id
             )
         )
-
         result["session_id"] = result.get("session_id") or session_id
         result["active_session_id"] = result.get("active_session_id") or result.get("session_id") or session_id
 
@@ -2354,7 +2619,7 @@ def api_chat():
             for index, item in enumerate(image_attachments[:5], start=1):
                 line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
                 if item.get("url"):
-                    line += f" ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {item.get('url')}"
+                    line += f" ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â {item.get('url')}"
                 lines.append(line)
 
             lines.append("")
@@ -3469,6 +3734,62 @@ def api_project_add_task(
     "/api/projects/<project_id>/tasks/<task_id>",
     methods=["DELETE"],
 )
+
+@app.route(
+    "/api/projects/<project_id>/tasks/<task_id>",
+    methods=["PATCH"],
+)
+def api_project_update_task(
+    project_id,
+    task_id,
+):
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    status = str(
+        data.get(
+            "status",
+            "",
+        )
+    ).strip().lower()
+
+    allowed_statuses = {
+        "open",
+        "running",
+        "completed",
+        "blocked",
+    }
+
+    if status not in allowed_statuses:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Invalid task status",
+            }
+        ), 400
+
+    task = project_workspace_service.update_task_status(
+        project_id,
+        task_id,
+        status,
+    )
+
+    if not task:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Task not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "task": task,
+        }
+    )
+
 def api_project_delete_task(
     project_id,
     task_id,
@@ -3501,7 +3822,7 @@ def api_project_delete_task(
     )
 
 
-@app.route(
+@app.route(                                                                                                                                                                                                                                                                                                                              
     "/api/projects/<project_id>/files",
     methods=["GET"],
 )
@@ -4043,10 +4364,26 @@ def execution_stream():
             flush=True,
         )
 
-        data = request.get_json(
-            force=True,
-            silent=False,
-        )
+        import json
+
+        try:
+            data = json.loads(
+                raw_body
+            )
+        except Exception as json_exc:
+            print(
+                "EXECUTION STREAM JSON PARSE FAILED =",
+                repr(json_exc),
+                flush=True,
+            )
+
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Invalid JSON body",
+                    "raw_body": raw_body,
+                }
+            ), 400
 
         print(
             "EXECUTION STREAM PARSED JSON =",
@@ -4097,13 +4434,32 @@ def execution_stream():
                 mimetype="text/event-stream",
             )
 
+        stream_payload = {
+            "session_id": session_id,
+            "action": action,
+        }
+
+        execution_state = (
+            data.get("execution_state")
+            or data.get("execution")
+        )
+
+        if isinstance(execution_state, dict):
+            stream_payload[
+                "execution_state"
+            ] = execution_state
+
+        print(
+            "EXECUTION STREAM FINAL PAYLOAD =",
+            repr(stream_payload),
+            flush=True,
+        )
+
         return Response(
             execution_stream_route_service.stream(
-                {
-                    "session_id": session_id,
-                    "action": action,
-                }
+                stream_payload
             ),
+
             mimetype="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -4541,9 +4897,19 @@ def nova_session_put_messages_compat_20260829(session_id):
         "session_id": sid,
     })
 
-# NOVA_APP_ROUTE_FIXED_CLEAN_BOTTOM_20260610
+# NOVA_APP_ROUTE_AUTH_PROTECTED_20260908
 @app.get("/app")
 def nova_desktop_app_fixed_20260610():
+
+    auth_user_id = str(
+        session.get("nova_user_id")
+        or session.get("user_id")
+        or ""
+    ).strip()
+
+    if not auth_user_id:
+        return redirect("/login")
+
     return render_template("app.html")
 
 # NOVA_ACCOUNT_PROFILE_ROUTE_20260708
@@ -5164,6 +5530,10 @@ if __name__ == "__main__":
         "seconds",
         flush=True,
     )
+
+
+
+
 
 
 

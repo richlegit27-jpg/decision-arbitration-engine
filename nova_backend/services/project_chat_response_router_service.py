@@ -1243,10 +1243,20 @@ def install_project_chat_response_router(app):
 
             "nova_api_auth_status_safe_20260612",
             "nova_api_auth_me_safe_20260612",
-            "nova_api_auth_me_safe_20260612",
             "nova_api_me_safe_20260612",
             "nova_api_auth_login_safe_20260611",
             "nova_api_auth_logout_safe_20260611",
+
+            # Billing and payment APIs.
+            # These return structured payment data or handle payment events
+            # and must never be intercepted by conversational wrappers.
+            "nova_billing_readiness_api",
+            "nova_billing_plans_api",
+            "nova_billing_account_api",
+            "nova_billing_checkout_api",
+            "nova_billing_webhook_api",
+            "nova_admin_billing_readiness",
+            "billing",
 
             # Project Workspace API endpoints
             "project_bp.build_project",

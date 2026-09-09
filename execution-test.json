@@ -1,4 +1,37 @@
 ﻿{
-  "session_id": "session_e39ba36647a7475e8dcd07536339007b",
-  "action": "run_step"
+  "action": "run_step",
+  "session_id": "session_891c67351e104158b74d8e58fba8b3ee",
+  "execution_state": {
+    "status": "ready",
+    "goal": "test execution persistence",
+    "task_type": "general",
+    "context": {},
+    "steps": [
+      {
+        "id": "step_1",
+        "title": "First test step",
+        "action": "echo",
+        "payload": {
+          "message": "step one"
+        },
+        "status": "pending"
+      },
+      {
+        "id": "step_2",
+        "title": "Second test step",
+        "action": "echo",
+        "payload": {
+          "message": "step two"
+        },
+        "status": "pending"
+      }
+    ],
+    "current_index": 0,
+    "current_step": null,
+    "history": [],
+    "waiting": false,
+    "complete": false,
+    "mission_id": null,
+    "error": null
+  }
 }

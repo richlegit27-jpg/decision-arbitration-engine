@@ -234,6 +234,37 @@ class PlannerService:
             },
         ]
 
+    def plan(
+        self,
+        goal,
+        context=None,
+    ) -> Dict[str, Any]:
+        """
+        Compatibility entry point used by PlannerBridge.
+
+        Builds a Nova plan and attaches execution-ready
+        metadata where possible.
+        """
+
+        plan = self.build_plan(
+            str(goal or "")
+        )
+
+        if not isinstance(plan, dict):
+            return {
+                "goal": str(goal or ""),
+                "steps": [],
+                "status": "planner_failed",
+            }
+
+        plan["context"] = (
+            context
+            if isinstance(context, dict)
+            else {}
+        )
+
+        return plan
+
     def build_plan(self, mission_name: str) -> Dict[str, Any]:
         safe_mission = str(mission_name or "generic").strip() or "generic"
 

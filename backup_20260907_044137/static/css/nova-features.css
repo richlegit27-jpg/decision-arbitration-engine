@@ -1,0 +1,644 @@
+/* NOVA_FEATURES_ENDGAME_20260711 */
+
+:root {
+    --nova-features-bg: #070812;
+    --nova-features-panel: rgba(15, 23, 42, 0.76);
+    --nova-features-panel-soft: rgba(255, 255, 255, 0.055);
+    --nova-features-line: rgba(226, 232, 240, 0.12);
+    --nova-features-text: #f8fafc;
+    --nova-features-muted: rgba(226, 232, 240, 0.70);
+    --nova-features-purple: #8b5cf6;
+    --nova-features-pink: #ec4899;
+    --nova-features-green: #34d399;
+}
+
+
+* {
+    box-sizing: border-box;
+}
+
+
+html {
+    min-width: 0;
+    background: var(--nova-features-bg);
+}
+
+
+body {
+    margin: 0;
+    min-width: 0;
+    min-height: 100vh;
+    color: var(--nova-features-text);
+    font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    background:
+        radial-gradient(
+            circle at 18% 8%,
+            rgba(139, 92, 246, 0.24),
+            transparent 32%
+        ),
+        radial-gradient(
+            circle at 80% 18%,
+            rgba(236, 72, 153, 0.16),
+            transparent 28%
+        ),
+        linear-gradient(
+            180deg,
+            #070812 0%,
+            #0f172a 100%
+        );
+}
+
+
+a {
+    color: inherit;
+}
+
+
+.nova-features-shell {
+    width: min(
+        1180px,
+        calc(100% - 40px)
+    );
+    margin-inline: auto;
+    padding: 26px 0 42px;
+}
+
+
+.nova-features-nav {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 48px;
+}
+
+
+.nova-features-brand {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+}
+
+
+.nova-features-brand > span {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 16px;
+    background:
+        linear-gradient(
+            135deg,
+            var(--nova-features-purple),
+            var(--nova-features-pink)
+        );
+    box-shadow:
+        0 18px 44px
+        rgba(139, 92, 246, 0.28);
+    font-weight: 950;
+}
+
+
+.nova-features-brand strong,
+.nova-features-brand em {
+    display: block;
+}
+
+
+.nova-features-brand strong {
+    font-size: 16px;
+}
+
+
+.nova-features-brand em {
+    margin-top: 2px;
+    color: var(--nova-features-muted);
+    font-size: 12px;
+    font-style: normal;
+}
+
+
+.nova-features-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+
+.nova-features-actions a,
+.nova-features-footer a {
+    color: var(--nova-features-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 800;
+    transition:
+        color 160ms ease,
+        border-color 160ms ease,
+        background 160ms ease,
+        transform 160ms ease;
+}
+
+
+.nova-features-actions a:hover,
+.nova-features-footer a:hover {
+    color: #ffffff;
+}
+
+
+.nova-features-actions a:last-child {
+    padding: 10px 15px;
+    color: #ffffff;
+    border: 1px solid
+        rgba(167, 139, 250, 0.28);
+    border-radius: 999px;
+    background:
+        rgba(139, 92, 246, 0.22);
+}
+
+
+.nova-features-actions a:last-child:hover {
+    border-color:
+        rgba(196, 181, 253, 0.50);
+    background:
+        rgba(139, 92, 246, 0.30);
+    transform:
+        translateY(-1px);
+}
+
+
+.nova-features-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 58px;
+    border: 1px solid
+        var(--nova-features-line);
+    border-radius: 38px;
+    background:
+        radial-gradient(
+            circle at 0% 0%,
+            rgba(139, 92, 246, 0.22),
+            transparent 38%
+        ),
+        radial-gradient(
+            circle at 92% 30%,
+            rgba(236, 72, 153, 0.13),
+            transparent 30%
+        ),
+        var(--nova-features-panel);
+    box-shadow:
+        0 28px 100px
+        rgba(0, 0, 0, 0.36);
+}
+
+
+.nova-features-hero::after {
+    content: "";
+    position: absolute;
+    width: 340px;
+    height: 340px;
+    right: -180px;
+    bottom: -210px;
+    border-radius: 50%;
+    border: 1px solid
+        rgba(196, 181, 253, 0.13);
+    box-shadow:
+        0 0 0 48px
+        rgba(139, 92, 246, 0.035);
+    pointer-events: none;
+}
+
+
+.nova-features-kicker,
+.nova-features-card p,
+.nova-features-flow p,
+.nova-features-cta p {
+    margin: 0 0 12px;
+    color:
+        rgba(196, 181, 253, 0.94);
+    font-size: 12px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+}
+
+
+.nova-features-hero h1 {
+    position: relative;
+    z-index: 1;
+    max-width: 870px;
+    margin: 0;
+    font-size:
+        clamp(
+            48px,
+            7.2vw,
+            88px
+        );
+    line-height: 0.93;
+    letter-spacing: -0.072em;
+    text-wrap: balance;
+}
+
+
+.nova-features-hero > span {
+    position: relative;
+    z-index: 1;
+    display: block;
+    max-width: 790px;
+    margin-top: 24px;
+    color: var(--nova-features-muted);
+    font-size: 18px;
+    line-height: 1.72;
+}
+
+
+.nova-features-buttons {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 30px;
+}
+
+
+.nova-features-buttons a,
+.nova-features-cta > a {
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    border-radius: 999px;
+    text-decoration: none;
+    font-weight: 950;
+    transition:
+        transform 160ms ease,
+        box-shadow 160ms ease,
+        border-color 160ms ease;
+}
+
+
+.nova-features-buttons a:first-child,
+.nova-features-cta > a {
+    color: #ffffff;
+    background:
+        linear-gradient(
+            135deg,
+            var(--nova-features-purple),
+            var(--nova-features-pink)
+        );
+    box-shadow:
+        0 18px 44px
+        rgba(139, 92, 246, 0.30);
+}
+
+
+.nova-features-buttons a:last-child {
+    color:
+        rgba(248, 250, 252, 0.92);
+    border: 1px solid
+        var(--nova-features-line);
+    background:
+        rgba(255, 255, 255, 0.06);
+}
+
+
+.nova-features-buttons a:hover,
+.nova-features-cta > a:hover {
+    transform:
+        translateY(-2px);
+}
+
+
+.nova-features-buttons a:first-child:hover,
+.nova-features-cta > a:hover {
+    box-shadow:
+        0 24px 56px
+        rgba(139, 92, 246, 0.38);
+}
+
+
+.nova-features-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(0, 1fr)
+        );
+    gap: 16px;
+    margin: 24px 0;
+}
+
+
+.nova-features-card {
+    min-width: 0;
+    padding: 28px;
+    border: 1px solid
+        var(--nova-features-line);
+    border-radius: 28px;
+    background:
+        var(--nova-features-panel-soft);
+    transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        background 180ms ease;
+}
+
+
+.nova-features-card:hover {
+    transform:
+        translateY(-4px);
+    border-color:
+        rgba(167, 139, 250, 0.27);
+    background:
+        rgba(255, 255, 255, 0.072);
+}
+
+
+.nova-features-card h2 {
+    margin: 0 0 12px;
+    font-size: 25px;
+    line-height: 1.08;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+}
+
+
+.nova-features-card span {
+    color: var(--nova-features-muted);
+    line-height: 1.72;
+}
+
+
+.nova-features-flow {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1.1fr)
+        minmax(320px, 0.9fr);
+    gap: 24px;
+    align-items: center;
+    margin: 24px 0;
+    padding: 42px;
+    border: 1px solid
+        var(--nova-features-line);
+    border-radius: 34px;
+    background:
+        rgba(15, 23, 42, 0.64);
+}
+
+
+.nova-features-flow > div:first-child {
+    max-width: 690px;
+}
+
+
+.nova-features-flow h2 {
+    max-width: 620px;
+    margin: 0;
+    font-size:
+        clamp(
+            34px,
+            5vw,
+            58px
+        );
+    line-height: 0.98;
+    letter-spacing: -0.06em;
+    text-wrap: balance;
+}
+
+
+.nova-features-flow > div:first-child > span {
+    display: block;
+    max-width: 680px;
+    margin-top: 20px;
+    color: var(--nova-features-muted);
+    line-height: 1.75;
+}
+
+
+.nova-features-flow-stack {
+    display: grid;
+    gap: 10px;
+}
+
+
+.nova-features-flow-stack > div {
+    display: grid;
+    grid-template-columns:
+        42px
+        minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    padding: 16px;
+    border: 1px solid
+        var(--nova-features-line);
+    border-radius: 20px;
+    background:
+        rgba(255, 255, 255, 0.045);
+}
+
+
+.nova-features-flow-stack strong {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    color:
+        rgba(233, 213, 255, 0.98);
+    background:
+        rgba(139, 92, 246, 0.17);
+}
+
+
+.nova-features-flow-stack span {
+    color:
+        rgba(248, 250, 252, 0.88);
+    font-weight: 750;
+    line-height: 1.5;
+}
+
+
+.nova-features-cta {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto;
+    gap: 24px;
+    align-items: center;
+    margin: 24px 0 38px;
+    padding: 34px;
+    border: 1px solid
+        rgba(52, 211, 153, 0.20);
+    border-radius: 32px;
+    background:
+        radial-gradient(
+            circle at 10% 0%,
+            rgba(52, 211, 153, 0.10),
+            transparent 42%
+        ),
+        rgba(6, 78, 59, 0.17);
+}
+
+
+.nova-features-cta h2 {
+    max-width: 760px;
+    margin: 0;
+    font-size:
+        clamp(
+            30px,
+            4vw,
+            48px
+        );
+    line-height: 1;
+    letter-spacing: -0.052em;
+    text-wrap: balance;
+}
+
+
+.nova-features-cta span {
+    display: block;
+    max-width: 760px;
+    margin-top: 14px;
+    color: var(--nova-features-muted);
+    line-height: 1.7;
+}
+
+
+.nova-features-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 18px;
+    color: var(--nova-features-muted);
+}
+
+
+.nova-features-footer > div {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
+
+@media (
+    max-width: 900px
+) {
+    .nova-features-nav,
+    .nova-features-flow,
+    .nova-features-cta {
+        grid-template-columns: 1fr;
+    }
+
+
+    .nova-features-actions {
+        justify-content: flex-start;
+    }
+
+
+    .nova-features-grid {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+
+    .nova-features-flow {
+        align-items: stretch;
+    }
+
+
+    .nova-features-cta > a {
+        width: fit-content;
+    }
+}
+
+
+@media (
+    max-width: 620px
+) {
+    .nova-features-shell {
+        width:
+            min(
+                100% - 28px,
+                1180px
+            );
+        padding-top: 18px;
+    }
+
+
+    .nova-features-nav {
+        margin-bottom: 30px;
+    }
+
+
+    .nova-features-actions {
+        gap: 6px;
+    }
+
+
+    .nova-features-hero {
+        padding: 30px 24px;
+        border-radius: 28px;
+    }
+
+
+    .nova-features-hero h1 {
+        font-size:
+            clamp(
+                43px,
+                15vw,
+                66px
+            );
+    }
+
+
+    .nova-features-hero > span {
+        font-size: 16px;
+    }
+
+
+    .nova-features-grid {
+        grid-template-columns: 1fr;
+    }
+
+
+    .nova-features-card {
+        padding: 24px;
+    }
+
+
+    .nova-features-flow,
+    .nova-features-cta {
+        padding: 28px 24px;
+        border-radius: 28px;
+    }
+
+
+    .nova-features-footer {
+        align-items: flex-start;
+    }
+
+
+    .nova-features-footer > div {
+        justify-content: flex-start;
+    }
+}

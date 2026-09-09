@@ -256,49 +256,23 @@ class ExecutionStateService:
 
         return None
 
-    def get_working_state(self, session_id):
-        session_id = str(session_id or "").strip()
-
+    def get_working_state(
+        self,
+        session_id,
+    ):
         if not session_id:
             return {}
 
         merged_state = {}
 
-        svc = self.session_service
+        services = []
 
-        if svc is not None:
+        if self.session_service is not None:
+            services.append(self.session_service)
 
-            method = getattr(
-                svc,
-                "get_working_state",
-                None,
-            )
+        session = None
 
-            if callable(method):
-                try:
-                    state = method(session_id)
-
-                    if isinstance(state, dict):
-                        for state_key, state_value in state.items():
-
-                            if state_key in {
-                                "active_execution",
-                                "execution_state",
-                                "execution",
-                                "last_execution",
-                            } and state_value is None:
-                                merged_state[state_key] = None
-                                continue
-
-                            if (
-                                state_key not in merged_state
-                                or state_value is not None
-                            ):
-                                merged_state[state_key] = state_value
-
-                except Exception:
-                    pass
-
+        for svc in services:
             for method_name in (
                 "get_session",
                 "get",
@@ -314,403 +288,190 @@ class ExecutionStateService:
 
                 try:
                     session = method(session_id)
-
                 except Exception:
                     session = None
 
-        if isinstance(session, dict):
+                if isinstance(session, dict):
+                    break
 
-            working_state = session.get(
-                "working_state"
-            )
+            if isinstance(session, dict):
+                break
 
-            if not isinstance(working_state, dict):
-                working_state = {}
+        if not isinstance(session, dict):
+            sessions_data = self.read_sessions_file()
 
-            print(
-                "DEBUG WORKING STATE EXEC:",
-                {
-                    "active_execution": working_state.get(
-                        "active_execution"
-                    ),
-                    "execution_state": working_state.get(
-                        "execution_state"
-                    ),
-                },
-            )
-
-            def execution_richness(item):
-                score = 0
-
-                if not isinstance(item, dict):
-                    return score
-
-                steps = item.get("steps")
-
-                if isinstance(steps, list):
-                    score += len(steps)
-
-                    for step in steps:
-                        if not isinstance(step, dict):
-                            continue
-
-                        if step.get("action"):
-                            score += 5
-
-                        if step.get("result"):
-                            score += 5
-
-                        if step.get("text"):
-                            score += 3
-
-                        if step.get("target_file"):
-                            score += 3
-
-                        if step.get("target_function"):
-                            score += 3
-
-                        if step.get("mutation_mode"):
-                            score += 3
-
-                        if step.get("mutation_ready"):
-                            score += 20
-
-                        if step.get("next_action") in {
-                            "generate_file_replacement",
-                            "generate_function_replacement",
-                        }:
-                            score += 20
-
-                        if step.get("payload_required"):
-                            score += 5
-
-                if item.get("history"):
-                    score += 2
-
-                if item.get("learning_history"):
-                    score += 2
-
-                if item.get("current_index") is not None:
-                    score += 5
-
-                if item.get("current_step_index") is not None:
-                    score += 5
-
-                if item.get("current_step"):
-                    score += 5
-
-                return score
-
-
-
-            def merge_execution_value(
-                key,
-                value,
-                source,
-            ):
-                if value is None:
-                    return
-
-                if not isinstance(value, dict) or not value:
-                    return
-
-                existing = merged_state.get(key)
-
-                if not isinstance(existing, dict) or not existing:
-                    merged_state[key] = value
-                    return
-
-                existing_index = execution_index(
-                    existing
+            if isinstance(sessions_data, dict):
+                session = self.find_session(
+                    sessions_data,
+                    session_id,
                 )
 
-                value_index = execution_index(
-                    value
-                )
+        if not isinstance(session, dict):
+            return {}
 
-                existing_richness = execution_richness(
-                    existing
-                )
+        working_state = session.get(
+            "working_state"
+        )
 
-                value_richness = execution_richness(
-                    value
-                )
+        if isinstance(working_state, dict):
+            merged_state.update(working_state)
 
-                print(
-                    "DEBUG EXECUTION FINAL MERGE:",
-                    {
-                        "key": key,
-                        "source": source,
-                        "existing_index": existing_index,
-                        "incoming_index": value_index,
-                        "existing_richness": existing_richness,
-                        "incoming_richness": value_richness,
-                    },
-                )
-
-                if value_index > existing_index:
-                    merged_state[key] = value
-                    return
-
-                if (
-                    value_index == existing_index
-                    and value_richness > existing_richness
-                ):
-                    merged_state[key] = value
-
-            for ws_key, ws_value in working_state.items():
-
-                if ws_key in {
-                    "active_execution",
-                    "execution_state",
-                    "execution",
-                    "last_execution",
-                }:
-                    merge_execution_value(
-                        ws_key,
-                        ws_value,
-                        "session_working_state",
-                    )
-                    continue
-
-                merged_state[ws_key] = ws_value
+        def execution_index(item):
+            if not isinstance(item, dict):
+                return -1
 
             for key in (
-                "active_execution",
-                "execution_state",
-                "execution",
-                "last_execution",
+                "current_index",
+                "current_step_index",
             ):
-                value = session.get(key)
-
-                merge_execution_value(
-                    key,
-                    value,
-                    "session_root",
-                )
-
-            working_state = session.get(
-                "working_state"
-            )
-
-            if not isinstance(working_state, dict):
-                working_state = {}
-
-            print(
-                "DEBUG WORKING STATE EXEC:",
-                {
-                    "active_execution": working_state.get(
-                        "active_execution"
-                    ),
-                    "execution_state": working_state.get(
-                        "execution_state"
-                    ),
-                },
-            )
-
-            def execution_richness(item):
-                score = 0
-
-                if not isinstance(item, dict):
-                    return score
-
-                steps = item.get("steps")
-
-                if isinstance(steps, list):
-                    score += len(steps)
-
-                    for step in steps:
-                        if not isinstance(step, dict):
-                            continue
-
-                        if step.get("action"):
-                            score += 5
-
-                        if step.get("result"):
-                            score += 5
-
-                        if step.get("text"):
-                            score += 3
-
-                        if step.get("target_file"):
-                            score += 3
-
-                        if step.get("target_function"):
-                            score += 3
-
-                        if step.get("mutation_mode"):
-                            score += 3
-
-                        if step.get("mutation_ready"):
-                            score += 20
-
-                        if step.get("next_action") in {
-                            "generate_file_replacement",
-                            "generate_function_replacement",
-                        }:
-                            score += 20
-
-                        if step.get("payload_required"):
-                            score += 5
-
-                if item.get("history"):
-                    score += 2
-
-                if item.get("learning_history"):
-                    score += 2
-
-                if item.get("current_index") is not None:
-                    score += 5
-
-                if item.get("current_step_index") is not None:
-                    score += 5
-
-                if item.get("current_step"):
-                    score += 5
-
-                return score
-
-            def execution_index(item):
-                if not isinstance(item, dict):
-                    return -1
-
-                value = item.get(
-                    "current_index"
-                )
-
-                if value is None:
-                    value = item.get(
-                        "current_step_index"
-                    )
+                value = item.get(key)
 
                 try:
                     return int(value)
                 except Exception:
-                    return -1
+                    pass
 
-            def merge_execution_value(
+            return -1
+
+        def execution_richness(item):
+            score = 0
+
+            if not isinstance(item, dict):
+                return score
+
+            steps = item.get("steps")
+
+            if isinstance(steps, list):
+                score += len(steps)
+
+                for step in steps:
+                    if not isinstance(step, dict):
+                        continue
+
+                    if step.get("action"):
+                        score += 5
+
+                    if step.get("result"):
+                        score += 5
+
+                    if step.get("text"):
+                        score += 3
+
+                    if step.get("target_file"):
+                        score += 3
+
+                    if step.get("target_function"):
+                        score += 3
+
+                    if step.get("mutation_mode"):
+                        score += 3
+
+                    if step.get("mutation_ready"):
+                        score += 20
+
+                    if step.get("next_action") in {
+                        "generate_file_replacement",
+                        "generate_function_replacement",
+                    }:
+                        score += 20
+
+                    if step.get("payload_required"):
+                        score += 5
+
+            if item.get("history"):
+                score += 2
+
+            if item.get("learning_history"):
+                score += 2
+
+            if item.get("current_index") is not None:
+                score += 5
+
+            if item.get("current_step_index") is not None:
+                score += 5
+
+            if item.get("current_step"):
+                score += 5
+
+            return score
+
+        def merge_execution_value(
+            key,
+            value,
+            source,
+        ):
+            if not isinstance(value, dict) or not value:
+                return
+
+            existing = merged_state.get(key)
+
+            if not isinstance(existing, dict) or not existing:
+                merged_state[key] = value
+                return
+
+            existing_index = execution_index(
+                existing
+            )
+
+            value_index = execution_index(
+                value
+            )
+
+            existing_richness = execution_richness(
+                existing
+            )
+
+            value_richness = execution_richness(
+                value
+            )
+
+            print(
+                "DEBUG EXECUTION FINAL MERGE:",
+                {
+                    "key": key,
+                    "source": source,
+                    "existing_index": existing_index,
+                    "incoming_index": value_index,
+                    "existing_richness": existing_richness,
+                    "incoming_richness": value_richness,
+                },
+            )
+
+            if value_index > existing_index:
+                merged_state[key] = value
+                return
+
+            if (
+                value_index == existing_index
+                and value_richness > existing_richness
+            ):
+                merged_state[key] = value
+
+        for key in (
+            "active_execution",
+            "execution_state",
+            "execution",
+            "last_execution",
+        ):
+            merge_execution_value(
                 key,
-                value,
-                source,
-            ):
-                if value is None:
-                    return
+                working_state.get(key)
+                if isinstance(working_state, dict)
+                else None,
+                "session_working_state",
+            )
 
-                if not isinstance(value, dict) or not value:
-                    return
-
-                existing = merged_state.get(key)
-
-                if not isinstance(existing, dict) or not existing:
-                    merged_state[key] = value
-                    return
-
-                existing_index = execution_index(
-                    existing
-                )
-
-                value_index = execution_index(
-                    value
-                )
-
-                existing_richness = execution_richness(
-                    existing
-                )
-
-                value_richness = execution_richness(
-                    value
-                )
-
-                print(
-                    "DEBUG EXECUTION FINAL MERGE:",
-                    {
-                        "key": key,
-                        "source": source,
-                        "existing_index": existing_index,
-                        "incoming_index": value_index,
-                        "existing_richness": existing_richness,
-                        "incoming_richness": value_richness,
-                    },
-                )
-
-                if value_index > existing_index:
-                    merged_state[key] = value
-                    return
-
-                if (
-                    value_index == existing_index
-                    and value_richness > existing_richness
-                ):
-                    merged_state[key] = value
-
-            for ws_key, ws_value in working_state.items():
-
-                if ws_key in {
-                    "active_execution",
-                    "execution_state",
-                    "execution",
-                    "last_execution",
-                }:
-                    merge_execution_value(
-                        ws_key,
-                        ws_value,
-                        "session_working_state",
-                    )
-                    continue
-
-                merged_state[ws_key] = ws_value
-
-            for key in (
-                "active_execution",
-                "execution_state",
-                "execution",
-                "last_execution",
-            ):
-                value = session.get(key)
-
-                merge_execution_value(
-                    key,
-                    value,
-                    "session_root",
-                )
-
-        print(
-            "DEBUG WORKING STATE EXECUTION RETURN:",
-            {
-                "active_status": (
-                    merged_state.get("active_execution", {}).get("status")
-                    if isinstance(
-                        merged_state.get("active_execution"),
-                        dict,
-                    )
-                    else None
-                ),
-                "active_index": (
-                    merged_state.get("active_execution", {}).get("current_index")
-                    if isinstance(
-                        merged_state.get("active_execution"),
-                        dict,
-                    )
-                    else None
-                ),
-                "state_status": (
-                    merged_state.get("execution_state", {}).get("status")
-                    if isinstance(
-                        merged_state.get("execution_state"),
-                        dict,
-                    )
-                    else None
-                ),
-                "state_index": (
-                    merged_state.get("execution_state", {}).get("current_index")
-                    if isinstance(
-                        merged_state.get("execution_state"),
-                        dict,
-                    )
-                    else None
-                ),
-            },
-        )
+        for key in (
+            "active_execution",
+            "execution_state",
+            "execution",
+            "last_execution",
+        ):
+            merge_execution_value(
+                key,
+                session.get(key),
+                "session_root",
+            )
 
         return merged_state
 

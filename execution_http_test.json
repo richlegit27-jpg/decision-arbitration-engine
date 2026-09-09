@@ -1,0 +1,16 @@
+﻿{
+    "execution_state":  {
+                            "status":  "ready",
+                            "id":  "execution-http-test",
+                            "steps":  [
+                                          {
+                                              "status":  "pending",
+                                              "title":  "HTTP execution test",
+                                              "id":  "step-1",
+                                              "action":  "run_step"
+                                          }
+                                      ]
+                        },
+    "session_id":  "execution-http-test",
+    "action":  "run"
+}

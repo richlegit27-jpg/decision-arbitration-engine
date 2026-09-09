@@ -986,8 +986,7 @@ class MemoryService:
         data = self._read_store()
         memory = data.get("memory", [])
 
-        owner_id = self._current_owner_id()
-
+        owner_id = str(self._current_owner_id() or "").strip()
         kept = []
 
         for item in memory:
@@ -997,14 +996,22 @@ class MemoryService:
                 kept.append(item)
                 continue
 
-            if owner_id:
-                if item.get("owner_id") == owner_id:
-                    continue
-                kept.append(item)
+            item_owner_id = str(item.get("owner_id") or "").strip()
+
+            # Delete legacy memories without an owner.
+            if not item_owner_id:
                 continue
 
-            # local tool execution without auth context
-            continue
+            # Delete memories belonging to the current owner.
+            if owner_id and item_owner_id == owner_id:
+                continue
+
+            # Local development mode without auth context.
+            if not owner_id:
+                continue
+
+            # Preserve memories belonging to another owner.
+            kept.append(item)
 
         if len(kept) == len(memory):
             return False
@@ -1012,7 +1019,6 @@ class MemoryService:
         data["memory"] = kept
         self._write_store(data)
         return True
-
     def clear(self) -> None:
         self._write_store({"memory": []})
 
@@ -1214,5 +1220,6 @@ class MemoryService:
             "kept": promote_result.get("kept", 0),
             "memory": self.all(),
         }
+
 
 

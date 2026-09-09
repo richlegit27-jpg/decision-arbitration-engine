@@ -1,0 +1,34 @@
+{
+  "action": "run",
+  "session_id": "execution-multistep-test",
+  "execution_state": {
+    "id": "execution-multistep-test-1",
+    "status": "ready",
+    "steps": [
+      {
+        "id": "step-1",
+        "title": "Update first function",
+        "status": "pending",
+        "target_file": "C:\\Users\\Owner\\nova\\_execution_multistep_test.py",
+        "target_function": "first",
+        "content": "def first():\n    return \"first updated\""
+      },
+      {
+        "id": "step-2",
+        "title": "Update second function",
+        "status": "pending",
+        "target_file": "C:\\Users\\Owner\\nova\\_execution_multistep_test.py",
+        "target_function": "second",
+        "content": "def second():\n    return \"second updated\""
+      }
+    ],
+    "type": "execution_run",
+    "title": "Multi Step Execution Test",
+    "goal": "Update two functions through sequential execution",
+    "current_step": "",
+    "result": "",
+    "error": "",
+    "history": [],
+    "meta": {}
+  }
+}
