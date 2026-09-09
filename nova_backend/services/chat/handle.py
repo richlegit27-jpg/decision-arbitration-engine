@@ -455,6 +455,9 @@ def chat_handle(
                 user_text=user_text,
                 decision=decision,
                 session_id=session_id,
+                requested_model=decision.get(
+                    "model"
+                ),
             )
         )
 
@@ -529,3 +532,7 @@ def chat_handle(
             },
             "session_id": session_id,
         }
+
+
+
+

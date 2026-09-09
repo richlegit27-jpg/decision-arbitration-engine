@@ -1,68 +1,129 @@
-# NOVA_MODEL_GATEWAY_SERVICE_COMPAT_20260705
+﻿# NOVA_MODEL_GATEWAY_SERVICE_COMPAT_20260705
 """
-Small compatibility module for model-call patching.
+Central Nova model gateway.
 
-Regression tests monkeypatch chat_completions_create here so they can capture
-the messages that /api/chat sends to the model without making a real OpenAI call.
-
-NOVA_MODEL_GATEWAY_CREDIT_ENFORCEMENT_20260709:
-- Keeps the same public wrapper function.
-- Adds local billing credit enforcement at the OpenAI gateway boundary.
-- Records usage after a successful provider response when the usage ledger exists.
-- Removes Nova-only kwargs before sending the request to OpenAI.
+All OpenAI calls pass Nova's API key explicitly instead of relying on
+whatever OPENAI_API_KEY happens to exist in the running process environment.
 """
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Tuple
+
+from dotenv import load_dotenv
 
 
 NOVA_GATEWAY_MINIMUM_CREDIT_COST = 1
 
-NOVA_MODEL_ALIASES = {
-    "nova-fast": "gpt-4.1-mini",
-    "nova-smart": "gpt-5.4",
-    "nova-vision": "gpt-4o-mini",
-    "nova-coding": "gpt-5.4",
-}
 
+# ---------------------------------------------------------------------
+# NOVA ENVIRONMENT / OPENAI CLIENT
+# ---------------------------------------------------------------------
+
+NOVA_ROOT = Path(__file__).resolve().parents[2]
+NOVA_ENV_PATH = NOVA_ROOT / ".env"
+
+load_dotenv(
+    NOVA_ENV_PATH,
+    override=True,
+)
+
+
+def _get_openai_api_key() -> str:
+    """
+    Always load Nova's project API key directly from Nova's environment.
+    """
+
+    load_dotenv(
+        NOVA_ENV_PATH,
+        override=True,
+    )
+
+    api_key = str(
+        os.getenv("OPENAI_API_KEY")
+        or ""
+    ).strip()
+
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is missing from "
+            + str(NOVA_ENV_PATH)
+        )
+
+    return api_key
+
+
+def _get_openai_client():
+    """
+    Create an OpenAI client using Nova's explicitly loaded API key.
+    """
+
+    try:
+        from openai import OpenAI
+    except Exception as error:
+        raise RuntimeError(
+            f"OpenAI client is unavailable: {error}"
+        ) from error
+
+    api_key = _get_openai_api_key()
+
+    return OpenAI(
+        api_key=api_key,
+    )
+
+
+# ---------------------------------------------------------------------
+# MODEL RESOLUTION
+# ---------------------------------------------------------------------
 
 def resolve_nova_model(model):
-    requested = str(model or "").strip()
+    from nova_backend.model_registry import resolve_model
 
-    if requested in NOVA_MODEL_ALIASES:
-        return NOVA_MODEL_ALIASES[requested]
+    return resolve_model(model)
 
-    return requested or os.environ.get(
-        "OPENAI_MODEL",
-        "gpt-4.1-mini",
-    )
 
 def resolve_nova_task_model(
     model=None,
     text="",
     intent="",
 ):
-    if model:
-        return resolve_nova_model(model)
+    from nova_backend.model_registry import (
+        get_default_model_alias,
+        resolve_model,
+    )
 
-    intent = str(intent or "").lower().strip()
+    # Explicit user-selected model always wins.
+    if model:
+        return resolve_model(model)
+
+    intent = str(
+        intent or ""
+    ).lower().strip()
 
     if intent in {
         "coding",
         "debugging",
     }:
-        return NOVA_MODEL_ALIASES["nova-coding"]
-
-    if intent == "image":
-        return NOVA_MODEL_ALIASES["nova-vision"]
+        return resolve_model("gpt-5.4-mini")
 
     if intent in {
         "planning",
         "working_state",
+        "reasoning",
     }:
-        return NOVA_MODEL_ALIASES["nova-smart"]
+        return resolve_model("astra")
+
+    if intent in {
+        "image",
+        "vision",
+    }:
+        from nova_backend.model_registry import (
+            get_vision_model,
+        )
+
+        return get_vision_model()
 
     text = str(text or "").lower()
 
@@ -71,461 +132,263 @@ def resolve_nova_task_model(
         for word in [
             "python",
             "code",
+            "debug",
             "bug",
             "error",
             "function",
-            "script",
-            "debug",
+            "class",
+            "backend",
+            "frontend",
+            "javascript",
         ]
     ):
-        return NOVA_MODEL_ALIASES["nova-coding"]
+        return resolve_model("gpt-5.4-mini")
 
-    if any(
-        word in text
-        for word in [
-            "image",
-            "photo",
-            "picture",
-            "vision",
-        ]
-    ):
-        return NOVA_MODEL_ALIASES["nova-vision"]
+    return resolve_model(
+        get_default_model_alias()
+    )
 
-    return NOVA_MODEL_ALIASES["nova-fast"]
 
-def resolve_nova_intent_model(
-    intent="",
-    model=None,
-):
-    if model:
-        return resolve_nova_model(model)
-
-    intent = str(intent or "").lower().strip()
-
-    if intent in {
-        "coding",
-        "debugging",
-    }:
-        return NOVA_MODEL_ALIASES["nova-coding"]
-
-    if intent == "image":
-        return NOVA_MODEL_ALIASES["nova-vision"]
-
-    if intent in {
-        "planning",
-        "working_state",
-    }:
-        return NOVA_MODEL_ALIASES["nova-smart"]
-
-    return NOVA_MODEL_ALIASES["nova-fast"]
+# ---------------------------------------------------------------------
+# TEXT HELPERS
+# ---------------------------------------------------------------------
 
 def _nova_text(value: Any) -> str:
-    try:
-        if value is None:
-            return ""
-
-        if isinstance(value, str):
-            return value
-
-        if isinstance(value, list):
-            return " ".join(_nova_text(item) for item in value)
-
-        if isinstance(value, dict):
-            parts = []
-
-            for key in ("text", "content", "input_text", "output_text"):
-                if key in value:
-                    parts.append(_nova_text(value.get(key)))
-
-            if not parts:
-                parts = [_nova_text(item) for item in value.values()]
-
-            return " ".join(part for part in parts if part)
-
-        return str(value)
-    except Exception:
+    if value is None:
         return ""
+
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, list):
+        parts = []
+
+        for item in value:
+            if isinstance(item, str):
+                parts.append(item)
+
+            elif isinstance(item, dict):
+                text = (
+                    item.get("text")
+                    or item.get("content")
+                    or item.get("input_text")
+                    or ""
+                )
+
+                if text:
+                    parts.append(str(text))
+
+        return "\n".join(parts)
+
+    if isinstance(value, dict):
+        return str(
+            value.get("text")
+            or value.get("content")
+            or ""
+        )
+
+    return str(value)
 
 
 def _nova_messages_text(messages: Any) -> str:
     if not isinstance(messages, list):
         return _nova_text(messages)
 
-    chunks = []
+    parts = []
 
     for message in messages:
         if isinstance(message, dict):
-            role = _nova_text(message.get("role"))
-            content = _nova_text(message.get("content"))
-            chunks.append((role + " " + content).strip())
-        else:
-            chunks.append(_nova_text(message))
+            content = message.get("content")
 
-    return "\n".join(chunk for chunk in chunks if chunk)
+            if content:
+                parts.append(
+                    _nova_text(content)
+                )
 
-
-def _nova_estimate_tokens(value: Any) -> int:
-    try:
-        from nova_backend.services.usage_ledger_service import estimate_tokens
-
-        return max(0, int(estimate_tokens(value)))
-    except Exception:
-        text = _nova_text(value)
-        return max(1, int((len(text) + 3) / 4)) if text else 0
+    return "\n".join(parts)
 
 
-def _nova_extract_provider_usage(response: Any) -> Dict[str, int]:
-    usage = getattr(response, "usage", None)
-
-    if usage is None and isinstance(response, dict):
-        usage = response.get("usage")
-
-    if usage is None:
-        return {}
-
-    def get_value(name: str) -> int:
-        try:
-            if isinstance(usage, dict):
-                return int(usage.get(name) or 0)
-
-            return int(getattr(usage, name, 0) or 0)
-        except Exception:
-            return 0
-
-    prompt_tokens = get_value("prompt_tokens") or get_value("input_tokens")
-    completion_tokens = get_value("completion_tokens") or get_value("output_tokens")
-    total_tokens = get_value("total_tokens") or prompt_tokens + completion_tokens
-
-    return {
-        "prompt_tokens": prompt_tokens,
-        "completion_tokens": completion_tokens,
-        "input_tokens": prompt_tokens,
-        "output_tokens": completion_tokens,
-        "total_tokens": total_tokens,
-    }
-
-
-def _nova_extract_response_text(response: Any) -> str:
-    try:
-        choices = getattr(response, "choices", None)
-
-        if choices is None and isinstance(response, dict):
-            choices = response.get("choices")
-
-        if choices:
-            first = choices[0]
-
-            message = getattr(first, "message", None)
-
-            if message is None and isinstance(first, dict):
-                message = first.get("message")
-
-            content = getattr(message, "content", None)
-
-            if content is None and isinstance(message, dict):
-                content = message.get("content")
-
-            return _nova_text(content)
-    except Exception:
-        pass
-
-    return ""
+# ---------------------------------------------------------------------
+# INTERNAL NOVA KWARGS
+# ---------------------------------------------------------------------
 
 def _nova_pop_internal_kwargs(
     kwargs: Dict[str, Any],
-) -> Tuple[str, str, str, bool]:
-    provided_username = (
-        kwargs.pop("nova_username", None)
-        or kwargs.pop("_nova_username", None)
-        or kwargs.pop("billing_username", None)
-        or ""
-    )
+) -> Tuple[Any, Any, Any, bool]:
 
-    provided_user_id = (
-        kwargs.pop("nova_user_id", None)
-        or kwargs.pop("_nova_user_id", None)
-        or kwargs.pop("billing_user_id", None)
-        or ""
-    )
-
-    provided_session_id = (
-        kwargs.pop("nova_session_id", None)
-        or kwargs.pop("_nova_session_id", None)
-        or kwargs.pop("billing_session_id", None)
-        or kwargs.pop("session_id", None)
-        or ""
-    )
-
-    enforce = kwargs.pop(
-        "nova_enforce_billing",
+    user_id = kwargs.pop(
+        "nova_user_id",
         None,
     )
 
-    if enforce is None:
-        raw = os.environ.get(
-            "NOVA_MODEL_GATEWAY_BILLING_ENFORCED",
-            "1",
-        )
-
-        enforce = (
-            str(raw).strip().lower()
-            not in {
-                "0",
-                "false",
-                "no",
-                "off",
-            }
-        )
-
-    authenticated_username = ""
-    authenticated_user_id = ""
-    request_session_id = ""
-    has_flask_request = False
-
-    try:
-        from flask import (
-            g,
-            has_request_context,
-            request,
-        )
-
-        has_flask_request = bool(
-            has_request_context()
-        )
-
-        if has_flask_request:
-            auth_user = getattr(
-                g,
-                "nova_auth_user",
-                None,
-            )
-
-            if isinstance(auth_user, dict):
-                authenticated_username = str(
-                    auth_user.get("username")
-                    or ""
-                ).strip()
-
-                authenticated_user_id = str(
-                    auth_user.get("id")
-                    or auth_user.get("user_id")
-                    or ""
-                ).strip()
-
-            else:
-                authenticated_username = str(
-                    getattr(
-                        auth_user,
-                        "username",
-                        "",
-                    )
-                    or ""
-                ).strip()
-
-                authenticated_user_id = str(
-                    getattr(
-                        auth_user,
-                        "id",
-                        "",
-                    )
-                    or getattr(
-                        auth_user,
-                        "user_id",
-                        "",
-                    )
-                    or ""
-                ).strip()
-
-            payload = (
-                request.get_json(silent=True)
-                if request.is_json
-                else {}
-            )
-
-            if isinstance(payload, dict):
-                request_session_id = str(
-                    payload.get("session_id")
-                    or payload.get(
-                        "active_session_id"
-                    )
-                    or ""
-                ).strip()
-
-    except Exception:
-        pass
-
-    payments_live = (
-        str(
-            os.environ.get(
-                "NOVA_PAYMENTS_LIVE",
-                "",
-            )
-        )
-        .strip()
-        .lower()
-        in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
+    username = kwargs.pop(
+        "nova_username",
+        None,
     )
 
-    if (
-        enforce
-        and payments_live
-        and has_flask_request
-        and (
-            not authenticated_username
-            or not authenticated_user_id
-        )
-    ):
-        raise RuntimeError(
-            "Nova billing blocked model call: "
-            "authenticated billing identity required."
-        )
-
-    username = (
-        authenticated_username
-        or provided_username
-        or os.environ.get(
-            "NOVA_DEFAULT_USERNAME"
-        )
-        or ""
+    session_id = kwargs.pop(
+        "nova_session_id",
+        None,
     )
 
-    user_id = (
-        authenticated_user_id
-        or provided_user_id
-        or ""
+    enforce = bool(
+        kwargs.pop(
+            "nova_enforce_credits",
+            False,
+        )
     )
-
-    session_id = (
-        provided_session_id
-        or request_session_id
-        or ""
-    )
-
-    username = str(
-        username or ""
-    ).strip().lower()
-
-    user_id = str(
-        user_id or ""
-    ).strip()
-
-    session_id = str(
-        session_id or ""
-    ).strip()
 
     return (
         user_id,
         username,
         session_id,
-        bool(enforce),
+        enforce,
     )
 
-def _nova_preflight_credits(username: str, model: str) -> None:
+
+# ---------------------------------------------------------------------
+# CREDIT PREFLIGHT
+# ---------------------------------------------------------------------
+
+def _nova_preflight_credits(
+    username=None,
+    model=None,
+):
     try:
-        from nova_backend.services.billing_service import get_account
+        from nova_backend.services.usage_ledger_service import (
+            ensure_user_can_use_model,
+        )
 
-        account = get_account(username)
-        plan = str(account.get("plan") or "").strip().lower()
+        return ensure_user_can_use_model(
+            username=username,
+            model=model,
+        )
 
-        if plan == "developer":
-            return
+    except ImportError:
+        return None
 
-        credits = int(account.get("credits", 0) or 0)
+    except Exception as error:
+        raise RuntimeError(
+            f"Nova credit preflight failed: {error}"
+        ) from error
 
-        if credits < NOVA_GATEWAY_MINIMUM_CREDIT_COST:
-            raise RuntimeError(
-                "Nova billing blocked model call: insufficient credits "
-                f"for {username}. Balance={credits}."
-            )
-    except RuntimeError:
-        raise
-    except Exception:
-        # Billing should protect usage when available, but the gateway should not
-        # hard-crash if local development billing state cannot be read.
-        return
 
+# ---------------------------------------------------------------------
+# USAGE / BILLING
+# ---------------------------------------------------------------------
 
 def _nova_consume_and_record_usage(
-    user_id: str,
-    username: str,
-    session_id: str,
-    model: str,
-    messages: Any,
-    response: Any,
-    enforce: bool,
-) -> Dict[str, Any]:
-    input_text = _nova_messages_text(messages)
+    user_id=None,
+    username=None,
+    session_id=None,
+    model=None,
+    messages=None,
+    response=None,
+    enforce=False,
+):
+    if not enforce:
+        return None
 
-    output_text = _nova_extract_response_text(
-        response
-    )
-
-    provider_usage = _nova_extract_provider_usage(
-        response
-    )
-
-    input_tokens = int(
-        provider_usage.get("input_tokens")
-        or provider_usage.get("prompt_tokens")
-        or _nova_estimate_tokens(input_text)
-        or 0
-    )
-
-    output_tokens = int(
-        provider_usage.get("output_tokens")
-        or provider_usage.get("completion_tokens")
-        or _nova_estimate_tokens(output_text)
-        or 0
-    )
-
-    billing_result = {
-        "ok": True,
-        "cost": 0,
-        "balance": None,
-        "skipped": True,
-    }
-
-    if enforce:
-        try:
-            from nova_backend.services.billing_service import (
-                consume_usage,
-            )
-
-            billing_result = consume_usage(
-                user_id=user_id,
-                username=username,
-                model=model,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-            )
-
-            if not billing_result.get("ok"):
-                try:
-                    print(
-                        "[NOVA BILLING WARNING] "
-                        "usage consume failed after "
-                        "successful model response:",
-                        billing_result,
-                    )
-                except Exception:
-                    pass
-
-        except RuntimeError:
-            raise
-
-        except Exception as exc:
-            billing_result = {
-                "ok": False,
-                "error": str(exc),
-                "skipped": False,
-            }
+    billing_result = None
 
     try:
+        from nova_backend.services.usage_ledger_service import (
+            consume_model_usage,
+        )
+
+        billing_result = consume_model_usage(
+            username=username,
+            model=model,
+            response=response,
+        )
+
+    except ImportError:
+        pass
+
+    except Exception:
+        pass
+
+    try:
+        input_text = _nova_text(messages)
+
+        output_text = ""
+
+        if hasattr(response, "choices"):
+            choices = getattr(
+                response,
+                "choices",
+                None,
+            ) or []
+
+            if choices:
+                choice = choices[0]
+
+                message = getattr(
+                    choice,
+                    "message",
+                    None,
+                )
+
+                output_text = str(
+                    getattr(
+                        message,
+                        "content",
+                        "",
+                    )
+                    or ""
+                )
+
+        elif hasattr(response, "output_text"):
+            output_text = str(
+                getattr(
+                    response,
+                    "output_text",
+                    "",
+                )
+                or ""
+            )
+
+        usage = getattr(
+            response,
+            "usage",
+            None,
+        )
+
+        input_tokens = 0
+        output_tokens = 0
+        provider_usage = None
+
+        if usage:
+            provider_usage = usage
+
+            input_tokens = int(
+                getattr(
+                    usage,
+                    "prompt_tokens",
+                    0,
+                )
+                or getattr(
+                    usage,
+                    "input_tokens",
+                    0,
+                )
+                or 0
+            )
+
+            output_tokens = int(
+                getattr(
+                    usage,
+                    "completion_tokens",
+                    0,
+                )
+                or getattr(
+                    usage,
+                    "output_tokens",
+                    0,
+                )
+                or 0
+            )
+
         from nova_backend.services.usage_ledger_service import (
             record_model_usage,
         )
@@ -571,15 +434,16 @@ def _nova_consume_and_record_usage(
 
     return billing_result
 
-def images_generate_create(*args, **kwargs):
-    try:
-        from openai import OpenAI
-    except Exception as error:
-        raise RuntimeError(
-            f"OpenAI client is unavailable: {error}"
-        ) from error
 
-    client = OpenAI()
+# ---------------------------------------------------------------------
+# IMAGE GENERATION
+# ---------------------------------------------------------------------
+
+def images_generate_create(
+    *args,
+    **kwargs,
+):
+    client = _get_openai_client()
 
     return client.images.generate(
         *args,
@@ -587,7 +451,14 @@ def images_generate_create(*args, **kwargs):
     )
 
 
-def chat_completions_create(*args, **kwargs):
+# ---------------------------------------------------------------------
+# CHAT COMPLETIONS
+# ---------------------------------------------------------------------
+
+def chat_completions_create(
+    *args,
+    **kwargs,
+):
     kwargs["model"] = resolve_nova_task_model(
         model=kwargs.get("model"),
         text=_nova_messages_text(
@@ -595,10 +466,13 @@ def chat_completions_create(*args, **kwargs):
         ),
     )
 
-    user_id, username, session_id, enforce = (
-        _nova_pop_internal_kwargs(
-            kwargs
-        )
+    (
+        user_id,
+        username,
+        session_id,
+        enforce,
+    ) = _nova_pop_internal_kwargs(
+        kwargs
     )
 
     model = str(
@@ -616,14 +490,7 @@ def chat_completions_create(*args, **kwargs):
             model=model,
         )
 
-    try:
-        from openai import OpenAI
-    except Exception as error:
-        raise RuntimeError(
-            f"OpenAI client is unavailable: {error}"
-        ) from error
-
-    client = OpenAI()
+    client = _get_openai_client()
 
     try:
         response = client.chat.completions.create(
@@ -644,12 +511,6 @@ def chat_completions_create(*args, **kwargs):
             flush=True,
         )
 
-        print(
-            "MODEL GATEWAY FAILED INPUT =",
-            messages,
-            flush=True,
-        )
-
         raise
 
     _nova_consume_and_record_usage(
@@ -657,14 +518,22 @@ def chat_completions_create(*args, **kwargs):
         username=username,
         session_id=session_id,
         model=model,
-        messages=model_input,
+        messages=messages,
         response=response,
         enforce=enforce,
     )
 
     return response
 
-def responses_create(*args, **kwargs):
+
+# ---------------------------------------------------------------------
+# RESPONSES API
+# ---------------------------------------------------------------------
+
+def responses_create(
+    *args,
+    **kwargs,
+):
     kwargs["model"] = resolve_nova_task_model(
         model=kwargs.get("model"),
         text=_nova_text(
@@ -672,10 +541,13 @@ def responses_create(*args, **kwargs):
         ),
     )
 
-    user_id, username, session_id, enforce = (
-        _nova_pop_internal_kwargs(
-            kwargs
-        )
+    (
+        user_id,
+        username,
+        session_id,
+        enforce,
+    ) = _nova_pop_internal_kwargs(
+        kwargs
     )
 
     model = str(
@@ -693,30 +565,28 @@ def responses_create(*args, **kwargs):
             model=model,
         )
 
-    try:
-        from openai import OpenAI
-    except Exception as error:
-        raise RuntimeError(
-            f"OpenAI client is unavailable: {error}"
-        ) from error
-
     print(
         "MODEL GATEWAY DEBUG MODEL =",
         model,
         flush=True,
     )
 
-    print(
-        "MODEL GATEWAY DEBUG INPUT =",
-        model_input,
-        flush=True,
-    )
+    client = _get_openai_client()
 
-    client = OpenAI()
-    response = client.responses.create(
-        *args,
-        **kwargs,
-    )
+    try:
+        response = client.responses.create(
+            *args,
+            **kwargs,
+        )
+
+    except Exception as error:
+        print(
+            "MODEL GATEWAY RESPONSES ERROR =",
+            repr(error),
+            flush=True,
+        )
+
+        raise
 
     _nova_consume_and_record_usage(
         user_id=user_id,

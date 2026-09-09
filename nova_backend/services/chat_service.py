@@ -400,10 +400,9 @@ class ChatService:
             "1024x1024",
         )
 
-        self.chat_model = os.getenv(
-            "OPENAI_MODEL",
-            "gpt-5.4",
-        )
+        from nova_backend.model_registry import get_default_model
+
+        self.chat_model = get_default_model()
 
         self.model = self.chat_model
 
@@ -609,6 +608,7 @@ class ChatService:
         session_id: str = "",
         attachments=None,
         regenerate: bool = False,
+        requested_model: str | None = None,
     ):
 
         print(
@@ -770,6 +770,9 @@ class ChatService:
 
         attachments = attachments or []
 
+        requested_model = str(
+            requested_model or ""
+        ).strip()
         # ==================================================
         # PRIMARY ROUTE DECISION
         # Classify before any project/mission orchestration.
@@ -780,6 +783,9 @@ class ChatService:
             attachments=attachments,
             session_id=session_id,
         )
+
+        if requested_model:
+            primary_decision["model"] = requested_model
 
         if not isinstance(primary_decision, dict):
             primary_decision = {
@@ -11947,7 +11953,27 @@ Rules:
         user_text: str,
         decision: dict,
         session_id: str = "",
+        requested_model: str | None = None,
     ) -> str:
+
+        
+        print(
+            "[NOVA MODEL PIPELINE]",
+            {
+                "requested_model": requested_model,
+                "decision_model": (
+                    decision.get("model")
+                    if isinstance(decision, dict)
+                    else None
+                ),
+                "default_chat_model": getattr(
+                    self,
+                    "chat_model",
+                    None,
+                ),
+            },
+            flush=True,
+        )
         prompt = self._build_chat_input(
             user_text=user_text,
             decision=decision,
@@ -11956,7 +11982,10 @@ Rules:
 
         try:
             response = model_gateway_service.responses_create(
-                model=self.chat_model,
+                model=(
+                    requested_model
+                    or self.chat_model
+                ),
                 input=prompt,
             )
 
@@ -12065,6 +12094,9 @@ Rules:
             user_text=user_text,
             decision=decision,
             session_id=session_id,
+            requested_model=decision.get(
+                "model"
+            ),
         )
 
         assistant_msg = self._build_assistant_message(
@@ -13622,10 +13654,14 @@ def _nova_install_attachment_guard_web_suppression():
     return _nova_attachment_guard_install_web_routing_suppression()
 
 def _create_model_response(self, model_messages):
-    return self._create_model_response(
+    return model_gateway_service.responses_create(
         model=self.chat_model,
         input=model_messages,
     )
+
+
+
+
 
 
 

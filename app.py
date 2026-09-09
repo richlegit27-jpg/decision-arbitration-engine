@@ -1536,31 +1536,48 @@ def about():
 def faq():
     return render_template("nova_faq.html")
 
+
 @app.route("/api/models", methods=["GET"])
 def api_models_route():
+    from nova_backend.model_registry import (
+        get_default_model_alias,
+        get_model_details,
+        get_public_models,
+    )
+
+    models = get_public_models()
+    default_model = get_default_model_alias()
+
     return {
         "ok": True,
-        "models": [
-            "nova-fast",
-            "gpt-5.4",
-            "gpt-4.1-mini",
-            "gpt-4o-mini",
-        ],
-        "default_model": "nova-fast",
-        "selected_model": "nova-fast",
+        "models": models,
+        "model_details": get_model_details(),
+        "default_model": default_model,
+        "selected_model": default_model,
     }
 
 
 @app.route("/api/models/select", methods=["POST"])
 def api_models_select_route():
+    from nova_backend.model_registry import (
+        get_default_model_alias,
+        get_public_models,
+    )
+
     data = request.get_json(silent=True) or {}
+
+    requested_model = str(
+        data.get("model") or ""
+    ).strip()
+
+    available_models = get_public_models()
+
+    if requested_model not in available_models:
+        requested_model = get_default_model_alias()
 
     return {
         "ok": True,
-        "selected_model": data.get(
-            "model",
-            "nova-fast",
-        ),
+        "selected_model": requested_model,
     }
 
 @app.route("/api/chat", methods=["POST"])
@@ -1581,35 +1598,63 @@ def api_chat_route():
         or ""
     ).strip()
 
+    requested_model = str(
+        data.get("model")
+        or ""
+    ).strip()
+
     attachments = data.get("attachments") or []
 
     print(
-        "[MINIMAL CHAT ROUTE]",
+        "[NOVA CHAT]",
         {
             "user_text": repr(user_text),
             "session_id": repr(session_id),
+            "requested_model": repr(requested_model),
             "attachments_count": len(attachments),
         },
         flush=True,
     )
 
-    if not user_text:
+    if not user_text and not attachments:
         return jsonify({
             "ok": False,
             "error": "user_text_required",
         }), 400
 
     try:
+        resolved_model = ""
+
+        if requested_model:
+            from nova_backend.model_registry import resolve_model
+
+            resolved_model = resolve_model(
+                requested_model
+            )
+
+            print(
+                "[NOVA MODEL RESOLVE]",
+                requested_model,
+                "->",
+                resolved_model,
+                flush=True,
+            )
+
         result = chat_service.handle(
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
-            auth_user_id=auth_user_id,
+            regenerate=bool(
+                data.get(
+                    "regenerate",
+                    False,
+                )
+            ),
+            requested_model=resolved_model or None,
         )
 
         print(
-            "[MINIMAL CHAT RESULT]",
-            result,
+            "[NOVA CHAT RESULT OK]",
             flush=True,
         )
 
@@ -2935,6 +2980,10 @@ def api_chat():
     result = None
     attachments_for_chat_service = attachments
 
+    requested_model = str(
+        data.get("model")
+        or ""
+    ).strip()
     image_command_user_text = user_text
 
     if user_text.lower().startswith("/image"):
@@ -3016,6 +3065,7 @@ def api_chat():
             user_text=image_command_user_text,
             session_id=session_id,
             attachments=attachments_for_chat_service,
+            requested_model=requested_model or None,
         )
     except Exception as chat_error:
         import traceback
@@ -5530,6 +5580,11 @@ if __name__ == "__main__":
         "seconds",
         flush=True,
     )
+
+
+
+
+
 
 
 

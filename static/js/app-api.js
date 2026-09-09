@@ -262,24 +262,19 @@ async function hydrateModelsIntoState() {
   const modelsPayload = await getModels();
 
   const rawModels =
-    Array.isArray(modelsPayload)
-      ? modelsPayload
-      : Array.isArray(modelsPayload?.models)
-        ? modelsPayload.models
-        : [];
-
-  const modelLabels = {
-    "nova-fast": "Nova Fast — nova-fast",
-    "gpt-5.4": "Nova Smart — gpt-5.4",
-    "gpt-4.1-mini": "Nova Coding — gpt-4.1-mini",
-    "gpt-4o-mini": "Nova Vision — gpt-4o-mini"
-  };
+    Array.isArray(modelsPayload?.model_details)
+      ? modelsPayload.model_details
+      : Array.isArray(modelsPayload)
+        ? modelsPayload
+        : Array.isArray(modelsPayload?.models)
+          ? modelsPayload.models
+          : [];
 
   const models = rawModels.map((model) => {
     if (typeof model === "string") {
       return {
         value: model,
-        label: modelLabels[model] || model
+        label: model
       };
     }
 
@@ -292,18 +287,35 @@ async function hydrateModelsIntoState() {
     return {
       ...model,
       value,
-      label:
-        model?.label ||
-        modelLabels[value] ||
-        value
+      label: model?.label || value
     };
   });
 
+
+  // Refresh persistence:
+  // Prefer the user's saved browser selection over backend defaults.
+  let savedModel = "";
+
+  try {
+    savedModel =
+      localStorage.getItem("nova_selected_model") ||
+      "";
+  } catch (_error) {
+    savedModel = "";
+  }
+
+  const savedModelExists = models.some(
+    (model) => String(model.value) === String(savedModel)
+  );
+
   const selected =
+    (savedModelExists ? savedModel : "") ||
+    app.state?.selectedModel ||
     modelsPayload?.selected_model ||
     modelsPayload?.active_model ||
-    app.state?.selectedModel ||
-    "nova-fast";
+    modelsPayload?.default_model ||
+    models[0]?.value ||
+    "";
 
   if (typeof app.setModels === "function") {
     app.setModels(models);
@@ -368,3 +380,4 @@ app.api = {
 };
 
 })();
+

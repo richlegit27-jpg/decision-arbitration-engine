@@ -2363,3 +2363,39 @@ Traceback (most recent call last):
     _t0 = time.perf_counter()
     ^^^
 IndentationError: expected an indented block after function definition on line 4
+
+
+===== CHAT FAILURE =====
+NameError("name 'requested_model' is not defined")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 3064, in api_chat
+    requested_model=requested_model or None,
+                    ^^^^^^^^^^^^^^^
+NameError: name 'requested_model' is not defined
+
+
+===== CHAT FAILURE =====
+NameError("name 'requested_model' is not defined")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 3064, in api_chat
+    requested_model=requested_model or None,
+                    ^^^^^^^^^^^^^^^
+NameError: name 'requested_model' is not defined
+
+
+===== CHAT FAILURE =====
+NameError("name 'requested_model' is not defined")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 3064, in api_chat
+    requested_model=requested_model or None,
+                    ^^^^^^^^^^^^^^^
+NameError: name 'requested_model' is not defined
+
+
+===== CHAT FAILURE =====
+NameError("name 'requested_model' is not defined")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 3064, in api_chat
+    requested_model=requested_model or None,
+                    ^^^^^^^^^^^^^^^
+NameError: name 'requested_model' is not defined

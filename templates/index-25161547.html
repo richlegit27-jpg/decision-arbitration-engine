@@ -1,0 +1,443 @@
+﻿
+<!-- NOVA_CLEAN_HOMEPAGE_DASHBOARD_20260609 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova</title>
+    <style>
+        :root {
+            --bg: #09090f;
+            --panel: rgba(255, 255, 255, 0.08);
+            --panel-strong: rgba(255, 255, 255, 0.12);
+            --text: rgba(255, 255, 255, 0.94);
+            --muted: rgba(255, 255, 255, 0.62);
+            --line: rgba(255, 255, 255, 0.14);
+            --brand: #8b5cf6;
+            --brand-2: #a78bfa;
+            --ok: #22c55e;
+            --warn: #f59e0b;
+            --bad: #ef4444;
+            --shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            min-height: 100%;
+            margin: 0;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(139, 92, 246, 0.35), transparent 34rem),
+                radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.22), transparent 32rem),
+                var(--bg);
+            color: var(--text);
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+        }
+
+        .shell {
+            width: min(1120px, 100%);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.18fr 0.82fr;
+            gap: 22px;
+            align-items: stretch;
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            background: linear-gradient(180deg, var(--panel-strong), var(--panel));
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+        }
+
+        .main {
+            padding: 34px;
+            min-height: 430px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            width: fit-content;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            color: var(--muted);
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--ok);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+        }
+
+        h1 {
+            margin: 22px 0 10px;
+            font-size: clamp(48px, 8vw, 88px);
+            letter-spacing: -0.08em;
+            line-height: 0.92;
+        }
+
+        .subtitle {
+            max-width: 700px;
+            color: var(--muted);
+            font-size: clamp(17px, 2vw, 22px);
+            line-height: 1.45;
+            margin: 0;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 30px;
+        }
+
+        .action {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            min-height: 64px;
+            padding: 18px 18px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            text-decoration: none;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.07);
+            transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+        }
+
+        .action:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(167, 139, 250, 0.62);
+        }
+
+        .action.primary {
+            background: linear-gradient(135deg, var(--brand), #5b21b6);
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .action span:first-child {
+            font-weight: 700;
+        }
+
+        .action small {
+            display: block;
+            color: rgba(255, 255, 255, 0.64);
+            font-weight: 500;
+            margin-top: 3px;
+        }
+
+        .side {
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .status-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 4px 2px;
+        }
+
+        .status-title h2 {
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: -0.02em;
+        }
+
+        .refresh {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.07);
+            color: var(--text);
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .metric {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: rgba(0, 0, 0, 0.18);
+        }
+
+        .metric strong {
+            display: block;
+            font-size: 14px;
+        }
+
+        .metric small {
+            color: var(--muted);
+        }
+
+        .value {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--brand-2);
+        }
+
+        .value.ok {
+            color: var(--ok);
+        }
+
+        .value.warn {
+            color: var(--warn);
+        }
+
+        .value.bad {
+            color: var(--bad);
+        }
+
+        .footer {
+            margin-top: 18px;
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
+        }
+
+        @media (max-width: 860px) {
+            body {
+                padding: 16px;
+                align-items: flex-start;
+            }
+
+            .hero {
+                grid-template-columns: 1fr;
+            }
+
+            .main {
+                padding: 24px;
+                min-height: auto;
+            }
+
+            .actions {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <div class="card main">
+                <div>
+                    <div class="eyebrow">
+                        <span class="dot"></span>
+                        <span>Local Nova workspace</span>
+                    </div>
+
+                    <h1>Nova</h1>
+                    <p class="subtitle">
+                        Clean control center for chat, mobile testing, sessions, memory, attachments, execution, and backend readiness.
+                    </p>
+                </div>
+
+                <nav class="actions" aria-label="Nova shortcuts">
+                    <a class="action primary" href="/mobile">
+                        <span>
+                            Open Mobile Nova
+                            <small>Current locked mobile interface</small>
+                        </span>
+                        <span>&gt;</span>
+                    </a>
+
+                    <a class="action" href="/app">
+                        <span>
+                            Open Desktop
+                            <small>Desktop app UI</small>
+                        </span>
+                        <span>&gt;</span>
+                    </a>
+
+                    <a class="action" href="/api/sessions">
+                        <span>
+                            Sessions API
+                            <small>Raw sessions JSON</small>
+                        </span>
+                        <span>&gt;</span>
+                    </a>
+
+                    <a class="action" href="/api/backend/readiness">
+                        <span>
+                            Backend Readiness
+                            <small>Health and progress JSON</small>
+                        </span>
+                        <span>&gt;</span>
+                    </a>
+                </nav>
+            </div>
+
+            <aside class="card side">
+                <div class="status-title">
+                    <h2>System status</h2>
+                    <button class="refresh" type="button" id="refreshStatus">Refresh</button>
+                </div>
+
+                <div class="metric">
+                    <div>
+                        <strong>Backend readiness</strong>
+                        <small>Overall system score</small>
+                    </div>
+                    <div class="value" id="overallValue">...</div>
+                </div>
+
+                <div class="metric">
+                    <div>
+                        <strong>Sessions</strong>
+                        <small>Stored conversations</small>
+                    </div>
+                    <div class="value" id="sessionsValue">...</div>
+                </div>
+
+                <div class="metric">
+                    <div>
+                        <strong>Memory</strong>
+                        <small>Stored memory items</small>
+                    </div>
+                    <div class="value" id="memoryValue">...</div>
+                </div>
+
+                <div class="metric">
+                    <div>
+                        <strong>Execution</strong>
+                        <small>Execution readiness</small>
+                    </div>
+                    <div class="value" id="executionValue">...</div>
+                </div>
+
+                <div class="metric">
+                    <div>
+                        <strong>Planner</strong>
+                        <small>Planner readiness</small>
+                    </div>
+                    <div class="value" id="plannerValue">...</div>
+                </div>
+            </aside>
+        </section>
+
+        <div class="footer">
+            Homepage dashboard lock: NOVA_CLEAN_HOMEPAGE_DASHBOARD_20260609
+        </div>
+    </main>
+
+    <script>
+        (function () {
+            "use strict";
+
+            function $(id) {
+                return document.getElementById(id);
+            }
+
+            function setValue(id, value, suffix) {
+                var el = $(id);
+                if (!el) return;
+
+                var text = value;
+                if (value === null || value === undefined || value === "") {
+                    text = "n/a";
+                }
+
+                if (typeof text === "number") {
+                    text = String(text);
+                }
+
+                el.textContent = String(text) + (suffix || "");
+
+                var numeric = Number(value);
+                el.classList.remove("ok", "warn", "bad");
+
+                if (!Number.isFinite(numeric)) return;
+
+                if (id.toLowerCase().includes("value") && suffix === "%") {
+                    if (numeric >= 95) el.classList.add("ok");
+                    else if (numeric >= 75) el.classList.add("warn");
+                    else el.classList.add("bad");
+                }
+            }
+
+            async function loadStatus() {
+                try {
+                    var response = await fetch("/api/backend/readiness", {
+                        method: "GET",
+                        headers: {
+                            "Accept": "application/json"
+                        }
+                    });
+
+                    var data = await response.json();
+
+                    setValue("overallValue", data.overall_backend_readiness, "%");
+                    setValue("sessionsValue", data.session_records, "");
+                    setValue("memoryValue", data.memory_items, "");
+                    setValue("executionValue", data.execution_percent, "%");
+                    setValue("plannerValue", data.planner_percent, "%");
+                } catch (error) {
+                    setValue("overallValue", "offline", "");
+                    setValue("sessionsValue", "n/a", "");
+                    setValue("memoryValue", "n/a", "");
+                    setValue("executionValue", "n/a", "");
+                    setValue("plannerValue", "n/a", "");
+                }
+            }
+
+            var button = $("refreshStatus");
+            if (button) {
+                button.addEventListener("click", loadStatus);
+            }
+
+            loadStatus();
+        })();
+    </script>
+<!-- NOVA_LEGACY_SESSION_RESTORE_DISABLED_20260707
+
+<script src="{{ url_for('static',
+filename='js/mobile/nova-mobile-session-restore-lock.js')
+}}?v=session-restore-dom-root-v3"></script>
+
+<script src="/static/js/mobile/nova-mobile-session-restore-override-v4.js?..."></script>
+
+<script src="/static/js/mobile/nova-mobile-session-drawer-restore-v5.js?..."></script>
+
+<!-- DISABLED OLD SESSION PANEL V6 OWNER -->
+<!-- <script src="/static/js/mobile/nova-mobile-session-panel-v6.js?..."></script> -->
+
+-->
+    <script src="/static/js/mobile/nova-mobile-new-chat-backend-create-v1.js?v=backend-create-v2-no-auto-run-20260703b"></script>
+    <script src="/static/js/mobile/nova-mobile-send-dedupe-guard-v1.js?v=send-dedupe-v1-20260703"></script>
+</body>
+</html>
+
+
+
+
