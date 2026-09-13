@@ -12,80 +12,49 @@
         ) || null;
     }
 
-    async function runProjectAction(action) {
-        const projectId = getActiveProjectId();
+async function runProjectAction(
+    projectId,
+    action
+) {
+    if (!projectId || !action) {
+        return;
+    }
 
-        console.log(
-            "[NOVA EXECUTION CONTROLS] action requested:",
-            action,
-            projectId
+    const projects =
+        window.NovaDesktopProjects;
+
+    if (!projects) {
+        console.error(
+            "NovaDesktopProjects is not available."
+        );
+        return;
+    }
+
+    try {
+        if (
+            typeof
+            projects.controlProjectExecution
+            !== "function"
+        ) {
+            console.error(
+                "controlProjectExecution is not available."
+            );
+            return;
+        }
+
+        await projects.controlProjectExecution(
+            projectId,
+            action
         );
 
-        if (!projectId) {
-            console.warn(
-                "[NOVA EXECUTION CONTROLS] No active project"
-            );
-            return;
-        }
-
-        const projects =
-            window.NovaDesktopProjects;
-
-        if (!projects) {
-            console.error(
-                "[NOVA EXECUTION CONTROLS] NovaDesktopProjects is not ready"
-            );
-            return;
-        }
-
-        try {
-            if (
-                action === "continue" &&
-                typeof projects.continueProject === "function"
-            ) {
-                await projects.continueProject(
-                    projectId
-                );
-
-                return;
-            }
-
-            if (
-                action === "run_all" &&
-                typeof projects.runAllProject === "function"
-            ) {
-                await projects.runAllProject(
-                    projectId
-                );
-
-                return;
-            }
-
-            if (
-                action === "pause" &&
-                typeof projects.controlProjectExecution === "function"
-            ) {
-                await projects.controlProjectExecution(
-                    projectId,
-                    "pause"
-                );
-
-                return;
-            }
-
-            console.error(
-                "[NOVA EXECUTION CONTROLS] Unsupported action:",
-                action
-            );
-
-        } catch (error) {
-            console.error(
-                "[NOVA EXECUTION CONTROLS] Action failed:",
-                action,
-                error
-            );
-        }
+    } catch (error) {
+        console.error(
+            "Project execution action failed:",
+            action,
+            error
+        );
     }
+}
 
     function bindButton(
         elementId,
@@ -119,7 +88,15 @@
                     action
                 );
 
-                await runProjectAction(action);
+                button.disabled = true;
+
+                try {
+                    await runProjectAction(
+                        action
+                    );
+                } finally {
+                    button.disabled = false;
+                }
             }
         );
 
@@ -131,6 +108,38 @@
     }
 
     function wireExecutionButtons() {
+        /*
+         * Left sidebar controls.
+         */
+        bindButton(
+            "novaLeftNextStep",
+            "next_step"
+        );
+
+        bindButton(
+            "novaLeftNextTask",
+            "next_task"
+        );
+
+        bindButton(
+            "novaLeftRunAll",
+            "run_all"
+        );
+
+        bindButton(
+            "novaLeftStop",
+            "stop"
+        );
+
+        bindButton(
+            "novaLeftReset",
+            "reset"
+        );
+
+        /*
+         * Existing right-panel controls.
+         * These remain supported.
+         */
         bindButton(
             "desktopContinueProject",
             "continue"

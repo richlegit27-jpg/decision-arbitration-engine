@@ -1,4 +1,5 @@
-﻿<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
+﻿  }
+  /*_DUPLICATE_QUICK_BUTTON_BLOCK_REMOVED --><!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -1413,6 +1414,52 @@ observer.observe(document.documentElement, {
           + Add Task
         </button>
       </div>
+      <div
+        id="nova-left-execution-controls"
+        class="nova-left-execution-controls"
+        aria-label="Project execution controls"
+      >
+        <div class="nova-left-execution-row">
+          <button
+            id="novaLeftNextStep"
+            type="button"
+          >
+            Next Step
+          </button>
+
+          <button
+            id="novaLeftNextTask"
+            type="button"
+          >
+            Next Task
+          </button>
+        </div>
+
+        <div
+          class="nova-left-execution-row nova-left-execution-row-three"
+        >
+          <button
+            id="novaLeftRunAll"
+            type="button"
+          >
+            Run All
+          </button>
+
+          <button
+            id="novaLeftStop"
+            type="button"
+          >
+            Stop
+          </button>
+
+          <button
+            id="novaLeftReset"
+            type="button"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
 
       <div
         id="desktopProjectTaskList"
@@ -1513,7 +1560,6 @@ observer.observe(document.documentElement, {
 
   </div>
 </section>
-
 
 <div
   id="newProjectModal"
@@ -3953,17 +3999,54 @@ if (countEl) {
           });
       }
 
-
   function wire() {
-    var button = $("openMemoryBtn");
-    if (!button || button.dataset.novaMemoryFinalWired === "true") return;
+    Array.from(
+      document.querySelectorAll(
+        "button, a, [role='button']"
+      )
+    ).forEach(function (button) {
+      /*
+       * Native Nova project execution controls
+       * have their own execution handlers.
+       *
+       * Do not let the generic quick-button
+       * system intercept them.
+       */
+      if (
+        button.id === "desktopContinueProject" ||
+        button.id === "desktopRunAll" ||
+        button.id === "desktopPause" ||
+        button.id === "desktopProjectContinueButton" ||
+        button.id === "desktopProjectRunAllButton"
+      ) {
+        return;
+      }
 
-    button.dataset.novaMemoryFinalWired = "true";
-    button.addEventListener("click", function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      loadDesktopMemory();
-    }, true);
+      var prompt = promptFor(button);
+
+      if (!prompt) return;
+
+      if (
+        button.dataset.novaQuickButtonWired ===
+        "true"
+      ) {
+        return;
+      }
+
+      button.dataset.novaQuickButtonWired =
+        "true";
+
+      button.addEventListener(
+        "click",
+        function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          sendPrompt(prompt);
+        },
+        true
+      );
+    });
   }
 
 window.NovaOpenDesktopMemoryLegacy = window.loadDesktopMemoryLegacy;
@@ -3982,6 +4065,7 @@ window.loadMemoriesLegacy = window.loadDesktopMemoryLegacy;
   setTimeout(wire, 1500);
 
   console.log("[Nova Desktop Memory Final Renderer] ready");
+
 })();
 
 
@@ -4244,6 +4328,8 @@ window.loadMemoriesLegacy = load;
     }));
   }
 
+window.sendPrompt = sendPrompt;
+
   var prompts = {
     "continue": "Continue from where we left off. Keep it direct and tell me the next move.",
     "summarize": "Summarize the current situation in plain English and tell me what matters most.",
@@ -4272,9 +4358,16 @@ function promptFor(button) {
         return prompts["summarize now"];
     }
 
-    if (label.indexOf("continue") === 0) {
-        return prompts["continue"];
-    }
+/*
+ * Continue belongs exclusively to the
+ * native Nova project execution system.
+ *
+ * The generic Quick Buttons system must
+ * never convert Continue into a chat prompt.
+ */
+if (label.indexOf("continue") === 0) {
+    return "";
+}
 
     if (label.indexOf("summarize") === 0) {
         return prompts["summarize"];
@@ -4290,25 +4383,67 @@ function promptFor(button) {
 
     return "";
 }
+  window.promptFor = promptFor;
+
 
   function wire() {
-    Array.from(document.querySelectorAll("button, a, [role='button']")).forEach(function (button) {
+    Array.from(
+      document.querySelectorAll(
+        "button, a, [role='button']"
+      )
+    ).forEach(function (button) {
+
+      /*
+       * Native Nova project execution controls
+       * own their click handlers.
+       *
+       * The generic Quick Buttons system must
+       * never intercept these controls.
+       */
+      if (
+        button.id === "desktopContinueProject" ||
+        button.id === "desktopRunAll" ||
+        button.id === "desktopPause" ||
+        button.id === "desktopProjectContinueButton" ||
+        button.id === "desktopProjectRunAllButton"
+      ) {
+        return;
+      }
+
       var prompt = promptFor(button);
-      if (!prompt) return;
 
-      if (button.dataset.novaQuickButtonWired === "true") return;
-      button.dataset.novaQuickButtonWired = "true";
+      if (!prompt) {
+        return;
+      }
 
-      button.addEventListener("click", function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        sendPrompt(prompt);
-      }, true);
+      if (
+        button.dataset.novaQuickButtonWired ===
+        "true"
+      ) {
+        return;
+      }
+
+      button.dataset.novaQuickButtonWired =
+        "true";
+
+      button.addEventListener(
+        "click",
+        function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          sendPrompt(prompt);
+        },
+        true
+      );
     });
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wire);
+    document.addEventListener(
+      "DOMContentLoaded",
+      wire
+    );
   } else {
     wire();
   }
@@ -4316,10 +4451,11 @@ function promptFor(button) {
   setTimeout(wire, 500);
   setTimeout(wire, 1500);
 
-  console.log("[Nova Desktop Quick Buttons Final] ready");
+  console.log(
+    "[Nova Desktop Quick Buttons Final] ready"
+  );
 
-})();
-(function () {
+})();(function () {
   "use strict";
 
   var recognition = null;
@@ -7400,12 +7536,22 @@ body {
 (function () {
     "use strict";
 
-    if (window.__NOVA_REAL_DESKTOP_RIGHT_PANEL_SCROLL_FIX_20260622__) return;
-    window.__NOVA_REAL_DESKTOP_RIGHT_PANEL_SCROLL_FIX_20260622__ = true;
+    if (
+        window.__NOVA_REAL_DESKTOP_RIGHT_PANEL_SCROLL_FIX_20260622__
+    ) {
+        return;
+    }
+
+    window.__NOVA_REAL_DESKTOP_RIGHT_PANEL_SCROLL_FIX_20260622__ =
+        true;
 
     function openMemoryFixed() {
-        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
-        const memory = document.querySelector(".memory-section");
+        const tools =
+            document.querySelector(".panel.tools") ||
+            document.querySelector(".tools");
+
+        const memory =
+            document.querySelector(".memory-section");
 
         if (tools) {
             tools.style.display = "flex";
@@ -7419,49 +7565,37 @@ body {
             memory.style.visibility = "visible";
             memory.style.opacity = "1";
 
-            if (tools && typeof tools.scrollTo === "function") {
+            if (
+                tools &&
+                typeof tools.scrollTo === "function"
+            ) {
                 tools.scrollTo({
-                    top: Math.max(0, memory.offsetTop - 16),
+                    top: Math.max(
+                        0,
+                        memory.offsetTop - 16
+                    ),
                     behavior: "smooth"
                 });
             }
         }
-
-// NOVA_MEMORY_AUTOLOAD_DISABLED
     }
 
-    function wire() {
-        const button = document.getElementById("openMemoryBtn");
-        if (!button || button.dataset.novaRealPanelScrollFixed === "true") return;
+    window.NovaOpenMemoryFixed =
+        openMemoryFixed;
 
-        button.dataset.novaRealPanelScrollFixed = "true";
-
-        button.addEventListener("click", function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            if (typeof event.stopImmediatePropagation === "function") {
-                event.stopImmediatePropagation();
-            }
-
-            openMemoryFixed();
-        }, true);
-    }
-
-    window.NovaOpenMemoryFixed = openMemoryFixed;
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", wire);
+    if (
+        document.readyState === "loading"
+    ) {
+        document.addEventListener(
+            "DOMContentLoaded",
+            openMemoryFixed
+        );
     } else {
-        wire();
+        openMemoryFixed();
     }
 
-    setTimeout(wire, 300);
-    setTimeout(wire, 1000);
 })();
 </script>
-
-
 <!-- NOVA_MEMORY_TOP_PRIORITY_FINAL_20260622 -->
 <style>
 
@@ -11660,6 +11794,21 @@ aside.panel.tools > .quick-actions-section {
 
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

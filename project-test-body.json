@@ -1,0 +1,4 @@
+﻿{
+  "name": "Nova Builder Verification",
+  "description": "Create a small project with phases, tasks, and dependencies to verify the project builder runtime."
+}

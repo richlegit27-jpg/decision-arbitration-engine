@@ -1,0 +1,1093 @@
+    def run_next_step(
+        self,
+        action: str,
+        session_id: str,
+        execution_state: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        state = (
+            dict(execution_state)
+            if isinstance(execution_state, dict)
+            else {}
+        )
+
+        steps = state.get("steps") or []
+
+        current_index = int(
+            state.get("current_index") or 0
+        )
+
+        if current_index >= len(steps):
+            state["status"] = "complete"
+            state["complete"] = True
+            state["waiting"] = False
+            state["current_step"] = None
+
+            return {
+                "ok": True,
+                "execution_state": state,
+            }
+
+        current_step = steps[current_index]
+
+        if not isinstance(current_step, dict):
+            state["status"] = "failed"
+            state["complete"] = False
+            state["waiting"] = False
+            state["error"] = (
+                "Current execution step is invalid."
+            )
+
+            return {
+                "ok": False,
+                "error": state["error"],
+                "execution_state": state,
+            }
+
+        current_step = dict(current_step)
+
+        current_step["status"] = "active"
+
+        step_action = str(
+            current_step.get("action") or "analysis"
+        ).strip().lower()
+
+        title = str(
+            current_step.get("title")
+            or "Project task"
+        ).strip()
+
+        description = str(
+            current_step.get("description") or ""
+        ).strip()
+
+        context = dict(
+            state.get("context") or {}
+        )
+
+        context["project_execution"] = True
+        context["execution_action"] = action
+        context["current_task"] = {
+            "id": current_step.get("id"),
+            "task_id": current_step.get(
+                "task_id"
+            ),
+            "title": title,
+            "description": description,
+            "action": step_action,
+            "target_file": current_step.get(
+                "target_file"
+            ),
+            "target_files": current_step.get(
+                "target_files"
+            ),
+            "target_function": current_step.get(
+                "target_function"
+            ),
+            "command": current_step.get(
+                "command"
+            ),
+        }
+
+        state["context"] = context
+        state["current_step"] = current_step
+        state["steps"] = steps
+
+        print(
+            "PROJECT EXECUTION HANDLER STEP",
+            {
+                "session_id": session_id,
+                "action": action,
+                "step_action": step_action,
+                "step_id": current_step.get("id"),
+                "title": title,
+            },
+            flush=True,
+        )
+
+        # ---------------------------------------------------------
+        # ANALYSIS / REVIEW / PLANNING
+        # ---------------------------------------------------------
+
+        if step_action in {
+            "analysis",
+            "analyze",
+            "research",
+            "review",
+            "plan",
+            "planning",
+            "design",
+            "document",
+            "documentation",
+        }:
+
+            if self.execution_step_service is None:
+                current_step["status"] = "failed"
+                current_step["error"] = (
+                    "ExecutionStepService is unavailable for "
+                    "AI execution."
+                )
+
+                steps[current_index] = current_step
+                state["steps"] = steps
+                state["status"] = "failed"
+                state["waiting"] = False
+                state["complete"] = False
+                state["error"] = current_step["error"]
+                state["current_step"] = current_step
+
+                return {
+                    "ok": False,
+                    "error": current_step["error"],
+                    "execution_state": state,
+                }
+
+            try:
+                generated_step = (
+                    self.execution_step_service.execute_step_logic(
+                        session_id=session_id,
+                        step=current_step,
+                    )
+                )
+
+                if isinstance(generated_step, dict):
+                    current_step = generated_step
+
+                steps[current_index] = current_step
+                state["steps"] = steps
+                state["current_step"] = current_step
+                state["waiting"] = False
+
+                step_status = str(
+                    current_step.get("status") or ""
+                ).strip().lower()
+
+                result = str(
+                    current_step.get("result") or ""
+                ).strip()
+
+                completion_status = str(
+                    current_step.get("completion_status")
+                    or current_step.get("execution_status")
+                    or ""
+                ).strip().lower()
+
+                # Explicit failure returned by the AI service.
+                if step_status in {
+                    "failed",
+                    "error",
+                }:
+                    raise RuntimeError(
+                        current_step.get("error")
+                        or "AI execution step failed."
+                    )
+
+                if completion_status in {
+                    "failed",
+                    "error",
+                    "incomplete",
+                }:
+                    raise RuntimeError(
+                        current_step.get("error")
+                        or (
+                            "AI execution step did not complete. "
+                            f"Completion status: {completion_status}"
+                        )
+                    )
+
+                # Explicit waiting state must not advance the project.
+                if step_status in {
+                    "waiting",
+                    "waiting_approval",
+                    "needs_input",
+                } or completion_status in {
+                    "waiting",
+                    "waiting_approval",
+                }:
+                    current_step["status"] = "waiting"
+                    state["steps"] = steps
+                    state["current_step"] = current_step
+                    state["status"] = "waiting"
+                    state["waiting"] = True
+                    state["complete"] = False
+
+                    return {
+                        "ok": True,
+                        "execution_state": state,
+                        "result": result,
+                    }
+
+                # An AI step cannot complete without a usable result.
+                if not result:
+                    raise RuntimeError(
+                        "AI execution returned an empty result."
+                    )
+
+                # Preserve the result and mark the step complete only
+                # after all validation checks have passed.
+                current_step["result"] = result
+                current_step["status"] = "completed"
+                current_step["next_action"] = None
+                current_step["mutation_ready"] = False
+                current_step["error"] = None
+
+                steps[current_index] = current_step
+                state["steps"] = steps
+                state["current_step"] = current_step
+
+                return {
+                    "ok": True,
+                    "execution_state": (
+                        self._advance_after_success(
+                            state=state,
+                            steps=steps,
+                            current_index=current_index,
+                            current_step=current_step,
+                        )
+                    ),
+                    "result": result,
+                }
+
+            except Exception as exc:
+                current_step["status"] = "failed"
+                current_step["error"] = (
+                    f"AI execution failed: {exc}"
+                )
+
+                steps[current_index] = current_step
+                state["steps"] = steps
+                state["status"] = "failed"
+                state["waiting"] = False
+                state["complete"] = False
+                state["error"] = current_step["error"]
+                state["current_step"] = current_step
+
+                return {
+                    "ok": False,
+                    "error": current_step["error"],
+                    "execution_state": state,
+                }
+
+        # ---------------------------------------------------------
+        # TEST / VERIFICATION EXECUTION
+        # ---------------------------------------------------------
+
+        if step_action in {
+            "test",
+            "verify",
+            "verification",
+            "validate",
+            "validation",
+            "check",
+        }:
+
+            if self.execution_step_service is None:
+
+                current_step["status"] = "failed"
+
+                current_step["error"] = (
+                    "ExecutionStepService is unavailable for "
+                    "test execution."
+                )
+
+                steps[current_index] = current_step
+
+                state["steps"] = steps
+                state["status"] = "failed"
+                state["waiting"] = False
+                state["complete"] = False
+                state["error"] = current_step["error"]
+                state["current_step"] = current_step
+
+                return {
+                    "ok": False,
+                    "error": current_step["error"],
+                    "execution_state": state,
+                }
+
+            try:
+
+                generated_step = (
+                    self.execution_step_service.execute_step_logic(
+                        session_id=session_id,
+                        step=current_step,
+                    )
+                )
+
+                if isinstance(
+                    generated_step,
+                    dict,
+                ):
+                    current_step = generated_step
+
+                result = str(
+                    current_step.get(
+                        "result",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+                if not result:
+
+                    result = (
+                        f"{title} completed successfully."
+                    )
+
+                    current_step["result"] = result
+
+                current_step["status"] = "completed"
+                current_step["next_action"] = None
+                current_step["mutation_ready"] = False
+                current_step["payload_required"] = False
+                current_step["mutation_mode"] = None
+                current_step["error"] = None
+
+                steps[current_index] = current_step
+
+                state["steps"] = steps
+                state["current_step"] = current_step
+
+                return {
+                    "ok": True,
+                    "execution_state": (
+                        self._advance_after_success(
+                            state=state,
+                            steps=steps,
+                            current_index=current_index,
+                            current_step=current_step,
+                        )
+                    ),
+                    "result": result,
+                }
+
+            except Exception as exc:
+
+                current_step["status"] = "failed"
+
+                current_step["error"] = (
+                    f"Test execution failed: {exc}"
+                )
+
+                steps[current_index] = current_step
+
+                state["steps"] = steps
+                state["status"] = "failed"
+                state["waiting"] = False
+                state["complete"] = False
+                state["error"] = current_step["error"]
+                state["current_step"] = current_step
+
+                return {
+                    "ok": False,
+                    "error": current_step["error"],
+                    "execution_state": state,
+                }
+
+        # ---------------------------------------------------------
+        # BUILD EXECUTION MOVE
+        # ---------------------------------------------------------
+
+        move = self._make_move(
+            current_step
+        )
+
+        # ---------------------------------------------------------
+        # LOCAL LOG MOVE
+        # ---------------------------------------------------------
+
+        if move is not None and move.type == "log":
+            current_step["result"] = str(
+                move.payload.get("message")
+                or f"{title} completed."
+            )
+
+            state = self._advance_after_success(
+                state=state,
+                steps=steps,
+                current_index=current_index,
+                current_step=current_step,
+            )
+
+            return {
+                "ok": True,
+                "execution_state": state,
+                "result": current_step["result"],
+            }
+
+        # ---------------------------------------------------------
+        # MISSING IMPLEMENT TARGET
+        # ---------------------------------------------------------
+
+        if move is None and step_action in {
+            "build",
+            "implement",
+            "implementation",
+            "create",
+            "edit",
+            "write",
+            "modify",
+            "patch",
+            "fix",
+        }:
+
+            target_file = str(
+                current_step.get("target_file") or ""
+            ).strip()
+
+            target_files = (
+                current_step.get("target_files")
+                or []
+            )
+
+            if (
+                not target_file
+                and not target_files
+            ):
+                current_step["next_action"] = (
+                    "execute_general_task"
+                )
+
+                current_step["mutation_ready"] = True
+
+                if self.execution_step_service is None:
+                    current_step["status"] = "failed"
+
+                    current_step["error"] = (
+                        "ExecutionStepService is unavailable for "
+                        "general task execution."
+                    )
+
+                    steps[current_index] = current_step
+
+                    state["steps"] = steps
+                    state["status"] = "failed"
+                    state["waiting"] = False
+                    state["complete"] = False
+                    state["error"] = current_step["error"]
+                    state["current_step"] = current_step
+
+                    return {
+                        "ok": False,
+                        "error": current_step["error"],
+                        "execution_state": state,
+                    }
+
+                try:
+                    generated_step = (
+                        self.execution_step_service.execute_step_logic(
+                            session_id=session_id,
+                            step=current_step,
+                        )
+                    )
+
+                    if isinstance(generated_step, dict):
+                        current_step = generated_step
+
+                    steps[current_index] = current_step
+
+                    state["steps"] = steps
+                    state["current_step"] = current_step
+                    state["waiting"] = False
+
+                    step_status = str(
+                        current_step.get("status") or ""
+                    ).strip().lower()
+
+                    if step_status in {
+                        "failed",
+                        "error",
+                    }:
+                        state["status"] = "failed"
+                        state["complete"] = False
+                        state["error"] = (
+                            current_step.get("error")
+                            or "Project execution step failed."
+                        )
+
+                        return {
+                            "ok": False,
+                            "error": state["error"],
+                            "execution_state": state,
+                        }
+
+                    if step_status in {
+                        "waiting",
+                        "waiting_approval",
+                    }:
+                        state["status"] = "waiting"
+                        state["waiting"] = True
+                        state["complete"] = False
+
+                        return {
+                            "ok": True,
+                            "execution_state": state,
+                        }
+
+                    current_step["status"] = "completed"
+
+                    state = self._advance_after_success(
+                        state=state,
+                        steps=steps,
+                        current_index=current_index,
+                        current_step=current_step,
+                    )
+
+                    return {
+                        "ok": True,
+                        "execution_state": state,
+                        "result": current_step.get("result"),
+                    }
+
+                except Exception as exc:
+                    current_step["status"] = "failed"
+
+                    current_step["error"] = (
+                        f"Project general task execution failed: {exc}"
+                    )
+
+                    steps[current_index] = current_step
+
+                    state["steps"] = steps
+                    state["status"] = "failed"
+                    state["waiting"] = False
+                    state["complete"] = False
+                    state["error"] = current_step["error"]
+                    state["current_step"] = current_step
+
+                    return {
+                        "ok": False,
+                        "error": current_step["error"],
+                        "execution_state": state,
+                    }
+
+            content = str(
+                current_step.get("content")
+                or current_step.get("code")
+                or current_step.get("replacement")
+                or ""
+            )
+
+            if not content.strip():
+                if self.execution_step_service is None:
+                    current_step["status"] = "failed"
+
+                    current_step["error"] = (
+                        "ExecutionStepService is unavailable for "
+                        "file replacement generation."
+                    )
+
+                    steps[current_index] = current_step
+
+                    state["steps"] = steps
+                    state["status"] = "failed"
+                    state["waiting"] = False
+                    state["complete"] = False
+                    state["error"] = current_step["error"]
+                    state["current_step"] = current_step
+
+                    return {
+                        "ok": False,
+                        "error": current_step["error"],
+                        "execution_state": state,
+                    }
+
+                current_step["next_action"] = (
+                    "generate_file_replacement"
+                )
+
+                current_step["mutation_ready"] = True
+
+                try:
+                    generated_step = (
+                        self.execution_step_service.execute_step_logic(
+                            session_id=session_id,
+                            step=current_step,
+                        )
+                    )
+
+                    if isinstance(generated_step, dict):
+                        current_step = generated_step
+
+                    steps[current_index] = current_step
+
+                    state["steps"] = steps
+                    state["current_step"] = current_step
+                    state["waiting"] = False
+
+                    step_status = str(
+                        current_step.get("status") or ""
+                    ).strip().lower()
+
+                    if step_status in {
+                        "failed",
+                        "error",
+                    }:
+                        state["status"] = "failed"
+                        state["complete"] = False
+                        state["error"] = (
+                            current_step.get("error")
+                            or "Project execution step failed."
+                        )
+
+                        return {
+                            "ok": False,
+                            "error": state["error"],
+                            "execution_state": state,
+                        }
+
+                    if step_status in {
+                        "waiting",
+                        "waiting_approval",
+                    }:
+                        state["status"] = "waiting"
+                        state["waiting"] = True
+                        state["complete"] = False
+
+                        return {
+                            "ok": True,
+                            "execution_state": state,
+                        }
+
+                    current_step["status"] = (
+                        "completed"
+                        if step_status not in {
+                            "completed",
+                            "complete",
+                        }
+                        else current_step["status"]
+                    )
+
+                    steps[current_index] = current_step
+
+                    state["steps"] = steps
+                    state["current_step"] = current_step
+                    state["current_index"] = current_index + 1
+                    state["waiting"] = False
+
+                    if state["current_index"] >= len(steps):
+                        state["status"] = "completed"
+                        state["complete"] = True
+                    else:
+                        state["status"] = "running"
+                        state["complete"] = False
+
+                    return {
+                        "ok": True,
+                        "execution_state": state,
+                        "result": current_step.get("result"),
+                    }
+
+                except Exception as exc:
+                    current_step["status"] = "failed"
+
+                    current_step["error"] = (
+                        f"Project file generation failed: {exc}"
+                    )
+
+                    steps[current_index] = current_step
+
+                    state["steps"] = steps
+                    state["status"] = "failed"
+                    state["waiting"] = False
+                    state["complete"] = False
+                    state["error"] = current_step["error"]
+                    state["current_step"] = current_step
+
+                    return {
+                        "ok": False,
+                        "error": current_step["error"],
+                        "execution_state": state,
+                    }
+
+                content = str(
+                    current_step.get("content")
+                    or current_step.get("code")
+                    or current_step.get("replacement")
+                    or ""
+                )
+
+                if not content.strip():
+                    current_step["status"] = "failed"
+
+                    current_step["error"] = (
+                        "File generation completed without usable content."
+                    )
+
+                    steps[current_index] = current_step
+
+                    state["steps"] = steps
+                    state["status"] = "failed"
+                    state["waiting"] = False
+                    state["complete"] = False
+                    state["error"] = current_step["error"]
+                    state["current_step"] = current_step
+
+                    return {
+                        "ok": False,
+                        "error": current_step["error"],
+                        "execution_state": state,
+                    }
+
+            # ---------------------------------------------------------
+            # NO EXECUTOR
+            # ---------------------------------------------------------
+
+            if not callable(self.default_executor):
+                current_step["status"] = "waiting"
+
+                current_step["result"] = (
+                    "Project execution is waiting because "
+                    "the default executor is unavailable."
+                )
+
+                steps[current_index] = current_step
+
+                state["steps"] = steps
+                state["status"] = "waiting"
+                state["waiting"] = True
+                state["complete"] = False
+                state["current_step"] = current_step
+
+                return {
+                    "ok": True,
+                    "execution_state": state,
+                }
+
+        # ---------------------------------------------------------
+        # EXECUTE REAL MOVE
+        # ---------------------------------------------------------
+
+        if move is not None:
+            print(
+                "PROJECT EXECUTION HANDLER CALLING EXECUTOR",
+                {
+                    "move_type": move.type,
+                    "move_id": move.id,
+                    "payload": move.payload,
+                },
+                flush=True,
+            )
+
+            try:
+
+                if (
+                    move.type == "run_step"
+                    and isinstance(
+                        move.payload,
+                        dict,
+                    )
+                    and isinstance(
+                        move.payload.get("step"),
+                        dict,
+                    )
+                    and str(
+                        move.payload["step"].get(
+                            "action",
+                            "",
+                        )
+                    ).strip().lower()
+                    in {
+                        "command",
+                        "shell",
+                        "run_command",
+                    }
+                ):
+
+                    if self.execution_step_service is None:
+                        raise RuntimeError(
+                            "ExecutionStepService is unavailable "
+                            "for command execution."
+                        )
+
+                    command_step = move.payload["step"]
+
+                    execution_result = (
+                        self.execution_step_service.execute_step_logic(
+                            session_id=session_id,
+                            step=command_step,
+                        )
+                    )
+
+                    if isinstance(
+                        execution_result,
+                        dict,
+                    ):
+                        current_step.update(
+                            execution_result
+                        )
+
+                    else:
+                        current_step = command_step
+
+                    steps[current_index] = current_step
+                    state["steps"] = steps
+                    state["current_step"] = current_step
+                    state["waiting"] = False
+
+                    result_status = str(
+                        current_step.get(
+                            "status",
+                            "",
+                        )
+                        or ""
+                    ).strip().lower()
+
+                    result_output = (
+                        current_step.get(
+                            "result"
+                        )
+                    )
+
+                    result_error = str(
+                        current_step.get(
+                            "error",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+
+                    print(
+                        "PROJECT EXECUTION HANDLER COMMAND RESULT",
+                        {
+                            "status": result_status,
+                            "error": result_error,
+                            "result": result_output,
+                        },
+                        flush=True,
+                    )
+
+                    if result_status in {
+                        "failed",
+                        "error",
+                    }:
+
+                        current_step["status"] = "failed"
+
+                        current_step["error"] = (
+                            result_error
+                            or "Command execution failed."
+                        )
+
+                        steps[current_index] = current_step
+
+                        state["steps"] = steps
+                        state["status"] = "failed"
+                        state["complete"] = False
+                        state["waiting"] = False
+                        state["error"] = (
+                            current_step["error"]
+                        )
+                        state["current_step"] = current_step
+
+                        return {
+                            "ok": False,
+                            "error": current_step[
+                                "error"
+                            ],
+                            "execution_state": state,
+                            "result": result_output,
+                        }
+
+                    if result_status in {
+                        "waiting",
+                        "waiting_approval",
+                    }:
+
+                        state["status"] = "waiting"
+                        state["waiting"] = True
+                        state["complete"] = False
+
+                        return {
+                            "ok": True,
+                            "execution_state": state,
+                            "result": result_output,
+                        }
+
+                    if result_status not in {
+                        "completed",
+                        "complete",
+                        "success",
+                    }:
+
+                        current_step["status"] = "failed"
+
+                        current_step["error"] = (
+                            result_error
+                            or (
+                                "Command execution returned "
+                                "an invalid completion status."
+                            )
+                        )
+
+                        steps[current_index] = current_step
+
+                        state["steps"] = steps
+                        state["status"] = "failed"
+                        state["complete"] = False
+                        state["waiting"] = False
+                        state["error"] = (
+                            current_step["error"]
+                        )
+                        state["current_step"] = current_step
+
+                        return {
+                            "ok": False,
+                            "error": current_step[
+                                "error"
+                            ],
+                            "execution_state": state,
+                            "result": result_output,
+                        }
+
+                    current_step["status"] = "completed"
+
+                    steps[current_index] = current_step
+
+                    state = self._advance_after_success(
+                        state=state,
+                        steps=steps,
+                        current_index=current_index,
+                        current_step=current_step,
+                    )
+
+                    return {
+                        "ok": True,
+                        "execution_state": state,
+                        "result": result_output,
+                    }
+                execution_result = (
+                    self.default_executor(move)
+                )
+
+            except Exception as exc:
+                current_step["status"] = "failed"
+                current_step["error"] = str(exc)
+
+                steps[current_index] = current_step
+
+                state["steps"] = steps
+                state["status"] = "failed"
+                state["complete"] = False
+                state["waiting"] = False
+                state["error"] = str(exc)
+                state["current_step"] = current_step
+
+                return {
+                    "ok": False,
+                    "error": str(exc),
+                    "execution_state": state,
+                }
+
+            result_status = str(
+                getattr(
+                    execution_result,
+                    "status",
+                    "",
+                )
+                or ""
+            ).strip().lower()
+
+            result_output = getattr(
+                execution_result,
+                "output",
+                None,
+            )
+
+            result_error = str(
+                getattr(
+                    execution_result,
+                    "error",
+                    "",
+                )
+                or ""
+            ).strip()
+
+            print(
+                "PROJECT EXECUTION HANDLER RESULT",
+                {
+                    "move_type": move.type,
+                    "status": result_status,
+                    "error": result_error,
+                },
+                flush=True,
+            )
+
+            if result_status in {
+                "success",
+                "completed",
+                "complete",
+            }:
+                current_step["result"] = result_output
+
+                current_step.pop(
+                    "error",
+                    None,
+                )
+
+                state = self._advance_after_success(
+                    state=state,
+                    steps=steps,
+                    current_index=current_index,
+                    current_step=current_step,
+                )
+
+                return {
+                    "ok": True,
+                    "execution_state": state,
+                    "result": result_output,
+                }
+
+            current_step["status"] = "failed"
+
+            current_step["error"] = (
+                result_error
+                or "Project execution failed."
+            )
+
+            current_step["result"] = result_output
+
+            steps[current_index] = current_step
+
+            state["steps"] = steps
+            state["status"] = "failed"
+            state["complete"] = False
+            state["waiting"] = False
+            state["error"] = current_step["error"]
+            state["current_step"] = current_step
+
+            return {
+                "ok": False,
+                "error": current_step["error"],
+                "execution_state": state,
+            }
+
+        # ---------------------------------------------------------
+        # UNSUPPORTED ACTION
+        # ---------------------------------------------------------
+
+        current_step["status"] = "failed"
+
+        current_step["error"] = (
+            f"Unsupported project execution action: "
+            f"{step_action}"
+        )
+
+        steps[current_index] = current_step
+
+        state["steps"] = steps
+        state["status"] = "failed"
+        state["waiting"] = False
+        state["complete"] = False
+        state["error"] = current_step["error"]
+
+        return {
+            "ok": False,
+            "error": current_step["error"],
+            "execution_state": state,
+        }
+
+
+
+
+
+

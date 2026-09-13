@@ -1,4 +1,4 @@
-
+﻿
 from __future__ import annotations
 
 
@@ -12,9 +12,10 @@ def _nova_boot_log_20260701(*args, **kwargs):
 
 import json
 import logging
+import threading
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from nova_backend.services.mission_service import mission_service
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ class ChatExecutionService:
         self.execution_handler = execution_handler
         self.session_service = session_service
         self._states: Dict[str, Dict[str, Any]] = {}
-
+        self._save_lock = threading.RLock()
         self._load_states()
 
         self.state_path = Path(state_path) if state_path else DEFAULT_EXECUTION_STATE_PATH
@@ -369,6 +370,148 @@ class ChatExecutionService:
 
         state["steps"] = normalized_steps
 
+        current_index = int(
+            state.get("current_index") or 0
+        )
+
+        if current_index >= len(
+            normalized_steps
+        ):
+            state["status"] = "complete"
+            state["complete"] = True
+            state["waiting"] = False
+            state["current_step"] = None
+            state["next_action"] = None
+
+            self._states[
+                safe_session_id
+            ] = state
+
+            self._sync_state_to_session(
+                safe_session_id,
+                state,
+            )
+
+            self._save_states()
+
+            return self._copy_state(
+                state
+            )
+
+        current_step = normalized_steps[
+            current_index
+        ]
+
+        if isinstance(
+            current_step,
+            dict,
+        ):
+
+            current_step_status = str(
+                current_step.get("status") or "pending"
+            ).strip().lower()
+
+
+            if current_step_status in {
+                "failed",
+                "error",
+            }:
+                state["status"] = "failed"
+                state["complete"] = False
+                state["waiting"] = False
+                state["next_action"] = None
+                state["error"] = (
+                    current_step.get("error")
+                    or current_step.get("result")
+                    or "Current execution step failed."
+                )
+
+                self._states[
+                    safe_session_id
+                ] = state
+
+                self._sync_state_to_session(
+                    safe_session_id,
+                    state,
+                )
+
+                self._save_states()
+
+                return self._copy_state(
+                    state
+                )
+
+            terminal_step_statuses = {
+                "completed",
+                "complete",
+                "success",
+                "succeeded",
+                "skipped",
+                "cancelled",
+                "canceled",
+            }
+
+            if current_step_status in terminal_step_statuses:
+                state["current_index"] = (
+                    current_index + 1
+                )
+                state["current_step"] = None
+
+                if state["current_index"] >= len(
+                    normalized_steps
+                ):
+                    state["status"] = "complete"
+                    state["complete"] = True
+                    state["waiting"] = False
+                    state["next_action"] = None
+
+                self._states[
+                    safe_session_id
+                ] = state
+
+                self._sync_state_to_session(
+                    safe_session_id,
+                    state,
+                )
+
+                self._save_states()
+
+                return self._copy_state(
+                    state
+                )
+
+            if current_step_status in terminal_step_statuses:
+                state["current_index"] = (
+                    current_index + 1
+                )
+                state["current_step"] = None
+
+                if state["current_index"] >= len(
+                    normalized_steps
+                ):
+                    state["status"] = "complete"
+                    state["complete"] = True
+                    state["waiting"] = False
+                    state["next_action"] = None
+
+                self._states[
+                    safe_session_id
+                ] = state
+
+                self._sync_state_to_session(
+                    safe_session_id,
+                    state,
+                )
+
+                self._save_states()
+
+                return self._copy_state(
+                    state
+                )
+
+
+
+
         execution_result = (
             self.execution_handler.run_next_move(
                 action="run_step",
@@ -483,6 +626,60 @@ class ChatExecutionService:
                 state.get("status") or ""
             ).strip().lower()
 
+            steps = state.get("steps") or []
+
+            dependency_waiting = bool(
+                state.get("waiting")
+            ) or any(
+                isinstance(step, dict)
+                and (
+                    str(
+                        step.get("status") or ""
+                    ).strip().lower()
+                    in {
+                        "blocked",
+                        "waiting",
+                    }
+                    or bool(
+                        step.get("blocked")
+                    )
+                    or bool(
+                        step.get("waiting")
+                    )
+                    or bool(
+                        step.get(
+                            "unresolved_dependencies"
+                        )
+                    )
+                )
+                for step in steps
+            )
+
+            if dependency_waiting:
+                state["status"] = "waiting"
+                state["waiting"] = True
+                state["complete"] = False
+                state["error"] = (
+                    state.get("error")
+                    or
+                    "Execution is waiting for unresolved task dependencies."
+                )
+
+                self._states[
+                    safe_session_id
+                ] = state
+
+                self._sync_state_to_session(
+                    safe_session_id,
+                    state,
+                )
+
+                self._save_states()
+
+                return self._copy_state(
+                    state
+                )
+
             if status in {
                 "idle",
                 "complete",
@@ -499,8 +696,6 @@ class ChatExecutionService:
             )
 
             if not isinstance(current_step, dict):
-                steps = state.get("steps") or []
-
                 if (
                     0 <= current_index < len(steps)
                     and isinstance(
@@ -527,8 +722,6 @@ class ChatExecutionService:
             current_step_error = str(
                 current_step.get("error") or ""
             )
-
-            steps = state.get("steps") or []
 
             steps_fingerprint = tuple(
                 (
@@ -599,11 +792,49 @@ class ChatExecutionService:
             safe_session_id
         )
 
-        state["status"] = "failed"
+        steps = state.get("steps") or []
 
-        state["error"] = (
-            "Execution stopped because max_steps was reached."
+        dependency_waiting = bool(
+            state.get("waiting")
+        ) or any(
+            isinstance(step, dict)
+            and (
+                str(
+                    step.get("status") or ""
+                ).strip().lower()
+                in {
+                    "blocked",
+                    "waiting",
+                }
+                or bool(
+                    step.get("blocked")
+                )
+                or bool(
+                    step.get("waiting")
+                )
+                or bool(
+                    step.get(
+                        "unresolved_dependencies"
+                    )
+                )
+            )
+            for step in steps
         )
+
+        if dependency_waiting:
+            state["status"] = "waiting"
+            state["waiting"] = True
+            state["complete"] = False
+            state["error"] = (
+                state.get("error")
+                or
+                "Execution is waiting for unresolved task dependencies."
+            )
+        else:
+            state["status"] = "failed"
+            state["error"] = (
+                "Execution stopped because max_steps was reached."
+            )
 
         self._states[safe_session_id] = state
 
@@ -621,7 +852,11 @@ class ChatExecutionService:
         if mission_id:
             mission_service.update_status(
                 mission_id,
-                "failed",
+                (
+                    "waiting"
+                    if dependency_waiting
+                    else "failed"
+                ),
             )
 
         return self._copy_state(
@@ -808,15 +1043,45 @@ class ChatExecutionService:
 
     def _save_states(self) -> None:
         try:
-            self.state_path.parent.mkdir(parents=True, exist_ok=True)
-            temp_path = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
-            temp_path.write_text(
-                json.dumps(self._states, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-            temp_path.replace(self.state_path)
+            with self._save_lock:
+                self.state_path.parent.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
+
+                payload = json.dumps(
+                    self._states,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+
+                temp_path = self.state_path.with_name(
+                    f"{self.state_path.name}."
+                    f"{uuid.uuid4().hex}.tmp"
+                )
+
+                try:
+                    temp_path.write_text(
+                        payload,
+                        encoding="utf-8",
+                    )
+
+                    temp_path.replace(
+                        self.state_path
+                    )
+
+                finally:
+                    try:
+                        if temp_path.exists():
+                            temp_path.unlink()
+                    except OSError:
+                        pass
+
         except Exception:
-            logger.exception("[ChatExecutionService] failed to save execution state")
+            logger.exception(
+                "[ChatExecutionService] failed to save execution state"
+            )
+
     def _save_execution_state(
         self,
         session_id: str,
@@ -1474,3 +1739,4 @@ except Exception as _nova_chat_execution_handler_wire_error:
         "[NOVA_CHAT_EXECUTION_HANDLER_WIRE_FAILED]",
         _nova_chat_execution_handler_wire_error,
     )
+

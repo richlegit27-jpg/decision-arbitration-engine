@@ -27,348 +27,1922 @@ class ProjectBuilderService:
     # PUBLIC API
     # ------------------------------------------------------------------
 
-    def build_project_from_request(
+    def _normalize_task_reference(
         self,
-        user_text: str | None = None,
-        owner_id: str | None = None,
-        project_id: str | None = None,
-        request: str | None = None,
-    ) -> dict[str, Any]:
+        reference,
+    ):
         """
-        Build or update a persistent Nova project from a natural-language
-        request.
-
-        Flow:
-        1. Build the project plan.
-        2. Create or update the persistent project.
-        3. Create persistent tasks from the plan.
-        4. Update the project brain.
-        5. Return the final project and plan.
+        Normalize planner task IDs, titles, and dependency references
+        into a stable lookup key.
         """
+        normalized_reference = str(
+            reference or ""
+        ).strip().lower()
 
-        clean_request = str(
-            user_text
-            or request
-            or ""
+        normalized_reference = re.sub(
+            r"[^a-z0-9]+",
+            " ",
+            normalized_reference,
+        )
+
+        normalized_reference = re.sub(
+            r"\s+",
+            " ",
+            normalized_reference,
         ).strip()
 
-        if not clean_request:
-            raise ValueError(
-                "Project request cannot be empty."
-            )
+        return normalized_reference
 
-        # --------------------------------------------------------------
-        # EXISTING PROJECT CONTEXT
-        #
-        # Load an existing project before AI planning so Nova understands
-        # existing tasks, progress, decisions, blockers, and next actions.
-        # --------------------------------------------------------------
+    def build_project_from_request(
+        self,
+        user_text,
+        user_id=None,
+        workspace_id=None,
+        owner_id=None,
+    ):
+        """
+        Build a project from a natural-language request.
 
-        project = None
-        project_context = {}
+        Responsibilities:
+        1. Generate a planner structure.
+        2. Create the project if necessary.
+        3. Persist phases before tasks.
+        4. Assign every task to a persistent phase.
+        5. Convert planner task references into persistent task UUIDs.
+        6. Persist remapped dependencies.
+        """
+
+        if owner_id is not None and user_id is None:
+            user_id = owner_id
+
+        if not user_text or not str(user_text).strip():
+            raise ValueError("Project request required")
+
+        clean_request = str(user_text).strip()
+
+        project_id = None
+
+        existing_project = None
 
         if project_id:
-
-            project = (
-                self.project_workspace_service.get_project(
-                    project_id
-                )
+            existing_project = self.project_workspace_service.get_project(
+                project_id
             )
 
-            if project:
-
-                project_context = (
-                    self.project_workspace_service.get_project_context(
-                        project_id
-                    )
-                )
-
-                if not isinstance(
-                    project_context,
-                    dict,
-                ):
-                    project_context = {}
-
-        # --------------------------------------------------------------
-        # PROJECT INTELLIGENCE
-        # --------------------------------------------------------------
+        context = {
+            "project_id": project_id,
+            "owner_id": owner_id,
+            "user_id": user_id,
+            "workspace_id": workspace_id,
+            "request_text": clean_request,
+        }
 
         plan = self._build_project_plan(
-            clean_request,
-            project_context=project_context,
+            request=clean_request,
+            project_context=context,
         )
 
-        # --------------------------------------------------------------
-        # PROJECT PERSISTENCE
-        # --------------------------------------------------------------
+        if not isinstance(plan, dict):
+            raise ValueError("Planner returned an invalid project plan")
 
-        if project:
+        planned_phases = plan.get("phases")
 
-            project = (
-                self.project_workspace_service.update_project(
-                    project_id=project_id,
-                    name=plan.get("name"),
-                    description=plan.get("description"),
-                )
+        if not isinstance(planned_phases, list):
+            planned_phases = plan.get("milestones")
+
+        if not isinstance(planned_phases, list):
+            planned_phases = []
+
+        planned_tasks = plan.get("tasks")
+
+        if not isinstance(planned_tasks, list):
+            planned_tasks = []
+
+        if not planned_tasks:
+            raise ValueError("Planner returned no tasks")
+
+        if existing_project:
+            project = existing_project
+        else:
+            project_title = (
+                plan.get("title")
+                or plan.get("name")
+                or clean_request[:120]
             )
 
-        if not project:
+            project_description = (
+                plan.get("description")
+                or clean_request
+            )
 
-            project = (
+            created_project = (
                 self.project_workspace_service.create_project(
-                    name=plan.get("name"),
-                    description=plan.get("description"),
+                    title=project_title,
+                    request_text=clean_request,
+                    owner_id=owner_id,
+                    name=project_title,
+                    description=project_description,
                 )
             )
-        if not project:
-            raise RuntimeError(
-                "Failed to create project."
+
+            if not isinstance(created_project, dict):
+                raise RuntimeError(
+                    "Project workspace failed to create project"
+                )
+
+            project = created_project
+
+            project_id = project.get(
+                "id"
             )
 
-        resolved_project_id = project.get("id")
+            if not project_id:
+                raise RuntimeError(
+                    "Created project did not contain an id"
+                )
 
-        if not resolved_project_id:
-            raise RuntimeError(
-                "Created project does not have an ID."
-            )
+        if not project_id:
+            project_id = project.get("id")
 
-        # --------------------------------------------------------------
-        # TASK MERGE
-        #
-        # Never destroy existing project progress when Nova rebuilds or
-        # expands a project.
-        #
-        # Existing tasks remain authoritative. The AI plan can add new
-        # work, but completed and in-progress work must survive.
-        # --------------------------------------------------------------
+        if not project_id:
+            raise ValueError("Project ID could not be determined")
 
-        existing_tasks = project.get(
-            "tasks",
-            [],
-        )
+        # ---------------------------------------------------------
+        # Normalize planner phases.
+        # ---------------------------------------------------------
 
-        existing_titles = set()
+        normalized_phases = []
 
-        for existing_task in existing_tasks:
-
-            if not isinstance(
-                existing_task,
-                dict,
-            ):
+        for phase_index, phase_spec in enumerate(planned_phases, start=1):
+            if not isinstance(phase_spec, dict):
                 continue
 
-            existing_title = str(
-                existing_task.get(
-                    "title",
-                    "",
+            phase_key = (
+                phase_spec.get("id")
+                or phase_spec.get("phase_id")
+                or phase_spec.get("key")
+                or f"phase_{phase_index}"
+            )
+
+            phase_title = (
+                phase_spec.get("title")
+                or phase_spec.get("name")
+                or phase_spec.get("phase")
+                or f"Phase {phase_index}"
+            )
+
+            phase_description = (
+                phase_spec.get("description")
+                or phase_spec.get("goal")
+                or ""
+            )
+
+            normalized_phases.append(
+                {
+                    "planner_id": str(phase_key),
+                    "title": str(phase_title),
+                    "description": str(phase_description),
+                    "goal": str(phase_spec.get("goal") or ""),
+                    "milestone": str(
+                        phase_spec.get("milestone") or ""
+                    ),
+                    "order": phase_spec.get("order")
+                        or phase_index,
+                }
+            )
+
+        # ---------------------------------------------------------
+        # Fallback: derive phases from task metadata when the AI
+        # planner returns tasks but no structural phases.
+        # ---------------------------------------------------------
+
+        if not normalized_phases:
+            derived_phase_groups = {}
+
+            for task_index, task_spec in enumerate(planned_tasks, start=1):
+                if not isinstance(task_spec, dict):
+                    continue
+
+                searchable_text = " ".join(
+                    [
+                        str(task_spec.get("title") or ""),
+                        str(task_spec.get("name") or ""),
+                        str(task_spec.get("description") or ""),
+                        str(task_spec.get("action") or ""),
+                        str(task_spec.get("phase") or ""),
+                        str(task_spec.get("phase_title") or ""),
+                        str(task_spec.get("phase_name") or ""),
+                        str(task_spec.get("phase_id") or ""),
+                    ]
+                ).lower()
+
+                explicit_phase = (
+                    task_spec.get("phase_id")
+                    or task_spec.get("phase")
+                    or task_spec.get("phase_title")
+                    or task_spec.get("phase_name")
                 )
+
+                if explicit_phase:
+                    phase_key = str(explicit_phase).strip()
+                    phase_title = phase_key.replace("_", " ").strip()
+                    phase_title = phase_title.title()
+                elif "foundation" in searchable_text:
+                    phase_key = "phase_foundation"
+                    phase_title = "Foundation"
+                elif "delivery" in searchable_text:
+                    phase_key = "phase_delivery"
+                    phase_title = "Delivery"
+                elif "deployment" in searchable_text:
+                    phase_key = "phase_deployment"
+                    phase_title = "Deployment"
+                elif "testing" in searchable_text or "test" in searchable_text:
+                    phase_key = "phase_testing"
+                    phase_title = "Testing"
+                elif "documentation" in searchable_text or "document" in searchable_text:
+                    phase_key = "phase_documentation"
+                    phase_title = "Documentation"
+                else:
+                    phase_key = "phase_1"
+                    phase_title = "Foundation"
+
+                if phase_key not in derived_phase_groups:
+                    derived_phase_groups[phase_key] = {
+                        "planner_id": phase_key,
+                        "title": phase_title,
+                        "description": "",
+                        "goal": "",
+                        "milestone": "",
+                        "order": len(derived_phase_groups) + 1,
+                    }
+
+            normalized_phases = list(
+                derived_phase_groups.values()
+            )
+
+        # Ensure there is always at least one phase.
+        if not normalized_phases:
+            normalized_phases = [
+                {
+                    "planner_id": "phase_1",
+                    "title": "Foundation",
+                    "description": "",
+                    "goal": "",
+                    "milestone": "",
+                    "order": 1,
+                }
+            ]
+
+        # ---------------------------------------------------------
+        # Persist phases and map planner phase IDs to real UUIDs.
+        # ---------------------------------------------------------
+
+        phase_id_map = {}
+
+
+        def _phase_lookup_key(value):
+            if isinstance(value, dict):
+                value = (
+                    value.get("id")
+                    or value.get("phase_id")
+                    or value.get("planner_id")
+                    or value.get("title")
+                    or value.get("name")
+                    or ""
+                )
+
+            value = str(value or "").strip().lower()
+
+            if not value:
+                return ""
+
+            return (
+                value
+                .replace("_", " ")
+                .replace("-", " ")
+                .replace(".", " ")
+            ).strip()
+
+        created_phases = []
+
+        for phase_spec in normalized_phases:
+            created_phase = (
+                self.project_workspace_service.add_phase(
+                    project_id=project_id,
+                    title=phase_spec["title"],
+                    description=phase_spec["description"],
+                    status="planned",
+                    order=phase_spec["order"],
+                    goal=phase_spec["goal"],
+                    milestone=phase_spec["milestone"],
+                )
+            )
+
+            if isinstance(created_phase, dict):
+                created_phase_id = (
+                    created_phase.get("id")
+                    or created_phase.get("phase_id")
+                    or ""
+                )
+            else:
+                created_phase_id = created_phase
+
+            while isinstance(created_phase_id, dict):
+                created_phase_id = (
+                    created_phase_id.get("id")
+                    or created_phase_id.get("phase_id")
+                    or ""
+                )
+
+            created_phase_id = str(
+                created_phase_id or ""
+            ).strip()
+
+            if not created_phase_id:
+                raise RuntimeError(
+                    "Created phase did not contain an id"
+                )
+
+            planner_phase_id = str(
+                phase_spec.get("planner_id")
+                or phase_spec.get("id")
+                or phase_spec.get("title")
+                or ""
+            ).strip()
+
+            phase_title_key = str(
+                phase_spec.get("title") or ""
             ).strip().lower()
 
-            if existing_title:
-                existing_titles.add(
-                    existing_title
-                )
+            if planner_phase_id:
+                phase_id_map[
+                    planner_phase_id
+                ] = created_phase_id
 
-        created_tasks = []
+            if phase_title_key:
+                phase_id_map[
+                    phase_title_key
+                ] = created_phase_id
 
-        skipped_existing_tasks = []
+            created_phases.append(
+                {
+                    "id": created_phase_id,
+                    "planner_id": (
+                        phase_spec.get("planner_id")
+                        or phase_spec.get("id")
+                        or planner_phase_id
+                    ),
+                    "title": phase_spec["title"],
+                    "description": phase_spec["description"],
+                    "status": "planned",
+                    "order": phase_spec["order"],
+                    "goal": phase_spec["goal"],
+                    "milestone": phase_spec["milestone"],
+                }
+            )
 
-        for task_spec in plan.get(
-            "tasks",
-            [],
-        ):
 
-            if not isinstance(
-                task_spec,
-                dict,
-            ):
+
+
+        # ---------------------------------------------------------
+        # Normalize task execution metadata before persistence.
+        # ---------------------------------------------------------
+
+        normalized_tasks = []
+
+        for task in planned_tasks:
+            if not isinstance(task, dict):
                 continue
 
             task_title = str(
-                task_spec.get(
-                    "title",
-                    "New Task",
-                )
+                task.get("title")
+                or task.get("name")
+                or ""
             ).strip()
 
-            if not task_title:
-                continue
+            task_title_lower = task_title.lower()
 
-            normalized_title = (
-                task_title.lower()
+            task_text = " ".join(
+                [
+                    task_title,
+                    str(task.get("description") or ""),
+                    str(task.get("content") or ""),
+                    str(task.get("expected_output") or ""),
+                    str(task.get("completion_criteria") or ""),
+                ]
             )
 
-            # Do not duplicate work that already exists in the project.
-            if normalized_title in existing_titles:
+            task_text_lower = task_text.lower()
 
-                skipped_existing_tasks.append(
-                    task_title
+            is_contract_task = (
+                "specify the exact" in task_title_lower
+                or "execution contract" in task_title_lower
+                or "define the execution contract" in task_title_lower
+                or "exact file content" in task_title_lower
+            )
+
+            is_output_persistence_task = (
+                "write captured output" in task_title_lower
+                or "persist captured output" in task_title_lower
+                or "save captured output" in task_title_lower
+                or "output to " in task_title_lower
+                or "write stdout" in task_title_lower
+                or "persist stdout" in task_title_lower
+            )
+
+            is_execution_task = (
+                not is_contract_task
+                and (
+                    task_title_lower.startswith("execute ")
+                    or task_title_lower.startswith("run ")
+                    or "execute " in task_title_lower
+                    or "run " in task_title_lower
+                    or "subprocess" in task_text_lower
+                    or "standard output" in task_text_lower
+                    or "capture its output" in task_text_lower
+                    or "real python" in task_text_lower
+                    or "script execution" in task_text_lower
                 )
+            )
 
-                continue
+            if is_contract_task:
+                task["action"] = "analysis"
+                task["execution_mode"] = "ai"
+                task["execution_file"] = ""
 
-            task_action = str(
-                task_spec.get(
-                    "action",
-                    "",
-                )
-            ).strip().lower()
+            elif is_output_persistence_task:
+                task["action"] = "implement"
+                task["execution_mode"] = "hybrid"
+                task["execution_file"] = ""
+
+            elif is_execution_task:
+                execution_file = str(
+                    task.get("execution_file")
+                    or task.get("run_file")
+                    or task.get("script_file")
+                    or task.get("test_script")
+                    or task.get("test_file")
+                    or ""
+                ).strip()
+
+                if not execution_file:
+                    execution_match = re.search(
+                        r"\b([A-Za-z0-9_.-]+\.py)\b",
+                        task_text,
+                        flags=re.IGNORECASE,
+                    )
+
+                    if execution_match:
+                        execution_file = (
+                            execution_match.group(1).strip()
+                        )
+
+                if not execution_file:
+                    candidate_target_file = str(
+                        task.get("target_file")
+                        or ""
+                    ).strip()
+
+                    if candidate_target_file.lower().endswith(".py"):
+                        execution_file = candidate_target_file
+
+                if not execution_file:
+                    candidate_target_files = (
+                        task.get("target_files") or []
+                    )
+
+                    if isinstance(candidate_target_files, list):
+                        for candidate_file in candidate_target_files:
+                            candidate_file = str(
+                                candidate_file or ""
+                            ).strip()
+
+                            if candidate_file.lower().endswith(".py"):
+                                execution_file = candidate_file
+                                break
+
+                if not execution_file:
+                    candidate_target_file = str(
+                        task.get("target_file") or ""
+                    ).strip()
+
+                    if candidate_target_file.lower().endswith(".py"):
+                        execution_file = candidate_target_file
+
+                if not execution_file:
+                    candidate_target_files = (
+                        task.get("target_files") or []
+                    )
+
+                    if isinstance(candidate_target_files, list):
+                        for candidate_file in candidate_target_files:
+                            candidate_file = str(
+                                candidate_file or ""
+                            ).strip()
+
+                            if candidate_file.lower().endswith(".py"):
+                                execution_file = candidate_file
+                                break
+
+                task["action"] = "execute"
+                task["execution_file"] = execution_file
+
+            else:
+                task["action"] = str(
+                    task.get("action") or ""
+                ).strip()
+
+                task["execution_file"] = str(
+                    task.get("execution_file")
+                    or ""
+                ).strip()
 
             target_file = str(
-                task_spec.get(
-                    "target_file",
-                    "",
-                )
+                task.get("target_file")
+                or ""
             ).strip()
 
-            task_description = str(
-                task_spec.get(
-                    "description",
-                    "",
-                )
-            ).strip()
+            target_files = task.get("target_files") or []
 
-            # ----------------------------------------------------------
-            # TARGET FILE RESOLUTION
-            #
-            # The planner is authoritative for explicit target files.
-            # Do not invent filenames here based on keywords. If Nova
-            # does not have a concrete file target, the execution layer
-            # will treat this as a general AI task rather than forcing
-            # a fake file implementation.
-            # ----------------------------------------------------------
-
-            if not target_file:
-
-                task_text = (
-                    task_title
-                    + " "
-                    + task_description
-                )
-
-                file_match = re.search(
-                    r"\b[\w./\\-]+\.(?:py|md|txt|json|js|html|css|yaml|yml)\b",
+            if (
+                is_execution_task
+                and task.get("execution_file")
+            ):
+                output_matches = re.findall(
+                    r"\b([A-Za-z0-9_.-]+\.(?:txt|json|csv|md|log|out|xml|yaml|yml))\b",
                     task_text,
                     flags=re.IGNORECASE,
                 )
 
-                if file_match:
-                    target_file = (
-                        file_match.group(0)
+                output_matches = [
+                    value
+                    for value in output_matches
+                    if value.lower()
+                    != str(task["execution_file"]).lower()
+                ]
+
+                if output_matches:
+                    target_file = output_matches[-1]
+                    target_files = [target_file]
+
+            task["target_file"] = target_file
+            task["target_files"] = target_files
+
+            normalized_tasks.append(task)
+
+        # ---------------------------------------------------------
+        # Final canonicalization after all planner tasks are built.
+        # ---------------------------------------------------------
+
+        for canonical_task in normalized_tasks:
+            if not isinstance(canonical_task, dict):
+                continue
+
+            canonical_title = str(
+                canonical_task.get("title")
+                or canonical_task.get("name")
+                or ""
+            ).strip()
+
+            canonical_description = str(
+                canonical_task.get("description")
+                or ""
+            ).strip()
+
+            canonical_expected_output = str(
+                canonical_task.get("expected_output")
+                or ""
+            ).strip()
+
+            canonical_content = str(
+                canonical_task.get("content")
+                or ""
+            ).strip()
+
+            canonical_completion_criteria = str(
+                canonical_task.get("completion_criteria")
+                or ""
+            ).strip()
+
+            canonical_target_file = str(
+                canonical_task.get("target_file")
+                or ""
+            ).strip()
+
+            canonical_target_files = (
+                canonical_task.get("target_files")
+                or []
+            )
+
+            if not isinstance(canonical_target_files, list):
+                canonical_target_files = []
+
+            canonical_text = " ".join(
+                [
+                    canonical_title,
+                    canonical_description,
+                    canonical_content,
+                    canonical_expected_output,
+                    canonical_completion_criteria,
+                    canonical_target_file,
+                    " ".join(
+                        str(value or "").strip()
+                        for value in canonical_target_files
+                    ),
+                ]
+            )
+
+            canonical_title_lower = canonical_title.lower()
+            canonical_text_lower = canonical_text.lower()
+
+            canonical_execution_file = str(
+                canonical_task.get("execution_file")
+                or canonical_task.get("run_file")
+                or canonical_task.get("script_file")
+                or canonical_task.get("test_script")
+                or canonical_task.get("test_file")
+                or ""
+            ).strip()
+
+            # Promote a Python target file into the execution file
+            # when the planner placed it in target_file.
+            if not canonical_execution_file:
+                if canonical_target_file.lower().endswith(".py"):
+                    canonical_execution_file = (
+                        canonical_target_file
                     )
 
+            # Also inspect target_files for a Python script.
+            if not canonical_execution_file:
+                for candidate_file in canonical_target_files:
+                    candidate_file = str(
+                        candidate_file or ""
+                    ).strip()
+
+                    if candidate_file.lower().endswith(".py"):
+                        canonical_execution_file = candidate_file
+                        break
+
+            # Last fallback: extract a Python filename from the
+            # complete canonical task text.
+            if not canonical_execution_file:
+                execution_match = re.search(
+                    r"\b([A-Za-z0-9_.-]+\.py)\b",
+                    canonical_text,
+                    flags=re.IGNORECASE,
+                )
+
+                if execution_match:
+                    canonical_execution_file = (
+                        execution_match.group(1).strip()
+                    )
+
+            is_execution_task = bool(
+                canonical_execution_file
+                and (
+                    canonical_title_lower.startswith("execute ")
+                    or canonical_title_lower.startswith("run ")
+                    or "execute" in canonical_title_lower
+                    or "subprocess" in canonical_text_lower
+                    or "capture output" in canonical_title_lower
+                    or "captured stdout" in canonical_text_lower
+                    or "standard output" in canonical_text_lower
+                    or "script execution" in canonical_text_lower
+                    or "real python" in canonical_text_lower
+                    or "real execution" in canonical_text_lower
+                )
+            )
+
+            is_output_persistence_task = (
+                "write captured output" in canonical_title_lower
+                or "write the captured output" in canonical_title_lower
+                or "persist captured output" in canonical_title_lower
+                or "persist the captured output" in canonical_title_lower
+                or "save captured output" in canonical_title_lower
+                or "save the captured output" in canonical_title_lower
+                or "write stdout" in canonical_text_lower
+                or "persist stdout" in canonical_text_lower
+                or "save stdout" in canonical_text_lower
+                or "write the stdout" in canonical_text_lower
+                or "capture and write stdout" in canonical_title_lower
+                or "capture and write stdout" in canonical_text_lower
+                or "capture and write" in canonical_title_lower
+                or "output artifact" in canonical_text_lower
+                or "output to " in canonical_title_lower
+            )
+
+            if is_execution_task:
+                canonical_task["action"] = "execute"
+                canonical_task["execution_mode"] = "hybrid"
+                canonical_task["execution_file"] = (
+                    canonical_execution_file
+                )
+
+                # The execution task captures output but does not
+                # itself persist the output artifact.
+                canonical_task["target_file"] = ""
+                canonical_task["target_files"] = []
+
+            elif is_output_persistence_task:
+                canonical_task["action"] = "implement"
+                canonical_task["execution_mode"] = "hybrid"
+                canonical_task["execution_file"] = ""
+
+                output_matches = re.findall(
+                    r"\b([A-Za-z0-9_.-]+\.(?:txt|json|csv|md|log|out|xml|yaml|yml))\b",
+                    canonical_text,
+                    flags=re.IGNORECASE,
+                )
+
+                if output_matches:
+                    canonical_output_file = output_matches[-1]
+
+                    canonical_task["target_file"] = (
+                        canonical_output_file
+                    )
+                    canonical_task["target_files"] = [
+                        canonical_output_file
+                    ]
+
+            canonical_steps = canonical_task.get("steps")
+
+            if not isinstance(canonical_steps, list):
+                continue
+
+            for canonical_step in canonical_steps:
+                if not isinstance(canonical_step, dict):
+                    continue
+
+                if is_execution_task:
+                    canonical_step["action"] = "execute"
+                    canonical_step["execution_mode"] = "hybrid"
+                    canonical_step["execution_file"] = (
+                        canonical_execution_file
+                    )
+                    canonical_step["target_file"] = ""
+                    canonical_step["target_files"] = []
+
+                elif is_output_persistence_task:
+                    canonical_step["action"] = "implement"
+                    canonical_step["execution_mode"] = "hybrid"
+                    canonical_step["execution_file"] = ""
+
+                    step_text = " ".join(
+                        [
+                            str(
+                                canonical_step.get("title")
+                                or canonical_step.get("name")
+                                or ""
+                            ),
+                            str(
+                                canonical_step.get("description")
+                                or ""
+                            ),
+                            str(
+                                canonical_step.get("content")
+                                or ""
+                            ),
+                            str(
+                                canonical_step.get("expected_output")
+                                or ""
+                            ),
+                            str(
+                                canonical_step.get("target_file")
+                                or ""
+                            ),
+                            " ".join(
+                                str(value or "").strip()
+                                for value in (
+                                    canonical_step.get(
+                                        "target_files"
+                                    )
+                                    or []
+                                )
+                            ),
+                        ]
+                    )
+
+                    step_output_matches = re.findall(
+                        r"\b([A-Za-z0-9_.-]+\.(?:txt|json|csv|md|log|out|xml|yaml|yml))\b",
+                        step_text,
+                        flags=re.IGNORECASE,
+                    )
+
+                    if step_output_matches:
+                        canonical_step["target_file"] = (
+                            step_output_matches[-1]
+                        )
+                        canonical_step["target_files"] = [
+                            step_output_matches[-1]
+                        ]
+
+            canonical_title_lower = canonical_title.lower()
+            canonical_text_lower = canonical_text.lower()
+
+            canonical_execution_file = str(
+                canonical_task.get("execution_file")
+                or canonical_task.get("run_file")
+                or canonical_task.get("script_file")
+                or canonical_task.get("test_script")
+                or canonical_task.get("test_file")
+                or ""
+            ).strip()
+
+            if not canonical_execution_file:
+                if canonical_target_file.lower().endswith(".py"):
+                    canonical_execution_file = (
+                        canonical_target_file
+                    )
+
+            if not canonical_execution_file:
+                if isinstance(canonical_target_files, list):
+                    for candidate_file in canonical_target_files:
+                        candidate_file = str(
+                            candidate_file or ""
+                        ).strip()
+
+                        if candidate_file.lower().endswith(".py"):
+                            canonical_execution_file = candidate_file
+                            break
+
+            if not canonical_execution_file:
+                execution_match = re.search(
+                    r"\b([A-Za-z0-9_.-]+\.py)\b",
+                    canonical_text,
+                    flags=re.IGNORECASE,
+                )
+
+                if execution_match:
+                    canonical_execution_file = (
+                        execution_match.group(1).strip()
+                    )
+
+            is_contract_task = (
+                "specify the exact" in canonical_title_lower
+                or "execution contract" in canonical_title_lower
+                or "define the execution contract" in canonical_title_lower
+                or "exact file content" in canonical_title_lower
+            )
+
+            is_non_executable_planning_task = (
+                canonical_title_lower.startswith("clarify ")
+                or canonical_title_lower.startswith("define ")
+                or canonical_title_lower.startswith("specify ")
+                or canonical_title_lower.startswith("design ")
+                or canonical_title_lower.startswith("plan ")
+                or canonical_title_lower.startswith("analyze ")
+                or canonical_title_lower.startswith("validate ")
+                or canonical_title_lower.startswith("verify ")
+                or canonical_title_lower.startswith("confirm ")
+                or is_contract_task
+            )
+
+            explicit_subprocess_task = (
+                "subprocess" in canonical_title_lower
+                or "subprocess" in canonical_text_lower
+                or "launches" in canonical_text_lower
+                or "launch " in canonical_text_lower
+                or "runs the script" in canonical_text_lower
+                or "run the script" in canonical_text_lower
+                or "execute the script" in canonical_text_lower
+                or "executes the script" in canonical_text_lower
+                or "invoke python" in canonical_text_lower
+                or "invokes python" in canonical_text_lower
+                or "real python subprocess" in canonical_text_lower
+            )
+
+            explicit_execution_title = (
+                canonical_title_lower.startswith("execute ")
+                or canonical_title_lower.startswith("run ")
+            )
+
+            actual_execution_task = (
+                explicit_subprocess_task
+                or (
+                    explicit_execution_title
+                    and (
+                        "script" in canonical_text_lower
+                        or "subprocess" in canonical_text_lower
+                        or "python" in canonical_text_lower
+                    )
+                )
+            )
+
+            output_persistence_task = (
+                "write captured output" in canonical_title_lower
+                or "write the captured output" in canonical_title_lower
+                or "persist captured output" in canonical_title_lower
+                or "persist the captured output" in canonical_title_lower
+                or "save captured output" in canonical_title_lower
+                or "save the captured output" in canonical_title_lower
+                or "write stdout" in canonical_text_lower
+                or "persist stdout" in canonical_text_lower
+                or "save stdout" in canonical_text_lower
+                or "output to " in canonical_title_lower
+                or "output persistence" in canonical_title_lower
+                or "output persistence" in canonical_text_lower
+                or (
+                    "persist" in canonical_text_lower
+                    and "output" in canonical_text_lower
+                )
+                or (
+                    "write" in canonical_title_lower
+                    and "output" in canonical_title_lower
+                )
+                or (
+                    "persist" in canonical_title_lower
+                    and "output" in canonical_title_lower
+                )
+                or (
+                    "save" in canonical_title_lower
+                    and "output" in canonical_title_lower
+                )
+            )
+
+            is_execution_task = bool(
+                canonical_execution_file
+                and not is_non_executable_planning_task
+                and actual_execution_task
+                and not output_persistence_task
+            )
+
+            is_output_persistence_task = bool(
+                output_persistence_task
+                and not is_execution_task
+            )
+
+            if is_execution_task:
+                canonical_task["action"] = "execute"
+                canonical_task["execution_mode"] = "hybrid"
+                canonical_task["execution_file"] = (
+                    canonical_execution_file
+                )
+
+                canonical_task["target_file"] = ""
+                canonical_task["target_files"] = []
+
+            elif is_output_persistence_task:
+                canonical_task["action"] = "implement"
+                canonical_task["execution_mode"] = "hybrid"
+                canonical_task["execution_file"] = ""
+
+                output_matches = re.findall(
+                    r"\b([A-Za-z0-9_.-]+\.txt)\b",
+                    canonical_text,
+                    flags=re.IGNORECASE,
+                )
+
+                if output_matches:
+                    canonical_output_file = output_matches[-1]
+
+                    canonical_task["target_file"] = (
+                        canonical_output_file
+                    )
+                    canonical_task["target_files"] = [
+                        canonical_output_file
+                    ]
+
+            else:
+                canonical_task["action"] = "analyze"
+                canonical_task["execution_mode"] = "ai"
+                canonical_task["execution_file"] = ""
+
+            canonical_steps = canonical_task.get("steps")
+
+            if not isinstance(canonical_steps, list):
+                continue
+
+            for canonical_step in canonical_steps:
+                if not isinstance(canonical_step, dict):
+                    continue
+
+                if is_execution_task:
+                    canonical_step["action"] = "execute"
+                    canonical_step["execution_mode"] = "hybrid"
+                    canonical_step["execution_file"] = (
+                        canonical_execution_file
+                    )
+                    canonical_step["target_file"] = ""
+                    canonical_step["target_files"] = []
+
+                elif is_output_persistence_task:
+                    canonical_step["action"] = "implement"
+                    canonical_step["execution_mode"] = "hybrid"
+                    canonical_step["execution_file"] = ""
+
+                else:
+                    canonical_step["action"] = "analyze"
+                    canonical_step["execution_mode"] = "ai"
+                    canonical_step["execution_file"] = ""
+
+        planned_tasks = normalized_tasks
+
+        # Persist the normalized task collection.
+        planned_tasks = normalized_tasks
+
+        task_id_map = {}
+        normalized_task_title_map = {}
+        pending_dependency_records = []
+        created_tasks = []
+
+        for task_index, task_spec in enumerate(
+            planned_tasks,
+            start=1,
+        ):
+            if not isinstance(task_spec, dict):
+                continue
+
+            task_title = (
+                task_spec.get("title")
+                or task_spec.get("name")
+                or f"Task {task_index}"
+            )
+
+            task_title = str(
+                task_title
+            ).strip()
+
+            planner_task_id = (
+                task_spec.get("id")
+                or task_spec.get("task_id")
+                or task_spec.get("key")
+                or task_title
+            )
+
+            planner_task_id = str(
+                planner_task_id
+            ).strip()
+
+            task_phase_key = (
+                task_spec.get("phase_id")
+                or task_spec.get("phase")
+                or task_spec.get("phase_title")
+                or task_spec.get("phase_name")
+            )
+
+            if isinstance(task_phase_key, dict):
+                task_phase_key = (
+                    task_phase_key.get("id")
+                    or task_phase_key.get("phase_id")
+                    or task_phase_key.get("title")
+                    or task_phase_key.get("name")
+                )
+
+            task_phase_key = str(task_phase_key or "").strip()
+
+            persistent_phase_id = None
+
+            # 1. Resolve an explicit planner phase ID or phase title.
+            if task_phase_key:
+                persistent_phase_id = phase_id_map.get(
+                    task_phase_key
+                )
+
+                if not persistent_phase_id:
+                    persistent_phase_id = phase_id_map.get(
+                        task_phase_key.lower()
+                    )
+
+            # 2. Resolve by task title and metadata.
+            searchable_task_text = " ".join(
+                [
+                    str(task_spec.get("title") or ""),
+                    str(task_spec.get("description") or ""),
+                    str(task_spec.get("name") or ""),
+                    str(task_spec.get("phase") or ""),
+                    str(task_spec.get("phase_title") or ""),
+                    str(task_spec.get("phase_name") or ""),
+                ]
+            ).strip().lower()
+
+            # Match explicit phase numbering in task text.
+            # Example:
+            #   "Design Phase One tasks" -> first phase
+            #   "Implement Phase Two tasks" -> second phase
+            if not persistent_phase_id and created_phases:
+                phase_number_words = {
+                    "one": 0,
+                    "two": 1,
+                    "three": 2,
+                    "four": 3,
+                    "five": 4,
+                    "six": 5,
+                    "seven": 6,
+                    "eight": 7,
+                    "nine": 8,
+                    "ten": 9,
+                }
+
+                for phase_word, phase_index in phase_number_words.items():
+                    if (
+                        f"phase {phase_word}" in searchable_task_text
+                        and phase_index < len(created_phases)
+                    ):
+                        persistent_phase_id = (
+                            created_phases[phase_index].get("id")
+                        )
+                        break
+
+            # 3. Match task text against persisted phase titles.
+            if not persistent_phase_id:
+                for created_phase in created_phases:
+                    created_phase_id = created_phase.get("id")
+                    created_phase_title = str(
+                        created_phase.get("title") or ""
+                    ).strip().lower()
+
+                    if not created_phase_id or not created_phase_title:
+                        continue
+
+                    phase_title_words = [
+                        word
+                        for word in created_phase_title.replace(
+                            "-", " "
+                        ).split()
+                        if len(word) >= 4
+                    ]
+
+                    if phase_title_words and all(
+                        word in searchable_task_text
+                        for word in phase_title_words
+                    ):
+                        persistent_phase_id = created_phase_id
+                        break
+
+            # 4. Existing semantic keyword matching.
+            if not persistent_phase_id:
+                if "foundation" in searchable_task_text:
+                    persistent_phase_id = phase_id_map.get(
+                        "phase_foundation"
+                    )
+
+                elif "delivery" in searchable_task_text:
+                    persistent_phase_id = phase_id_map.get(
+                        "phase_delivery"
+                    )
+
+                elif "deployment" in searchable_task_text:
+                    persistent_phase_id = phase_id_map.get(
+                        "phase_deployment"
+                    )
+
+                elif "testing" in searchable_task_text:
+                    persistent_phase_id = phase_id_map.get(
+                        "phase_testing"
+                    )
+
+                elif "documentation" in searchable_task_text:
+                    persistent_phase_id = phase_id_map.get(
+                        "phase_documentation"
+                    )
+
+            # Final fallback: assign unresolved tasks to a phase
+            # deterministically instead of placing every task in
+            # the first phase.
+            if not persistent_phase_id and created_phases:
+                phase_count = len(created_phases)
+
+                if phase_count == 1:
+                    fallback_phase_index = 0
+                else:
+                    tasks_per_phase = max(
+                        1,
+                        len(planned_tasks) // phase_count,
+                    )
+
+                    fallback_phase_index = min(
+                        (task_index - 1) // tasks_per_phase,
+                        phase_count - 1,
+                    )
+
+                persistent_phase_id = (
+                    created_phases[fallback_phase_index].get("id")
+                )
+
+            # Unwrap nested phase objects until only the actual
+            # persistent phase ID remains.
+            while isinstance(
+                persistent_phase_id,
+                dict,
+            ):
+                persistent_phase_id = (
+                    persistent_phase_id.get("id")
+                    or persistent_phase_id.get("phase_id")
+                    or persistent_phase_id.get("title")
+                    or persistent_phase_id.get("name")
+                    or ""
+                )
+
+            persistent_phase_id = str(
+                persistent_phase_id or ""
+            ).strip()
+
+            dependencies = (
+                task_spec.get("dependencies")
+                or task_spec.get("depends_on")
+                or []
+            )
+
+            if isinstance(
+                dependencies,
+                str,
+            ):
+                dependencies = [
+                    dependencies
+                ]
+
+            if not isinstance(
+                dependencies,
+                list,
+            ):
+                dependencies = []
+
+            if not persistent_phase_id:
+                raise RuntimeError(
+                    "Task did not contain a valid phase_id"
+                )
+
+            print(
+                "NOVA DEBUG persistent_phase_id:",
+                repr(persistent_phase_id),
+                type(persistent_phase_id).__name__,
+            )
+
+            # -----------------------------------------------------
+            # Normalize task steps before persistence.
+            # -----------------------------------------------------
+
+            task_steps = (
+                task_spec.get(
+                    "steps"
+                )
+                or []
+            )
+
+            if isinstance(
+                task_steps,
+                dict,
+            ):
+                task_steps = [
+                    task_steps
+                ]
+
+            if not isinstance(
+                task_steps,
+                list,
+            ):
+                task_steps = []
+
+            normalized_steps = []
+
+            for step_index, step_spec in enumerate(
+                task_steps,
+                start=1,
+            ):
+                if not isinstance(
+                    step_spec,
+                    dict,
+                ):
+                    continue
+
+                step = dict(
+                    step_spec
+                )
+
+                step_id = (
+                    step.get("id")
+                    or step.get("step_id")
+                    or f"{planner_task_id}-step-{step_index}"
+                )
+
+                step["id"] = str(
+                    step_id
+                ).strip()
+
+                step["task_id"] = str(
+                    planner_task_id
+                ).strip()
+
+                step["action"] = str(
+                    step.get("action")
+                    or task_spec.get("action")
+                    or "analyze"
+                ).strip().lower()
+
+                step["status"] = (
+                    step.get("status")
+                    or "pending"
+                )
+
+                normalized_steps.append(
+                    step
+                )
+
+            # If the planner supplied no executable steps, create
+            # one normalized step from the task metadata.
+            if not normalized_steps:
+                fallback_action = str(
+                    task_spec.get(
+                        "action"
+                    )
+                    or "analyze"
+                ).strip().lower()
+
+                fallback_step = {
+                    "id": (
+                        f"{planner_task_id}-step-1"
+                    ),
+                    "task_id": str(
+                        planner_task_id
+                    ).strip(),
+                    "title": task_title,
+                    "description": str(
+                        task_spec.get(
+                            "description"
+                        )
+                        or task_title
+                    ).strip(),
+                    "action": fallback_action,
+                    "status": "pending",
+
+                    "execution_file": (
+                        task_spec.get(
+                            "execution_file"
+                        )
+                        or task_spec.get(
+                            "run_file"
+                        )
+                        or task_spec.get(
+                            "script_file"
+                        )
+                        or task_spec.get(
+                            "test_script"
+                        )
+                        or task_spec.get(
+                            "test_file"
+                        )
+                        or ""
+                    ),
+
+                    "target_file": (
+                        task_spec.get(
+                            "target_file"
+                        )
+                        or ""
+                    ),
+                    "target_files": (
+                        task_spec.get(
+                            "target_files"
+                        )
+                        or []
+                    ),
+
+                    "target_function": (
+                        task_spec.get(
+                            "target_function"
+                        )
+                        or ""
+                    ),
+                    "expected_output": (
+                        task_spec.get(
+                            "expected_output"
+                        )
+                        or []
+                    ),
+                    "replacement": (
+                        task_spec.get(
+                            "replacement"
+                        )
+                        or ""
+                    ),
+                    "command": (
+                        task_spec.get(
+                            "command"
+                        )
+                        or ""
+                    ),
+                }
+
+                normalized_steps.append(
+                    fallback_step
+                )
+
+            task_steps = normalized_steps
+
+            # -----------------------------------------------------
+            # -----------------------------------------------------
+            # Normalize execution and output metadata.
+            # -----------------------------------------------------
+
+            task_title_text = str(
+                task_spec.get("title")
+                or task_title
+                or ""
+            )
+
+            task_description_text = str(
+                task_spec.get("description")
+                or ""
+            )
+
+            task_expected_output_text = str(
+                task_spec.get("expected_output")
+                or ""
+            )
+
+            task_completion_text = str(
+                task_spec.get("completion_criteria")
+                or ""
+            )
+
+            task_text = " ".join(
+                [
+                    task_title_text,
+                    task_description_text,
+                    task_expected_output_text,
+                    task_completion_text,
+                ]
+            )
+
+            execution_file = (
+                task_spec.get("execution_file")
+                or task_spec.get("run_file")
+                or task_spec.get("script_file")
+                or task_spec.get("test_script")
+                or task_spec.get("test_file")
+                or ""
+            )
+
+            # Recover execution metadata from normalized task steps
+            # when the planner placed it on a step instead of the task.
+            if not execution_file and isinstance(task_steps, list):
+                for normalized_step in task_steps:
+                    if not isinstance(normalized_step, dict):
+                        continue
+
+                    execution_file = (
+                        normalized_step.get("execution_file")
+                        or normalized_step.get("run_file")
+                        or normalized_step.get("script_file")
+                        or normalized_step.get("test_script")
+                        or normalized_step.get("test_file")
+                        or ""
+                    )
+
+                    if execution_file:
+                        break
+
+            task_text_lower = task_text.lower()
+            task_title_lower = task_title_text.lower()
+
+            is_execution_task = (
+                task_title_lower.startswith("execute ")
+                or task_title_lower.startswith("run ")
+                or task_title_lower.startswith("implement script execution")
+                or "execute " in task_title_lower
+                or "run " in task_title_lower
+                or "script execution" in task_text_lower
+                or "execution metadata" in task_text_lower
+                or "capture output" in task_text_lower
+                or "standard output" in task_text_lower
+            )
+
+            is_output_persistence_task = (
+                "write captured output" in task_title_lower
+                or "persist captured output" in task_title_lower
+                or "save captured output" in task_title_lower
+                or "output to " in task_title_lower
+            )
+
+            if is_output_persistence_task:
+                is_execution_task = False
+                execution_file = ""
+
+            if is_execution_task:
+                execution_match = re.search(
+
+                    r"\b([A-Za-z0-9_.-]+\.py)\b",
+                    task_title_text,
+                    flags=re.IGNORECASE,
+                )
+
+                if not execution_match:
+                    execution_match = re.search(
+                        r"\b([A-Za-z0-9_.-]+\.py)\b",
+                        task_text,
+                        flags=re.IGNORECASE,
+                    )
+
+                if execution_match:
+                    execution_file = (
+                        execution_match.group(1).strip()
+                    )
+
+            target_file = (
+                task_spec.get("target_file")
+                or ""
+            )
+
+            target_files = (
+                task_spec.get("target_files")
+                or []
+            )
+
+            # -----------------------------------------------------
+            # Final execution/output metadata normalization.
+            # -----------------------------------------------------
+
+            normalized_action = str(
+                task_spec.get("action") or ""
+            ).strip().lower()
+
+            normalized_execution_mode = str(
+                task_spec.get("execution_mode") or ""
+            ).strip().lower()
+
+            final_task_title = str(
+                task_title
+                or task_spec.get("title")
+                or ""
+            ).strip()
+
+            final_task_text = " ".join(
+                [
+                    final_task_title,
+                    task_text,
+                    str(task_spec.get("description") or ""),
+                    str(task_spec.get("expected_output") or ""),
+                    str(task_spec.get("completion_criteria") or ""),
+                ]
+            )
+
+            final_task_title_lower = final_task_title.lower()
+            final_task_text_lower = final_task_text.lower()
+
+            final_is_execution_task = bool(
+                execution_file
+                and (
+                    final_task_title_lower.startswith("execute ")
+                    or final_task_title_lower.startswith("run ")
+                    or "script execution" in final_task_title_lower
+                    or "capture output" in final_task_title_lower
+                    or "standard output" in final_task_text_lower
+                    or "execute " in final_task_title_lower
+                    or "run " in final_task_title_lower
+                )
+            )
+
+            if final_is_execution_task:
+                normalized_action = "execute"
+                normalized_execution_mode = "hybrid"
+
+                output_matches = re.findall(
+                    r"\b([A-Za-z0-9_.-]+\.(?:txt|json|csv|md|log|out|xml|yaml|yml))\b",
+                    final_task_text,
+                    flags=re.IGNORECASE,
+                )
+
+                output_matches = [
+                    value
+                    for value in output_matches
+                    if value.lower() != execution_file.lower()
+                ]
+
+                if output_matches:
+                    target_file = output_matches[-1]
+                    target_files = [target_file]
+
+                elif target_file and (
+                    target_file.lower() == execution_file.lower()
+                ):
+                    # Do not use the executable itself as the output
+                    # artifact when no distinct output file was found.
+                    target_file = ""
+                    target_files = []
+
+            else:
+                if normalized_execution_mode not in {
+                    "ai",
+                    "hybrid",
+                    "manual",
+                    "system",
+                }:
+                    normalized_execution_mode = ""
+
+            # Output-persistence tasks are implementation tasks, not
+            # executable tasks.
+            if (
+                "write captured output" in final_task_title_lower
+                or "persist captured output" in final_task_title_lower
+                or "save captured output" in final_task_title_lower
+                or "output to " in final_task_title_lower
+            ):
+                normalized_action = "implement"
+                normalized_execution_mode = (
+                    normalized_execution_mode or "hybrid"
+                )
+                execution_file = ""
+
+            # -----------------------------------------------------
+            # Enforce execution metadata at the final persistence
+            # boundary. Planner-provided values are not authoritative.
+            # -----------------------------------------------------
+
+            normalized_execution_mode = str(
+                task_spec.get("execution_mode") or ""
+            ).strip().lower()
+
+            if is_execution_task and execution_file:
+                normalized_action = "execute"
+                normalized_execution_mode = "hybrid"
+            elif normalized_execution_mode not in {
+                "ai",
+                "hybrid",
+                "manual",
+                "system",
+            }:
+                normalized_execution_mode = ""
+
+            if is_output_persistence_task:
+                normalized_action = "implement"
+                normalized_execution_mode = (
+                    normalized_execution_mode
+                    or "hybrid"
+                )
+
+
+            # Persist the task.
+            # -----------------------------------------------------
+
             created_task = (
+
                 self.project_workspace_service.add_task(
-                    project_id=resolved_project_id,
+                    project_id=project_id,
                     title=task_title,
-                    priority=task_spec.get(
-                        "priority",
-                        "medium",
+                    priority=(
+                        task_spec.get(
+                            "priority"
+                        )
+                        or "medium"
                     ),
-                    description=task_description,
-                    action=task_action,
-
-                    execution_mode=task_spec.get(
-                        "execution_mode",
-                        "",
+                    description=(
+                        task_spec.get(
+                            "description"
+                        )
+                        or ""
                     ),
 
+
+                    action=normalized_action,
+                    execution_mode=normalized_execution_mode,
+
+                    execution_file=execution_file,
                     target_file=target_file,
-
-                    target_files=task_spec.get(
-                        "target_files",
-                        [],
+                    target_files=target_files,
+                    target_function=(
+                        task_spec.get(
+                            "target_function"
+                        )
+                        or ""
                     ),
-
-                    target_function=task_spec.get(
-                        "target_function",
-                        "",
+                    dependencies=dependencies,
+                    expected_output=(
+                        task_spec.get(
+                            "expected_output"
+                        )
+                        or ""
                     ),
-
-                    dependencies=task_spec.get(
-                        "dependencies",
-                        [],
+                    completion_criteria=(
+                        task_spec.get(
+                            "completion_criteria"
+                        )
+                        or []
                     ),
+                    phase_id=persistent_phase_id,
 
-                    expected_output=task_spec.get(
-                        "expected_output",
-                        "",
+                    steps=task_steps,
+
+                    content=(
+                        task_spec.get(
+                            "content"
+                        )
+                        or ""
                     ),
-
-                    completion_criteria=task_spec.get(
-                        "completion_criteria",
-                        [],
+                    code=(
+                        task_spec.get(
+                            "code"
+                        )
+                        or ""
                     ),
-
-                    content=task_spec.get(
-                        "content",
-                        "",
+                    replacement=(
+                        task_spec.get(
+                            "replacement"
+                        )
+                        or ""
                     ),
-
-                    code=task_spec.get(
-                        "code",
-                        "",
-                    ),
-
-                    replacement=task_spec.get(
-                        "replacement",
-                        "",
-                    ),
-
-                    command=task_spec.get(
-                        "command",
-                        "",
+                    command=(
+                        task_spec.get(
+                            "command"
+                        )
+                        or ""
                     ),
                 )
             )
 
-            if created_task:
+            if isinstance(
+                created_task,
+                dict,
+            ):
+                persistent_task_id = (
+                    created_task.get("id")
+                    or created_task.get("task_id")
+                    or created_task.get("key")
+                )
+            else:
+                persistent_task_id = created_task
 
-                created_tasks.append(
-                    created_task
+            if not persistent_task_id:
+                raise RuntimeError(
+                    "Created task did not contain an id"
                 )
 
-                existing_titles.add(
-                    normalized_title
+            persistent_task_id = str(
+                persistent_task_id
+            ).strip()
+
+            task_id_map[
+                planner_task_id
+            ] = persistent_task_id
+
+            normalized_task_title_map[
+                self._normalize_task_reference(
+                    task_title
+                )
+            ] = persistent_task_id
+
+            created_tasks.append(
+                {
+                    "id": persistent_task_id,
+                    "planner_id": planner_task_id,
+                    "title": task_title,
+                    "phase_id": persistent_phase_id,
+                    "priority": (
+                        task_spec.get(
+                            "priority"
+                        )
+                        or "medium"
+                    ),
+                    "status": (
+                        created_task.get(
+                            "status",
+                            "open",
+                        )
+                        if isinstance(
+                            created_task,
+                            dict,
+                        )
+                        else "open"
+                    ),
+                }
+            )
+
+            if dependencies:
+                pending_dependency_records.append(
+                    {
+                        "task_id": persistent_task_id,
+                        "dependencies": dependencies,
+                    }
                 )
 
-        if skipped_existing_tasks:
+        project = self.project_workspace_service.get_project(
+            project_id
+        )
 
-            print(
-                "[NOVA PROJECT BUILDER] "
-                f"Preserved {len(skipped_existing_tasks)} "
-                "existing matching tasks.",
-                flush=True,
+        if not isinstance(project, dict):
+            raise RuntimeError(
+                "Project workspace could not retrieve project "
+                f"for project_id={project_id!r}"
             )
 
-        if created_tasks:
+        persisted_tasks = project.get(
+            "tasks",
+            []
+        )
 
-            print(
-                "[NOVA PROJECT BUILDER] "
-                f"Added {len(created_tasks)} new tasks.",
-                flush=True,
+        dependency_map = {
+            str(
+                persisted_task.get("id") or ""
+            ).strip(): list(
+                persisted_task.get("dependencies") or []
             )
+            for persisted_task in persisted_tasks
+            if isinstance(
+                persisted_task,
+                dict,
+            )
+            and persisted_task.get("id")
+        }
+
+        for dependency_record in pending_dependency_records:
+            persistent_task_id = dependency_record.get(
+                "task_id"
+            )
+
+            persistent_task_id = str(
+                persistent_task_id or ""
+            ).strip()
+
+            resolved_dependencies = []
+
+            for dependency_reference in (
+                dependency_record.get(
+                    "dependencies"
+                )
+                or []
+            ):
+                dependency_reference = str(
+                    dependency_reference or ""
+                ).strip()
+
+                if not dependency_reference:
+                    continue
+
+                resolved_dependency_id = (
+                    task_id_map.get(
+                        dependency_reference
+                    )
+                )
+
+                if not resolved_dependency_id:
+                    resolved_dependency_id = (
+                        task_id_map.get(
+                            dependency_reference.lower()
+                        )
+                    )
+
+                if not resolved_dependency_id:
+                    normalized_reference = (
+                        self._normalize_task_reference(
+                            dependency_reference
+                        )
+                    )
+
+                    resolved_dependency_id = (
+                        normalized_task_title_map.get(
+                            normalized_reference
+                        )
+                    )
+
+                if resolved_dependency_id:
+                    resolved_dependencies.append(
+                        resolved_dependency_id
+                    )
+
+            dependency_map[persistent_task_id] = (
+                resolved_dependencies
+            )
+
+        for persisted_task in persisted_tasks:
+            if not isinstance(
+                persisted_task,
+                dict,
+            ):
+                continue
+
+            persisted_task_id = str(
+                persisted_task.get("id") or ""
+            ).strip()
+
+            if persisted_task_id in dependency_map:
+                persisted_task["dependencies"] = (
+                    dependency_map[persisted_task_id]
+                )
+
+        self.project_workspace_service.update_project_tasks(
+            project_id=project_id,
+            tasks=persisted_tasks,
+        )
+
+        project = self.project_workspace_service.get_project(
+            project_id
+        )
+
         self._update_project_brain(
-            project_id=resolved_project_id,
+            project_id=project_id,
             plan=plan,
         )
 
-        self.project_workspace_service.add_activity(
-            project_id=resolved_project_id,
-            action="project_built",
-            details=clean_request,
-        )
-
-        final_project = (
-            self.project_workspace_service.get_project(
-                resolved_project_id
-            )
+        print(
+            "[NOVA PROJECT BUILDER] "
+            f"Created {len(created_phases)} phases and "
+            f"{len(created_tasks)} tasks."
         )
 
         return {
-            "project_id": resolved_project_id,
-            "project": final_project,
+            "project_id": project_id,
+            "project": project,
             "plan": plan,
+            "phases": created_phases,
             "tasks": created_tasks,
         }
 
@@ -429,6 +2003,98 @@ class ProjectBuilderService:
 
                     task = dict(task)
 
+                    task_title = str(
+                        task.get(
+                            "title",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+
+                    task_description = str(
+                        task.get(
+                            "description",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+
+                    task_text = " ".join(
+                        [
+                            task_title,
+                            task_description,
+                        ]
+                    )
+
+                    task_title_lower = task_title.lower()
+                    task_text_lower = task_text.lower()
+
+                    is_execution_task = (
+                        task_title_lower.startswith("execute ")
+                        or task_title_lower.startswith("run ")
+                        or task_title_lower.startswith(
+                            "implement script execution"
+                        )
+                        or "script execution" in task_text_lower
+                        or "execution metadata" in task_text_lower
+                        or "capture output" in task_text_lower
+                        or "standard output" in task_text_lower
+                    )
+
+                    is_output_persistence_task = (
+                        "write captured output" in task_title_lower
+                        or "persist captured output" in task_title_lower
+                        or "save captured output" in task_title_lower
+                        or "output to " in task_title_lower
+                    )
+
+                    if is_output_persistence_task:
+                        is_execution_task = False
+                        task["execution_file"] = ""
+                        task["action"] = "implement"
+                    else:
+                        execution_file = str(
+                            task.get(
+                                "execution_file",
+                                "",
+                            )
+                            or task.get(
+                                "run_file",
+                                "",
+                            )
+                            or task.get(
+                                "script_file",
+                                "",
+                            )
+                            or task.get(
+                                "test_script",
+                                "",
+                            )
+                            or task.get(
+                                "test_file",
+                                "",
+                            )
+                            or ""
+                        ).strip()
+
+                        if is_execution_task:
+                            execution_match = re.search(
+                                r"\b([A-Za-z0-9_.-]+\.py)\b",
+                                task_title,
+                                flags=re.IGNORECASE,
+                            )
+
+                            if execution_match:
+                                execution_file = (
+                                    execution_match.group(1).strip()
+                                )
+
+                            task["action"] = "execute"
+                            task["execution_mode"] = "hybrid"
+
+                        task["execution_file"] = execution_file
+
+
                     target_file = str(
                         task.get(
                             "target_file",
@@ -438,26 +2104,6 @@ class ProjectBuilderService:
                     ).strip()
 
                     if not target_file:
-
-                        task_text = " ".join(
-                            [
-                                str(
-                                    task.get(
-                                        "title",
-                                        "",
-                                    )
-                                    or ""
-                                ),
-                                str(
-                                    task.get(
-                                        "description",
-                                        "",
-                                    )
-                                    or ""
-                                ),
-                            ]
-                        )
-
                         file_match = re.search(
                             r"\b[\w./-]+\.(?:py|md|txt|json|js|html|css|yaml|yml)\b",
                             task_text,
@@ -1872,6 +3518,26 @@ class ProjectBuilderService:
             )
 
             return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

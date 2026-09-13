@@ -1,0 +1,4 @@
+﻿{
+    "name": "Nova Phase Count Verification",
+    "description": "Verify phase persistence and task assignment after duplicate phase append fix"
+}

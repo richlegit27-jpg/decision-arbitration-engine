@@ -739,6 +739,16 @@ idea through planning, execution, adaptation, and completion.
                 )
             ),
 
+            "phases": self._normalize_milestones(
+                plan.get(
+                    "phases",
+                    plan.get(
+                        "milestones",
+                        [],
+                    ),
+                )
+            ),
+
             "tasks": normalized_tasks,
 
             "next_actions": self._string_list(

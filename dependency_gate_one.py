@@ -1,0 +1,1 @@
+VALUE_ONE = "ONE"

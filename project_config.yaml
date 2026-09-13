@@ -1,0 +1,15 @@
+name: nova-runtime-test
+version: 0.1.0
+description: A minimal Nova project for runtime test
+tasks:
+  run:
+    type: exec
+    command: ./bin/runtime-test
+directories:
+  src: src
+  bin: bin
+  lib: lib
+settings:
+  language: nova
+  runtime: native
+  build_tool: none

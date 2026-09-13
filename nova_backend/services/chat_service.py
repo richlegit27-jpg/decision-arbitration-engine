@@ -342,6 +342,7 @@ class ChatService:
                 tool_executor=self.tool_executor,
             )
         )
+
         self.decision_service = DecisionService(
             self
         )
@@ -506,6 +507,33 @@ class ChatService:
                 tool_executor=self.tool_executor,
             )
         )
+
+        # The project execution handler is the authoritative handler for
+        # project plans, dependency gating, and step execution.
+        #
+        # Import locally to avoid module-level circular imports.
+        from nova_backend.services.project_execution_handler import (
+            ProjectExecutionHandler,
+        )
+
+        self.project_execution_handler = (
+            ProjectExecutionHandler(
+                default_executor=self.default_executor,
+                execution_step_service=self.execution_step_service,
+            )
+        )
+
+        # Keep the generic handler's service reference available for any
+        # legacy execution paths that still use it.
+        self.execution_handler.execution_step_service = (
+            self.execution_step_service
+        )
+
+        # The shared ChatExecutionService must use the project handler.
+        if self.chat_execution_service is not None:
+            self.chat_execution_service.execution_handler = (
+                self.project_execution_handler
+            )
 
         self.execution_engine = (
             ExecutionEngine(
@@ -773,6 +801,7 @@ class ChatService:
         requested_model = str(
             requested_model or ""
         ).strip()
+
         # ==================================================
         # PRIMARY ROUTE DECISION
         # Classify before any project/mission orchestration.
@@ -11956,24 +11985,6 @@ Rules:
         requested_model: str | None = None,
     ) -> str:
 
-        
-        print(
-            "[NOVA MODEL PIPELINE]",
-            {
-                "requested_model": requested_model,
-                "decision_model": (
-                    decision.get("model")
-                    if isinstance(decision, dict)
-                    else None
-                ),
-                "default_chat_model": getattr(
-                    self,
-                    "chat_model",
-                    None,
-                ),
-            },
-            flush=True,
-        )
         prompt = self._build_chat_input(
             user_text=user_text,
             decision=decision,
@@ -13658,10 +13669,6 @@ def _create_model_response(self, model_messages):
         model=self.chat_model,
         input=model_messages,
     )
-
-
-
-
 
 
 

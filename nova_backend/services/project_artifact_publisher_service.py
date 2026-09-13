@@ -281,13 +281,71 @@ class ProjectArtifactPublisherService:
 
         return file_record
 
+    def _resolve_execution_file(
+        self,
+        result,
+        target_file=None,
+    ):
+        if not isinstance(result, dict):
+            return None
+
+        records = result.get("files")
+
+        if not isinstance(records, list):
+            return None
+
+        target_name = Path(
+            str(target_file or "")
+        ).name.lower()
+
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+
+            if record.get("written") is not True:
+                continue
+
+            file_path = str(
+                record.get("file_path")
+                or ""
+            ).strip()
+
+            if not file_path:
+                continue
+
+            source = Path(file_path).expanduser().resolve()
+
+            if not source.is_file():
+                continue
+
+            try:
+                if source.stat().st_size <= 0:
+                    continue
+            except Exception:
+                continue
+
+            if (
+                target_name
+                and source.name.lower() != target_name
+            ):
+                continue
+
+            return source
+
+        return None
+
     def _publish_existing_file(
         self,
         project_id,
         target_file,
+        source_override=None,
     ):
-        source = self._resolve_sandbox_file(
-            target_file
+        source = (
+            source_override
+            if source_override is not None
+            else self._resolve_sandbox_file(
+                target_file
+            )
         )
 
         if source is None:
@@ -441,6 +499,35 @@ class ProjectArtifactPublisherService:
             )
 
             return None
+
+        execution_source = (
+            self._resolve_execution_file(
+                result,
+                target_file,
+            )
+        )
+
+        if execution_source is not None:
+            file_artifact = (
+                self._publish_existing_file(
+                    project_id,
+                    target_file,
+                    source_override=execution_source,
+                )
+            )
+
+            if file_artifact:
+                print(
+                    "[PROJECT ARTIFACT PUBLISHED FROM EXECUTION RESULT]",
+                    {
+                        "project_id": project_id,
+                        "target_file": target_file,
+                        "source": str(execution_source),
+                    },
+                    flush=True,
+                )
+
+                return file_artifact
 
         source = self._resolve_sandbox_file(
             target_file

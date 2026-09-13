@@ -40,11 +40,9 @@ class NovaBehaviorMemory:
                 with open(
                     BEHAVIOR_MEMORY_PATH,
                     "r",
-                    encoding="utf-8"
+                    encoding="utf-8-sig"
                 ) as file:
-
                     data = json.load(file)
-
 
                 if isinstance(data, list):
 

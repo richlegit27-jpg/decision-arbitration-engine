@@ -329,6 +329,103 @@
     }
 
     async function run(command) {
+        const activeProjectId =
+            window.__NOVA_PROJECT_STATE &&
+            window.__NOVA_PROJECT_STATE.activeProjectId;
+
+        const projectExecution =
+            window.NovaDesktopProjects;
+
+        const action =
+            getActionFromCommand(command);
+
+        /*
+         * PROJECT EXECUTION PATH
+         *
+         * When a project is active, Continue and Run
+         * must operate on the project workflow.
+         *
+         * Do not send these commands through the
+         * generic chat/execution stream.
+         */
+        if (
+            activeProjectId &&
+            projectExecution &&
+            (
+                action === "continue" ||
+                action === "run"
+            )
+        ) {
+            console.log(
+                "[Nova Execution] Delegating to active project:",
+                {
+                    projectId:
+                        activeProjectId,
+
+                    action,
+                }
+            );
+
+            try {
+                if (
+                    action === "continue" &&
+                    typeof projectExecution.continueProject ===
+                        "function"
+                ) {
+                    await projectExecution.continueProject(
+                        activeProjectId
+                    );
+
+                    return;
+                }
+
+                if (
+                    action === "run" &&
+                    typeof projectExecution.runAllProject ===
+                        "function"
+                ) {
+                    await projectExecution.runAllProject(
+                        activeProjectId
+                    );
+
+                    return;
+                }
+
+                console.error(
+                    "[Nova Execution] Project execution function unavailable:",
+                    action
+                );
+
+            } catch (error) {
+                console.error(
+                    "[Nova Execution] Project execution failed:",
+                    error
+                );
+
+                execution.state = {
+                    ...(
+                        execution.state ||
+                        {}
+                    ),
+
+                    status: "error",
+
+                    error:
+                        error?.message ||
+                        "Project execution failed.",
+                };
+
+                render();
+            }
+
+            return;
+        }
+
+        /*
+         * GENERIC EXECUTION PATH
+         *
+         * Used when there is no active project.
+         */
         if (execution.isRunning) {
             console.warn(
                 "[Nova Execution] already running"
@@ -339,7 +436,8 @@
 
         if (
             !Nova.api ||
-            typeof Nova.api.streamExecution !== "function"
+            typeof Nova.api.streamExecution !==
+                "function"
         ) {
             console.error(
                 "[Nova Execution] streamExecution API unavailable"
@@ -347,9 +445,6 @@
 
             return;
         }
-
-        const action =
-            getActionFromCommand(command);
 
         const currentState =
             normalizeState(
@@ -550,7 +645,7 @@
         }
     }
 
-    function stop() {
+    function stop(){
         if (
             execution.abortController
         ) {

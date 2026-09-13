@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
@@ -26,28 +26,52 @@ project_builder_service = ProjectBuilderService(
     project_workspace_service
 )
 
-
 def register_project_routes(
     app,
     chat_execution_service=None,
+    project_execution_controller=None,
 ):
-    project_execution_controller = (
-        ProjectExecutionController(
-            project_workspace_service=(
-                project_workspace_service
-            ),
-            chat_execution_service=(
-                chat_execution_service
-            ),
+    if project_execution_controller is None:
+        project_execution_controller = (
+            ProjectExecutionController(
+                project_workspace_service=(
+                    project_workspace_service
+                ),
+                chat_execution_service=(
+                    chat_execution_service
+                ),
+            )
         )
+
+    @project_bp.route(
+        "/api/projects/<project_id>/reset",
+        methods=["POST"],
     )
+    def reset_project_execution(project_id):
+        result = (
+            project_execution_controller
+            .reset_execution_state(project_id)
+        )
+
+        if result is None:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Project not found",
+                }
+            ), 404
+
+        return jsonify(
+            {
+                "ok": True,
+                **result,
+            }
+        )
 
     @project_bp.route(
         "/api/projects/build",
         methods=["POST"],
     )
-
-
     def build_project():
         data = request.get_json(
             silent=True
@@ -83,7 +107,6 @@ def register_project_routes(
                 .build_project_from_request(
                     user_text=project_request,
                     owner_id=owner_id,
-                    project_id=project_id,
                 )
             )
 
@@ -98,13 +121,14 @@ def register_project_routes(
             ), 400
 
         except Exception as exc:
+            import traceback
+
+            traceback.print_exc()
+
             return jsonify(
                 {
                     "ok": False,
-                    "error": (
-                        "Project build failed: "
-                        f"{exc}"
-                    ),
+                    "error": f"Project build failed: {exc}",
                 }
             ), 500
 
@@ -455,32 +479,72 @@ def register_project_routes(
         task = (
             project_workspace_service
             .add_task(
-                project_id,
-                data.get(
+                project_id=project_id,
+                title=data.get(
                     "title",
                     "New Task",
                 ),
-                data.get(
+                priority=data.get(
                     "priority",
                     "medium",
                 ),
-                data.get(
+                description=data.get(
                     "description",
                     "",
                 ),
-                data.get(
+                action=data.get(
                     "action",
                     "",
                 ),
-                data.get(
+                execution_mode=data.get(
+                    "execution_mode",
+                    "",
+                ),
+                target_file=data.get(
                     "target_file",
                     "",
                 ),
-                data.get(
+                target_files=data.get(
+                    "target_files",
+                    [],
+                ),
+                target_function=data.get(
+                    "target_function",
+                    "",
+                ),
+                dependencies=data.get(
+                    "dependencies",
+                    [],
+                ),
+                expected_output=data.get(
+                    "expected_output",
+                    "",
+                ),
+                completion_criteria=data.get(
+                    "completion_criteria",
+                    [],
+                ),
+                phase_id=data.get(
+                    "phase_id",
+                    "",
+                ),
+                steps=data.get(
+                    "steps",
+                    [],
+                ),
+                content=data.get(
                     "content",
                     "",
                 ),
-                data.get(
+                code=data.get(
+                    "code",
+                    "",
+                ),
+                replacement=data.get(
+                    "replacement",
+                    "",
+                ),
+                command=data.get(
                     "command",
                     "",
                 ),
@@ -501,7 +565,6 @@ def register_project_routes(
                 "task": task,
             }
         )
-
     @project_bp.route(
         "/api/projects/<project_id>/tasks/<task_id>",
         methods=["DELETE"],
@@ -610,9 +673,29 @@ def register_project_routes(
                 }
             ), 404
 
+        execution = (
+            result.get("execution")
+            or result.get("execution_state")
+            or {}
+        )
+
+        execution_status = str(
+            execution.get("status")
+            or ""
+        ).strip().lower()
+
+        ok = (
+            execution_status
+            not in {
+                "failed",
+                "error",
+                "blocked",
+            }
+        )
+
         return jsonify(
             {
-                "ok": True,
+                "ok": ok,
                 **result,
             }
         )
@@ -674,6 +757,12 @@ def register_project_routes(
         )
 
     app.register_blueprint(project_bp)
+
+
+
+
+
+
 
 
 

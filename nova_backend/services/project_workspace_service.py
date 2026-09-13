@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import uuid
@@ -39,28 +39,6 @@ class ProjectWorkspaceService:
         self,
         project,
     ):
-        current_owner_id = (
-            self._current_owner_id()
-        )
-
-        if not current_owner_id:
-            return False
-
-        project_owner_id = str(
-            project.get(
-                "owner_id",
-                "",
-            ) or ""
-        ).strip()
-
-        if not project_owner_id:
-            return False
-
-        return (
-            project_owner_id
-            == str(current_owner_id).strip()
-        )
-
         current_owner_id = self._current_owner_id()
 
         project_owner_id = str(
@@ -82,7 +60,7 @@ class ProjectWorkspaceService:
 
         return project_owner_id == str(
             current_owner_id
-        )
+        ).strip()
 
     def _refresh_project_brain_state(
         self,
@@ -112,6 +90,8 @@ class ProjectWorkspaceService:
         ):
             brain = {}
 
+        project["brain"] = brain
+
         tasks = project.get(
             "tasks",
             [],
@@ -127,6 +107,8 @@ class ProjectWorkspaceService:
 
         completed_tasks = []
         active_tasks = []
+        failed_tasks = []
+        blocked_tasks = []
         pending_tasks = []
 
         active_statuses = {
@@ -134,12 +116,36 @@ class ProjectWorkspaceService:
             "in progress",
             "active",
             "running",
+            "executing",
         }
 
         completed_statuses = {
             "completed",
             "complete",
             "done",
+            "success",
+        }
+
+        failed_statuses = {
+            "failed",
+            "failure",
+            "error",
+        }
+
+        blocked_statuses = {
+            "blocked",
+            "waiting",
+        }
+
+        pending_statuses = {
+            "",
+            "open",
+            "pending",
+            "planned",
+            "queued",
+            "ready",
+            "not_started",
+            "not started",
         }
 
         for task in tasks:
@@ -169,6 +175,24 @@ class ProjectWorkspaceService:
                     task
                 )
 
+            elif status in failed_statuses:
+
+                failed_tasks.append(
+                    task
+                )
+
+            elif status in blocked_statuses:
+
+                blocked_tasks.append(
+                    task
+                )
+
+            elif status in pending_statuses:
+
+                pending_tasks.append(
+                    task
+                )
+
             else:
 
                 pending_tasks.append(
@@ -181,6 +205,14 @@ class ProjectWorkspaceService:
 
         active_count = len(
             active_tasks
+        )
+
+        failed_count = len(
+            failed_tasks
+        )
+
+        blocked_count = len(
+            blocked_tasks
         )
 
         pending_count = len(
@@ -206,11 +238,15 @@ class ProjectWorkspaceService:
             title = str(
                 task.get(
                     "title",
-                    "",
+                    task.get(
+                        "name",
+                        "",
+                    ),
                 )
             ).strip()
 
             if title:
+
                 current_focus.append(
                     title
                 )
@@ -222,7 +258,10 @@ class ProjectWorkspaceService:
                 title = str(
                     task.get(
                         "title",
-                        "",
+                        task.get(
+                            "name",
+                            "",
+                        ),
                     )
                 ).strip()
 
@@ -235,28 +274,52 @@ class ProjectWorkspaceService:
                 if len(
                     current_focus
                 ) >= 5:
+
                     break
 
         next_actions = []
 
-        for task in active_tasks + pending_tasks:
+        prioritized_task_groups = [
+            failed_tasks,
+            blocked_tasks,
+            active_tasks,
+            pending_tasks,
+        ]
 
-            title = str(
-                task.get(
-                    "title",
-                    "",
+        for task_group in prioritized_task_groups:
+
+            for task in task_group:
+
+                if not isinstance(
+                    task,
+                    dict,
+                ):
+                    continue
+
+                title = str(
+                    task.get(
+                        "title",
+                        task.get(
+                            "name",
+                            "",
+                        ),
+                    ),
+                ).strip()
+
+                if not title:
+                    continue
+
+                if title in next_actions:
+                    continue
+
+                next_actions.append(
+                    title
                 )
-            ).strip()
 
-            if not title:
-                continue
-
-            if title in next_actions:
-                continue
-
-            next_actions.append(
-                title
-            )
+                if len(
+                    next_actions
+                ) >= 5:
+                    break
 
             if len(
                 next_actions
@@ -303,10 +366,135 @@ class ProjectWorkspaceService:
                     filename
                 )
 
+        execution_state = project.get(
+            "execution",
+            {},
+        )
+
+        if not isinstance(
+            execution_state,
+            dict,
+        ):
+            execution_state = {}
+
+        execution_status = str(
+            execution_state.get(
+                "status",
+                "",
+            )
+        ).strip().lower()
+
+        current_project_status = str(
+            project.get(
+                "status",
+                "",
+            )
+        ).strip().lower()
+
+        if execution_status in {
+            "failed",
+            "failure",
+            "error",
+        }:
+
+            project_status = "failed"
+
+        elif execution_status == "blocked":
+
+            project_status = "blocked"
+
+        elif execution_status in {
+            "completed",
+            "complete",
+            "done",
+            "success",
+        }:
+
+            project_status = "completed"
+
+        elif failed_count > 0:
+
+            project_status = "failed"
+
+        elif blocked_count > 0:
+
+            project_status = "blocked"
+
+        elif total_tasks == 0:
+
+            project_status = "not_started"
+
+        elif completed_count == total_tasks:
+
+            project_status = "completed"
+
+        elif active_count > 0:
+
+            project_status = "in_progress"
+
+        elif current_project_status in {
+            "failed",
+            "failure",
+            "error",
+            "blocked",
+            "completed",
+            "complete",
+            "done",
+        }:
+
+            project_status = current_project_status
+
+        else:
+
+            project_status = "pending"
+
+        project["status"] = project_status
+
+        health_status = "healthy"
+
+        if (
+            execution_status in {
+                "failed",
+                "failure",
+                "error",
+            }
+            or failed_count > 0
+        ):
+
+            health_status = "failed"
+
+        elif (
+            execution_status == "blocked"
+            or blocked_count > 0
+        ):
+
+            health_status = "blocked"
+
+        elif (
+            active_count > 0
+            or execution_status in {
+                "running",
+                "active",
+                "in_progress",
+                "in progress",
+            }
+        ):
+
+            health_status = "in_progress"
+
+        elif (
+            total_tasks > 0
+            and completed_count == total_tasks
+        ):
+
+            health_status = "completed"
+
         brain["current_state"] = {
             "total_tasks": total_tasks,
             "completed_tasks": completed_count,
             "in_progress_tasks": active_count,
+            "failed_tasks": failed_count,
+            "blocked_tasks": blocked_count,
             "pending_tasks": pending_count,
             "completion_percentage": (
                 completion_percentage
@@ -322,15 +510,77 @@ class ProjectWorkspaceService:
             next_actions
         )
 
-        # ----------------------------------------------------------
-        # PROJECT HEALTH INTELLIGENCE
-        # ----------------------------------------------------------
+        brain["health"] = {
+            "status": health_status,
+            "project_status": project_status,
+            "execution_status": execution_status,
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_count,
+            "in_progress_tasks": active_count,
+            "failed_tasks": failed_count,
+            "blocked_tasks": blocked_count,
+            "pending_tasks": pending_count,
+        }
+
+        brain["planning_summary"] = (
+            f"Tasks: {total_tasks} total, "
+            f"{active_count} active, "
+            f"{completed_count} completed, "
+            f"{failed_count} failed, "
+            f"{blocked_count} blocked, "
+            f"{pending_count} pending. "
+            f"Project status: {project_status}."
+        )
 
         project_health = "not_started"
         attention_required = False
         insights = []
 
-        if total_tasks == 0:
+        if (
+            execution_status in {
+                "failed",
+                "failure",
+                "error",
+            }
+            or failed_count > 0
+        ):
+
+            project_health = "failed"
+            attention_required = True
+
+            insights.append(
+                "Project execution has failed."
+            )
+
+            if failed_count > 0:
+
+                insights.append(
+                    f"{failed_count} task"
+                    f"{' has' if failed_count == 1 else 's have'} "
+                    "failed."
+                )
+
+        elif (
+            execution_status == "blocked"
+            or blocked_count > 0
+        ):
+
+            project_health = "blocked"
+            attention_required = True
+
+            insights.append(
+                "Project execution is blocked."
+            )
+
+            if blocked_count > 0:
+
+                insights.append(
+                    f"{blocked_count} task"
+                    f"{' is' if blocked_count == 1 else 's are'} "
+                    "blocked."
+                )
+
+        elif total_tasks == 0:
 
             project_health = "not_started"
 
@@ -346,41 +596,39 @@ class ProjectWorkspaceService:
                 "All project tasks are complete."
             )
 
-        else:
+        elif active_count > 0:
 
-            if active_count > 0:
+            project_health = "on_track"
 
-                project_health = "on_track"
+            insights.append(
+                f"{active_count} task"
+                f"{' is' if active_count == 1 else 's are'} "
+                "currently in progress."
+            )
 
-                insights.append(
-                    f"{active_count} task"
-                    f"{' is' if active_count == 1 else 's are'} "
-                    "currently in progress."
-                )
+        elif pending_count > 0:
 
-            elif pending_count > 0:
+            project_health = "needs_attention"
+            attention_required = True
 
-                project_health = "needs_attention"
-                attention_required = True
+            insights.append(
+                "No task is currently in progress."
+            )
 
-                insights.append(
-                    "No task is currently in progress."
-                )
+        if completed_count > 0:
 
-            if completed_count > 0:
+            insights.append(
+                f"{completion_percentage}% of project "
+                "tasks are complete."
+            )
 
-                insights.append(
-                    f"{completion_percentage}% of project "
-                    "tasks are complete."
-                )
+        if pending_count > 0:
 
-            if pending_count > 0:
-
-                insights.append(
-                    f"{pending_count} task"
-                    f"{' remains' if pending_count == 1 else 's remain'} "
-                    "pending."
-                )
+            insights.append(
+                f"{pending_count} task"
+                f"{' remains' if pending_count == 1 else 's remain'} "
+                "pending."
+            )
 
         if valid_files:
 
@@ -411,6 +659,11 @@ class ProjectWorkspaceService:
 
         normalized_milestones = []
 
+        all_tasks_complete = (
+            total_tasks > 0
+            and completed_count == total_tasks
+        )
+
         for milestone in milestones:
 
             if not isinstance(
@@ -419,8 +672,43 @@ class ProjectWorkspaceService:
             ):
                 continue
 
-            normalized_milestones.append(
+            normalized_milestone = dict(
                 milestone
+            )
+
+            current_status = str(
+                normalized_milestone.get(
+                    "status",
+                    "pending",
+                )
+                or "pending"
+            ).strip().lower()
+
+            if all_tasks_complete:
+
+                normalized_milestone["status"] = (
+                    "completed"
+                )
+
+            elif current_status in {
+                "completed",
+                "complete",
+                "done",
+                "success",
+            }:
+
+                normalized_milestone["status"] = (
+                    "completed"
+                )
+
+            else:
+
+                normalized_milestone["status"] = (
+                    "pending"
+                )
+
+            normalized_milestones.append(
+                normalized_milestone
             )
 
         brain["milestones"] = (
@@ -624,7 +912,36 @@ class ProjectWorkspaceService:
                 "Project has pending work but no active task."
             )
 
-        if (
+        if execution_status in {
+            "failed",
+            "failure",
+            "error",
+        } or failed_count > 0:
+
+            health_status = "failed"
+
+            health_score = min(
+                health_score,
+                40,
+            )
+
+            risks.append(
+                "Project execution has failed."
+            )
+
+        elif (
+            execution_status == "blocked"
+            or blocked_count > 0
+        ):
+
+            health_status = "blocked"
+
+            health_score = min(
+                health_score,
+                50,
+            )
+
+        elif (
             total_tasks > 0
             and completed_count == total_tasks
         ):
@@ -637,9 +954,9 @@ class ProjectWorkspaceService:
                 "All project tasks are complete."
             )
 
-        elif valid_blockers:
+        elif active_count > 0:
 
-            health_status = "blocked"
+            health_status = "in_progress"
 
         elif health_score < 60:
 
@@ -733,9 +1050,85 @@ class ProjectWorkspaceService:
             timezone.utc
         ).isoformat()
 
+        execution_state = project.get(
+            "execution",
+            {},
+        )
+
+        execution_status = str(
+            execution_state.get("status", "")
+        ).strip().lower()
+
+        current_project_status = str(
+            project.get("status", "")
+        ).strip().lower()
+
+        failed_count = sum(
+            1
+            for task in tasks
+            if str(
+                task.get("status", "")
+            ).strip().lower()
+            in {
+                "failed",
+                "error",
+            }
+        )
+
+        blocked_count = sum(
+            1
+            for task in tasks
+            if str(
+                task.get("status", "")
+            ).strip().lower()
+            in {
+                "blocked",
+                "waiting",
+            }
+        )
+
+        if execution_status in {
+            "failed",
+            "error",
+        }:
+
+            project["status"] = "failed"
+
+        elif execution_status == "blocked":
+
+            project["status"] = "blocked"
+
+        elif current_project_status in {
+            "failed",
+            "error",
+        } or failed_count > 0:
+
+            project["status"] = "failed"
+
+        elif current_project_status == "blocked" or blocked_count > 0:
+
+            project["status"] = "blocked"
+
+        elif total_tasks == 0:
+
+            project["status"] = "not_started"
+
+        elif completed_count == total_tasks:
+
+            project["status"] = "completed"
+
+        elif active_count > 0:
+
+            project["status"] = "in_progress"
+
+        else:
+
+            project["status"] = "pending"
+
         project["brain"] = brain
 
         return project
+
     def _ensure_storage(
         self,
     ):
@@ -744,6 +1137,88 @@ class ProjectWorkspaceService:
                 "[]",
                 encoding="utf-8-sig",
                 )
+
+    def _normalize_terminal_parent_nested_steps(
+        self,
+        projects,
+    ):
+        if not isinstance(projects, list):
+            return False
+
+        changed = False
+
+        terminal_statuses = {
+            "completed",
+            "complete",
+            "done",
+            "success",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "canceled",
+        }
+
+        for project in projects:
+            if not isinstance(project, dict):
+                continue
+
+            tasks = project.get("tasks")
+
+            if not isinstance(tasks, list):
+                continue
+
+            for task in tasks:
+                if not isinstance(task, dict):
+                    continue
+
+                parent_status = str(
+                    task.get("status")
+                    or task.get("state")
+                    or task.get("completion_status")
+                    or ""
+                ).strip().lower()
+
+                if parent_status not in terminal_statuses:
+                    continue
+
+                steps = task.get("steps")
+
+                if not isinstance(steps, list):
+                    continue
+
+                for step in steps:
+                    if not isinstance(step, dict):
+                        continue
+
+                    current_status = str(
+                        step.get("status")
+                        or ""
+                    ).strip().lower()
+
+                    current_state = str(
+                        step.get("state")
+                        or ""
+                    ).strip().lower()
+
+                    current_completion_status = str(
+                        step.get("completion_status")
+                        or ""
+                    ).strip().lower()
+
+                    if (
+                        current_status == "completed"
+                        and current_state == "completed"
+                        and current_completion_status == "completed"
+                    ):
+                        continue
+
+                    step["status"] = "completed"
+                    step["state"] = "completed"
+                    step["completion_status"] = "completed"
+
+                    changed = True
+
+        return changed
 
     def _load_projects(
         self,
@@ -774,6 +1249,11 @@ class ProjectWorkspaceService:
 
                     changed = True
 
+            if self._normalize_terminal_parent_nested_steps(
+                data
+            ):
+                changed = True
+
             if changed:
                 self._save_projects(
                     data
@@ -788,6 +1268,10 @@ class ProjectWorkspaceService:
         self,
         projects,
     ):
+        self._normalize_terminal_parent_nested_steps(
+            projects
+        )
+
         self.projects_file.write_text(
             json.dumps(
                 projects,
@@ -800,6 +1284,24 @@ class ProjectWorkspaceService:
     def _default_execution_state(
         self,
     ):
+        return {
+            "status": "idle",
+            "current_task_id": None,
+            "current_step": None,
+            "current_step_index": None,
+            "current_phase_id": None,
+            "current_phase_title": None,
+            "phase_queue": [],
+            "queue": [],
+            "completed_steps": [],
+            "completed_tasks": [],
+            "failed_tasks": [],
+            "last_action": None,
+            "updated_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+        }
+
         return {
             "status": "idle",
             "current_task_id": None,
@@ -919,10 +1421,27 @@ class ProjectWorkspaceService:
                                 "medium",
                             )
                         ),
-                        "status": "open",
+                        "status": str(
+                            item.get(
+                                "status",
+                                "open",
+                            )
+                        ),
                         "action": str(
                             item.get(
                                 "action",
+                                "",
+                            )
+                        ),
+                        "execution_mode": str(
+                            item.get(
+                                "execution_mode",
+                                "",
+                            )
+                        ),
+                        "execution_file": str(
+                            item.get(
+                                "execution_file",
                                 "",
                             )
                         ),
@@ -931,6 +1450,22 @@ class ProjectWorkspaceService:
                                 "target_file",
                                 "",
                             )
+                        ),
+                        "target_files": (
+                            list(
+                                item.get(
+                                    "target_files",
+                                    [],
+                                )
+                            )
+                            if isinstance(
+                                item.get(
+                                    "target_files",
+                                    [],
+                                ),
+                                list,
+                            )
+                            else []
                         ),
                         "content": str(
                             item.get(
@@ -944,8 +1479,263 @@ class ProjectWorkspaceService:
                                 "",
                             )
                         ),
-                        "created_at": now,
+                        "dependencies": (
+                            list(
+                                item.get(
+                                    "dependencies",
+                                    [],
+                                )
+                            )
+                            if isinstance(
+                                item.get(
+                                    "dependencies",
+                                    [],
+                                ),
+                                list,
+                            )
+                            else []
+                        ),
+                        "phase_id": str(
+                            item.get(
+                                "phase_id",
+                                "",
+                            )
+                        ),
+                        "step_id": str(
+                            item.get(
+                                "step_id",
+                                "",
+                            )
+                        ),
+                        "created_at": str(
+                            item.get(
+                                "created_at",
+                                now,
+                            )
+                        ),
                     }
+
+                    task["execution_mode"] = str(
+                        item.get(
+                            "execution_mode",
+                            "",
+                        )
+                        or ""
+                    ).strip().lower()
+
+                    task["execution_file"] = str(
+                        item.get(
+                            "execution_file",
+                            "",
+                        )
+                        or item.get(
+                            "run_file",
+                            "",
+                        )
+                        or item.get(
+                            "script_file",
+                            "",
+                        )
+                        or item.get(
+                            "test_script",
+                            "",
+                        )
+                        or item.get(
+                            "test_file",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+
+                    task["target_files"] = (
+                        list(
+                            item.get(
+                                "target_files",
+                                [],
+                            )
+                            or []
+                        )
+                        if isinstance(
+                            item.get(
+                                "target_files",
+                                [],
+                            ),
+                            list,
+                        )
+                        else []
+                    )
+
+                    task["target_function"] = str(
+                        item.get(
+                            "target_function",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+
+                    task["dependencies"] = (
+                        list(
+                            item.get(
+                                "dependencies",
+                                [],
+                            )
+                            or []
+                        )
+                        if isinstance(
+                            item.get(
+                                "dependencies",
+                                [],
+                            ),
+                            list,
+                        )
+                        else []
+                    )
+
+                    task["expected_output"] = str(
+                        item.get(
+                            "expected_output",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+
+                    task["completion_criteria"] = (
+                        list(
+                            item.get(
+                                "completion_criteria",
+                                [],
+                            )
+                            or []
+                        )
+                        if isinstance(
+                            item.get(
+                                "completion_criteria",
+                                [],
+                            ),
+                            list,
+                        )
+                        else []
+                    )
+
+                    task["steps"] = (
+                        list(
+                            item.get(
+                                "steps",
+                                [],
+                            )
+                            or []
+                        )
+                        if isinstance(
+                            item.get(
+                                "steps",
+                                [],
+                            ),
+                            list,
+                        )
+                        else []
+                    )
+
+                    task_title_lower = task["title"].lower()
+                    task_text_lower = " ".join(
+                        [
+                            task["title"],
+                            task["description"],
+                            task["expected_output"],
+                        ]
+                    ).lower()
+
+                    is_output_persistence_task = (
+                        "write captured output" in task_title_lower
+                        or "persist captured output" in task_title_lower
+                        or "save captured output" in task_title_lower
+                        or "output to " in task_title_lower
+                        or "persist the captured output" in task_text_lower
+                    )
+
+                    is_execution_task = (
+                        not is_output_persistence_task
+                        and (
+                            task_title_lower.startswith("execute ")
+                            or task_title_lower.startswith("run ")
+                            or "script execution" in task_text_lower
+                            or "capture output" in task_text_lower
+                            or "standard output" in task_text_lower
+                        )
+                    )
+
+                    if is_execution_task:
+                        task["action"] = "execute"
+                        task["execution_mode"] = "hybrid"
+
+                        if not task["execution_file"]:
+                            execution_match = re.search(
+                                r"\b([A-Za-z0-9_.-]+\.py)\b",
+                                task_text_lower,
+                                flags=re.IGNORECASE,
+                            )
+
+                            if execution_match:
+                                task["execution_file"] = (
+                                    execution_match.group(1)
+                                )
+
+                        task["target_file"] = ""
+                        task["target_files"] = []
+
+                    elif is_output_persistence_task:
+                        task["action"] = "implement"
+                        task["execution_mode"] = "hybrid"
+                        task["execution_file"] = ""
+
+                        output_matches = re.findall(
+                            r"\b([A-Za-z0-9_.-]+\.txt)\b",
+                            task_text_lower,
+                            flags=re.IGNORECASE,
+                        )
+
+                        if output_matches:
+                            task["target_file"] = output_matches[-1]
+                            task["target_files"] = [
+                                task["target_file"]
+                            ]
+
+                    for imported_step in task["steps"]:
+                        if not isinstance(
+                            imported_step,
+                            dict,
+                        ):
+                            continue
+
+                        imported_step.setdefault(
+                            "execution_mode",
+                            task["execution_mode"],
+                        )
+                        imported_step.setdefault(
+                            "execution_file",
+                            task["execution_file"],
+                        )
+                        imported_step.setdefault(
+                            "target_files",
+                            task["target_files"],
+                        )
+                        imported_step.setdefault(
+                            "target_file",
+                            task["target_file"],
+                        )
+
+                        if is_execution_task:
+                            imported_step["action"] = "execute"
+                            imported_step["execution_mode"] = "hybrid"
+                            imported_step["execution_file"] = (
+                                task["execution_file"]
+                            )
+                            imported_step["target_file"] = ""
+                            imported_step["target_files"] = []
+
+                        elif is_output_persistence_task:
+                            imported_step["action"] = "implement"
+                            imported_step["execution_mode"] = "hybrid"
+                            imported_step["execution_file"] = ""
 
                     project["tasks"].append(
                         task
@@ -967,26 +1757,104 @@ class ProjectWorkspaceService:
     def list_projects(
         self,
     ):
+        """
+        Return projects visible to the current owner.
+
+        Projects are persisted as a JSON list in
+        self.projects_file and loaded through _load_projects().
+        """
+
         projects = self._load_projects()
 
-        return [
-            project
-            for project in projects
-            if self._same_project_owner(
+        if not isinstance(
+            projects,
+            list,
+        ):
+            return []
+
+        visible_projects = []
+
+        for project in projects:
+            if not isinstance(
+                project,
+                dict,
+            ):
+                continue
+
+            if not self._same_project_owner(
+                project
+            ):
+                continue
+
+            visible_projects.append(
                 project
             )
-        ]
+
+        return visible_projects
 
     def get_project(
         self,
         project_id,
     ):
-        for project in self._load_projects():
-            if (
-                project.get("id") == project_id
-                and self._same_project_owner(project)
-            ):
-                return project
+        projects = self._load_projects()
+
+        requested_project_id = str(project_id)
+
+        for project in projects:
+            if not isinstance(project, dict):
+                continue
+
+            stored_project_id = str(
+                project.get("id", "")
+            )
+
+            if stored_project_id != requested_project_id:
+                continue
+
+            if not self._same_project_owner(project):
+                continue
+
+            refreshed_project = (
+                self._refresh_project_brain_state(
+                    project
+                )
+            )
+
+            if refreshed_project is not project:
+                project = refreshed_project
+
+            execution_state = project.get(
+                "execution",
+                {},
+            )
+
+            execution_status = str(
+                execution_state.get(
+                    "status",
+                    "",
+                )
+            ).strip().lower()
+
+            if execution_status in {
+                "failed",
+                "error",
+            }:
+
+                project["status"] = "failed"
+
+            elif execution_status == "blocked":
+
+                project["status"] = "blocked"
+
+            elif execution_status == "completed":
+
+                project["status"] = "completed"
+
+            self._save_projects(
+                projects
+            )
+
+            return project
 
         return None
 
@@ -1298,64 +2166,17 @@ class ProjectWorkspaceService:
         )
 
         return True
+
     def get_execution_state(
         self,
         project_id,
-    ):
-        project = self.get_project(
-            project_id
-        )
-
-        if not project:
-            return None
-
-        execution = project.get(
-            "execution"
-        )
-
-        if not isinstance(
-            execution,
-            dict,
-        ):
-            execution = self._default_execution_state()
-
-            project["execution"] = execution
-
-            projects = self._load_projects()
-
-            for index, stored_project in enumerate(
-                projects
-            ):
-                if (
-                    stored_project.get("id")
-                    == project_id
-                ):
-                    projects[index] = project
-                    break
-
-            self._save_projects(
-                projects
-            )
-
-        return execution
-
-    def update_execution_state(
-        self,
-        project_id,
-        status=_UNSET,
-        current_task_id=_UNSET,
-        current_step=_UNSET,
-        queue=_UNSET,
-        last_action=_UNSET,
     ):
         projects = self._load_projects()
 
         for project in projects:
             if (
                 project.get("id") != project_id
-                or not self._same_project_owner(
-                    project
-                )
+                or not self._same_project_owner(project)
             ):
                 continue
 
@@ -1367,9 +2188,51 @@ class ProjectWorkspaceService:
                 execution,
                 dict,
             ):
-                execution = (
-                    self._default_execution_state()
+                execution = self._default_execution_state()
+
+                project["execution"] = execution
+
+                project["updated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+
+                self._save_projects(
+                    projects
                 )
+
+            return execution
+
+        return None
+
+    def update_execution_state(
+        self,
+        project_id,
+        status=_UNSET,
+        current_task_id=_UNSET,
+        current_step=_UNSET,
+        current_step_index=_UNSET,
+        current_phase_id=_UNSET,
+        current_phase_title=_UNSET,
+        phase_queue=_UNSET,
+        queue=_UNSET,
+        completed_steps=_UNSET,
+        completed_tasks=_UNSET,
+        failed_tasks=_UNSET,
+        last_action=_UNSET,
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+            if (
+                project.get("id") != project_id
+                or not self._same_project_owner(project)
+            ):
+                continue
+
+            execution = project.get("execution")
+
+            if not isinstance(execution, dict):
+                execution = self._default_execution_state()
 
             if status is not _UNSET:
                 execution["status"] = (
@@ -1379,14 +2242,33 @@ class ProjectWorkspaceService:
                 )
 
             if current_task_id is not _UNSET:
-                execution[
-                    "current_task_id"
-                ] = current_task_id
+                execution["current_task_id"] = current_task_id
 
             if current_step is not _UNSET:
-                execution[
-                    "current_step"
-                ] = current_step
+                execution["current_step"] = current_step
+
+            if current_step_index is not _UNSET:
+                execution["current_step_index"] = (
+                    current_step_index
+                    if isinstance(current_step_index, int)
+                    and current_step_index >= 0
+                    else None
+                )
+
+            if current_phase_id is not _UNSET:
+                execution["current_phase_id"] = current_phase_id
+
+            if current_phase_title is not _UNSET:
+                execution["current_phase_title"] = (
+                    current_phase_title
+                )
+
+            if phase_queue is not _UNSET:
+                execution["phase_queue"] = (
+                    phase_queue
+                    if isinstance(phase_queue, list)
+                    else []
+                )
 
             if queue is not _UNSET:
                 execution["queue"] = (
@@ -1395,10 +2277,29 @@ class ProjectWorkspaceService:
                     else []
                 )
 
+            if completed_steps is not _UNSET:
+                execution["completed_steps"] = (
+                    completed_steps
+                    if isinstance(completed_steps, list)
+                    else []
+                )
+
+            if completed_tasks is not _UNSET:
+                execution["completed_tasks"] = (
+                    completed_tasks
+                    if isinstance(completed_tasks, list)
+                    else []
+                )
+
+            if failed_tasks is not _UNSET:
+                execution["failed_tasks"] = (
+                    failed_tasks
+                    if isinstance(failed_tasks, list)
+                    else []
+                )
+
             if last_action is not _UNSET:
-                execution[
-                    "last_action"
-                ] = (
+                execution["last_action"] = (
                     str(last_action).strip()
                     if last_action is not None
                     else ""
@@ -1410,15 +2311,11 @@ class ProjectWorkspaceService:
                 ).isoformat()
             )
 
+
             project["execution"] = execution
+            project["updated_at"] = execution["updated_at"]
 
-            project["updated_at"] = (
-                execution["updated_at"]
-            )
-
-            self._save_projects(
-                projects
-            )
+            self._save_projects(projects)
 
             return execution
 
@@ -1443,6 +2340,58 @@ class ProjectWorkspaceService:
             ):
                 continue
 
+            tasks = project.get("tasks") or []
+
+            for task in tasks:
+                if not isinstance(
+                    task,
+                    dict,
+                ):
+                    continue
+
+                task["status"] = "open"
+
+                for key in (
+                    "error",
+                    "result",
+                    "output",
+                    "completed_at",
+                    "failed_at",
+                    "failure_reason",
+                ):
+                    task.pop(
+                        key,
+                        None,
+                    )
+
+                steps = task.get("steps") or []
+
+                for step in steps:
+                    if not isinstance(
+                        step,
+                        dict,
+                    ):
+                        continue
+
+                    step["status"] = "pending"
+                    step["state"] = "pending"
+                    step["completion_status"] = "pending"
+
+                    for key in (
+                        "error",
+                        "result",
+                        "output",
+                        "completed_at",
+                        "failed_at",
+                        "failure_reason",
+                    ):
+                        step.pop(
+                            key,
+                            None,
+                        )
+
+            project["status"] = "draft"
+            project["active"] = False
             project["execution"] = execution
             project["updated_at"] = (
                 execution["updated_at"]
@@ -1455,7 +2404,6 @@ class ProjectWorkspaceService:
             return execution
 
         return None
-
     def archive_project(
         self,
         project_id,
@@ -1930,6 +2878,7 @@ class ProjectWorkspaceService:
         description="",
         action="",
         execution_mode="",
+        execution_file="",
         target_file="",
         target_files=None,
         target_function="",
@@ -1937,6 +2886,7 @@ class ProjectWorkspaceService:
         expected_output="",
         completion_criteria=None,
         phase_id="",
+        steps=None,
         content="",
         code="",
         replacement="",
@@ -1965,6 +2915,17 @@ class ProjectWorkspaceService:
                 tasks = []
                 project["tasks"] = tasks
 
+            if isinstance(phase_id, dict):
+                phase_id = (
+                    phase_id.get("id")
+                    or phase_id.get("phase_id")
+                    or ""
+                )
+
+            phase_id = str(
+                phase_id or ""
+            ).strip()
+
             task = {
                 "id": str(
                     uuid.uuid4()
@@ -1976,9 +2937,17 @@ class ProjectWorkspaceService:
                     priority or "medium"
                 ).strip(),
                 "status": "open",
-                "phase_id": str(
-                    phase_id or ""
-                ).strip(),
+                "steps": (
+                    steps
+                    if isinstance(
+                        steps,
+                        list,
+                    )
+                    else []
+                ),
+
+                "phase_id": phase_id,
+
                 "description": str(
                     description or ""
                 ).strip(),
@@ -1987,10 +2956,17 @@ class ProjectWorkspaceService:
                 "action": str(
                     action or ""
                 ).strip().lower(),
+
                 "execution_mode": str(
                     execution_mode or ""
                 ).strip().lower(),
+
+                "execution_file": str(
+                    execution_file or ""
+                ).strip(),
+
                 "dependencies": (
+
                     list(dependencies)
                     if isinstance(
                         dependencies,
@@ -2062,6 +3038,152 @@ class ProjectWorkspaceService:
             return task
 
         return None
+
+    def update_task_input(
+        self,
+        project_id,
+        task_id,
+        values,
+    ):
+        projects = self._load_projects()
+
+        if not isinstance(values, dict):
+            return None
+
+        allowed_fields = {
+            "target_file",
+            "target_files",
+            "target_function",
+            "content",
+            "code",
+            "replacement",
+            "command",
+            "execution_file",
+            "expected_output",
+            "completion_criteria",
+            "submitted_input",
+            "payload",
+        }
+
+        for project in projects:
+
+            if (
+                project.get("id") != project_id
+                or not self._same_project_owner(project)
+            ):
+                continue
+
+            tasks = project.get(
+                "tasks",
+                [],
+            )
+
+            if not isinstance(tasks, list):
+                return None
+
+            for task in tasks:
+
+                if not isinstance(task, dict):
+                    continue
+
+                if task.get("id") != task_id:
+                    continue
+
+                for key, value in values.items():
+
+                    if key not in allowed_fields:
+                        continue
+
+                    if key in {
+                        "target_files",
+                        "completion_criteria",
+                    }:
+                        if isinstance(value, list):
+                            task[key] = list(value)
+                        continue
+
+                    if key == "payload":
+                        task[key] = value
+                        continue
+
+                    task[key] = (
+                        str(value)
+                        if value is not None
+                        else ""
+                    )
+
+                target_file = str(
+                    task.get("target_file", "")
+                ).strip()
+
+                target_files = task.get(
+                    "target_files",
+                    [],
+                )
+
+                target_function = str(
+                    task.get("target_function", "")
+                ).strip()
+
+                content = str(
+                    task.get("content", "")
+                )
+
+                code = str(
+                    task.get("code", "")
+                )
+
+                replacement = str(
+                    task.get("replacement", "")
+                )
+
+                command = str(
+                    task.get("command", "")
+                ).strip()
+
+                has_target = bool(
+                    target_file
+                    or target_files
+                    or target_function
+                    or command
+                    or content.strip()
+                    or code.strip()
+                    or replacement.strip()
+                )
+
+                task["submitted_input"] = dict(values)
+
+                if has_target:
+                    task["payload_required"] = False
+                    task["mutation_ready"] = True
+                    task["next_action"] = (
+                        "Input received. Continue execution."
+                    )
+
+                    if str(
+                        task.get("status", "")
+                    ).strip().lower() in {
+                        "waiting",
+                        "blocked",
+                    }:
+                        task["status"] = "open"
+
+                project = self._refresh_project_brain_state(
+                    project
+                )
+
+                project["updated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+
+                self._save_projects(
+                    projects
+                )
+
+                return task
+
+        return None
+
     def update_task_status(
         self,
         project_id,
@@ -2123,6 +3245,47 @@ class ProjectWorkspaceService:
                 return task
 
         return None
+
+    def update_project_tasks(
+        self,
+        project_id,
+        tasks,
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+
+            if (
+                project.get("id") != project_id
+                or not self._same_project_owner(project)
+            ):
+                continue
+
+            if not isinstance(
+                tasks,
+                list,
+            ):
+                return None
+
+            project["tasks"] = tasks
+
+            # Keep Project Brain synchronized after task execution changes.
+            project = self._refresh_project_brain_state(
+                project
+            )
+
+            project["updated_at"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+
+            self._save_projects(
+                projects
+            )
+
+            return project["tasks"]
+
+        return None
+
     def delete_task(
         self,
         project_id,
@@ -2856,6 +4019,12 @@ class ProjectWorkspaceService:
 # Shared authoritative project workspace service instance.
 
 project_workspace_service = ProjectWorkspaceService()
+
+
+
+
+
+
 
 
 

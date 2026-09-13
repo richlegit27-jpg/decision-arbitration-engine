@@ -1192,6 +1192,7 @@ local_auth_route_service = LocalAuthRouteService(
     jsonify,
     session,
 )
+
 project_workspace_service = ProjectWorkspaceService(
     data_dir="data"
 )
@@ -1740,6 +1741,10 @@ def api_runtime_cycle():
     "/api/projects",
     methods=["GET"],
 )
+@app.route(
+    "/api/projects/",
+    methods=["GET"],
+)
 def api_projects():
     return jsonify(
         {
@@ -1747,7 +1752,6 @@ def api_projects():
             "projects": project_workspace_service.list_projects(),
         }
     )
-
 
 @app.route(
     "/api/projects/<project_id>",
@@ -1795,15 +1799,35 @@ def api_project_get(
         }
     )
 
-
 @app.route(
     "/api/projects/new",
     methods=["POST"],
 )
 def api_projects_new():
+    print(
+        "[PROJECTS NEW DEBUG] content_type=",
+        request.content_type,
+        flush=True,
+    )
+
+    print(
+        "[PROJECTS NEW DEBUG] raw_body=",
+        request.get_data(
+            cache=True,
+            as_text=True,
+        ),
+        flush=True,
+    )
+
     data = request.get_json(
         silent=True
     ) or {}
+
+    print(
+        "[PROJECTS NEW DEBUG] parsed_data=",
+        data,
+        flush=True,
+    )
 
     name = str(
         data.get("name") or ""
@@ -1862,12 +1886,15 @@ def api_projects_new():
         )
 
     except Exception as error:
+        import traceback
 
         print(
             "[NOVA PROJECT BUILDER ERROR]",
             repr(error),
+            flush=True,
         )
 
+        traceback.print_exc()
         return jsonify(
             {
                 "ok": False,

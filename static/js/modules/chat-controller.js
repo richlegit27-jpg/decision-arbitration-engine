@@ -177,16 +177,77 @@ async function handleSubmit() {
     });
 
     let finalText = "";
+
     for await (const evt of stream.events()) {
+      const data = evt.data || {};
+
       if (evt.event === "token") {
-        const tokenText = evt.data?.t || "";
-        finalText += tokenText;
-        updateMessageContent(assistantRow, finalText);
+        const tokenText =
+          data.content ||
+          data.text ||
+          data.token ||
+          data.delta ||
+          "";
+
+        if (tokenText) {
+          finalText += tokenText;
+          updateMessageContent(
+            assistantRow,
+            finalText
+          );
+        }
+
+        continue;
+      }
+
+      if (
+        evt.event === "message" ||
+        evt.event === "final"
+      ) {
+        const messageText =
+          data.content ||
+          data.text ||
+          data.message?.content ||
+          data.message?.text ||
+          "";
+
+        if (messageText) {
+          finalText = messageText;
+          updateMessageContent(
+            assistantRow,
+            finalText
+          );
+        }
+
+        continue;
       }
 
       if (evt.event === "done") {
-        finalText = evt.data?.full_text || finalText;
-        updateMessageContent(assistantRow, finalText);
+        const completedText =
+          data.full_text ||
+          data.content ||
+          data.text ||
+          data.message?.content ||
+          "";
+
+        if (completedText) {
+          finalText = completedText;
+        }
+
+        updateMessageContent(
+          assistantRow,
+          finalText
+        );
+      }
+
+      if (evt.event === "error") {
+        const errorText =
+          data.error ||
+          data.message ||
+          data.content ||
+          "Streaming failed.";
+
+        throw new Error(String(errorText));
       }
     }
 

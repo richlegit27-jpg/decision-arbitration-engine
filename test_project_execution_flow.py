@@ -9,6 +9,15 @@ from nova_backend.services.project_execution_handler import (
 from nova_backend.services.execution_handler import (
     default_executor,
 )
+from nova_backend.services.execution_step_service import (
+    ExecutionStepService,
+)
+from nova_backend.services.execution_approval_service import (
+    ExecutionApprovalService,
+)
+from nova_backend.services.python_runner_service import (
+    PythonRunnerService,
+)
 
 
 test_file = Path(
@@ -21,43 +30,67 @@ if test_file.exists():
 
 service = ChatExecutionService()
 
-service.execution_handler = ProjectExecutionHandler(
-    default_executor=default_executor
+approval_service = ExecutionApprovalService()
+python_runner = PythonRunnerService()
+
+execution_step_service = ExecutionStepService(
+    safe_str=lambda value: str(value or ""),
+    python_runner=python_runner,
+    approval_service=approval_service,
+    tool_executor=default_executor,
 )
 
+service.execution_handler = ProjectExecutionHandler(
+    default_executor=default_executor,
+    execution_step_service=execution_step_service,
+)
 
 steps = [
     {
         "id": "step-1",
-        "action": "analysis",
-        "title": "Analyze test project",
-        "description": (
-            "Verify multi-step project execution."
+        "action": "implement",
+        "title": "Create test file",
+        "description": "Create the Python test file.",
+        "target_file": (
+            r"C:\Users\Owner\nova\project_execution_flow_test.py"
         ),
+        "content": 'print("FLOW_OK")\n',
+        "completion_criteria": [
+            "The Python file exists.",
+        ],
     },
     {
         "id": "step-2",
-        "action": "implement",
-        "title": "Create test file",
+        "action": "execute",
+        "title": "Execute test file",
         "description": (
-            "Create the project execution test file."
+            "Execute the created Python file through the real "
+            "project execution pipeline."
         ),
-        "target_file": str(test_file),
-        "content": (
-            'def execution_flow_test():\n'
-            '    return "FLOW_OK"\n'
+        "execution_file": (
+            r"C:\Users\Owner\nova\project_execution_flow_test.py"
         ),
+        "expected_output": "FLOW_OK",
+        "completion_criteria": [
+            "The Python subprocess completed successfully.",
+            "stdout contains FLOW_OK.",
+        ],
     },
     {
         "id": "step-3",
         "action": "review",
         "title": "Review execution result",
         "description": (
-            "Verify the execution flow completed."
+            "Verify that the Python subprocess completed successfully "
+            "and returned FLOW_OK."
         ),
+        "expected_output": "FLOW_OK",
+        "completion_criteria": [
+            "The execution result is successful.",
+            "stdout contains FLOW_OK.",
+        ],
     },
 ]
-
 
 session_id = "test-project-execution-flow"
 

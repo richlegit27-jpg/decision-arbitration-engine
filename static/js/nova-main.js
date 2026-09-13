@@ -13,8 +13,10 @@
       Nova.shell?.applyPanelState?.();
       Nova.shell?.autoResizeComposer?.();
 
-      if (Nova.sessions?.loadState) {
-        await Nova.sessions.loadState();
+      if (typeof window.NovaDesktopLoadSessions === "function") {
+        await window.NovaDesktopLoadSessions();
+      } else if (Nova.sessions?.loadSessions) {
+        await Nova.sessions.loadSessions();
       }
 
       if (Nova.memory?.loadMemory) {
@@ -34,4 +36,5 @@
     bootstrap();
   }
 })();
+
 

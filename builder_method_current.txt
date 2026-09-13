@@ -1,0 +1,761 @@
+    def build_project_from_request(
+        self,
+        user_text: str | None = None,
+        owner_id: str | None = None,
+        project_id: str | None = None,
+        request: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Build or update a persistent Nova project from a natural-language
+        request.
+
+        Persistence order:
+
+        1. Build the project plan.
+        2. Create or update the project.
+        3. Create planned phases.
+        4. Create planned tasks linked to phases.
+        5. Remap planner task IDs to persistent task IDs.
+        6. Remap task dependencies.
+        7. Update the project brain.
+        8. Return the final project and plan.
+        """
+
+        clean_request = str(
+            user_text
+            or request
+            or ""
+        ).strip()
+
+        if not clean_request:
+            raise ValueError(
+                "Project request cannot be empty."
+            )
+
+        # --------------------------------------------------------------
+        # EXISTING PROJECT CONTEXT
+        # --------------------------------------------------------------
+
+        project = None
+        project_context = {}
+
+        if project_id:
+
+            project = (
+                self.project_workspace_service.get_project(
+                    project_id
+                )
+            )
+
+            if project:
+
+                project_context = (
+                    self.project_workspace_service.get_project_context(
+                        project_id
+                    )
+                )
+
+                if not isinstance(
+                    project_context,
+                    dict,
+                ):
+                    project_context = {}
+
+        # --------------------------------------------------------------
+        # PROJECT INTELLIGENCE
+        # --------------------------------------------------------------
+
+        plan = self._build_project_plan(
+            clean_request,
+            project_context=project_context,
+        )
+
+        if not isinstance(plan, dict):
+            raise RuntimeError(
+                "Project planner returned an invalid plan."
+            )
+
+        # Normalize plan collections.
+        planned_phases = plan.get(
+            "phases",
+            [],
+        )
+
+        planned_tasks = plan.get(
+            "tasks",
+            [],
+        )
+
+        if not isinstance(
+            planned_phases,
+            list,
+        ):
+            planned_phases = []
+
+        if not isinstance(
+            planned_tasks,
+            list,
+        ):
+            planned_tasks = []
+
+        # --------------------------------------------------------------
+        # PROJECT PERSISTENCE
+        # --------------------------------------------------------------
+
+        if project:
+
+            project = (
+                self.project_workspace_service.update_project(
+                    project_id=project_id,
+                    name=plan.get("name"),
+                    description=plan.get("description"),
+                )
+            )
+
+        if not project:
+
+            project = (
+                self.project_workspace_service.create_project(
+                    name=plan.get("name"),
+                    description=plan.get("description"),
+                )
+            )
+
+        if not project:
+            raise RuntimeError(
+                "Failed to create project."
+            )
+
+        resolved_project_id = project.get("id")
+
+        if not resolved_project_id:
+            raise RuntimeError(
+                "Created project does not have an ID."
+            )
+
+        # Refresh after project creation/update.
+        project = (
+            self.project_workspace_service.get_project(
+                resolved_project_id
+            )
+        )
+
+        if not project:
+            raise RuntimeError(
+                "Persistent project could not be reloaded."
+            )
+
+        # --------------------------------------------------------------
+        # PHASE MERGE
+        #
+        # Planner phase IDs are temporary logical IDs. The workspace
+        # generates persistent UUIDs, so maintain a mapping between them.
+        # --------------------------------------------------------------
+
+        existing_phases = project.get(
+            "phases",
+            [],
+        )
+
+        if not isinstance(
+            existing_phases,
+            list,
+        ):
+            existing_phases = []
+
+        existing_phase_titles = {}
+
+        for existing_phase in existing_phases:
+
+            if not isinstance(
+                existing_phase,
+                dict,
+            ):
+                continue
+
+            phase_title = str(
+                existing_phase.get(
+                    "title",
+                    "",
+                )
+            ).strip()
+
+            phase_id = existing_phase.get(
+                "id"
+            )
+
+            if phase_title and phase_id:
+                existing_phase_titles[
+                    phase_title.lower()
+                ] = phase_id
+
+        phase_id_map = {}
+        created_phases = []
+        skipped_existing_phases = []
+
+        for phase_index, phase_spec in enumerate(
+            planned_phases
+        ):
+
+            if not isinstance(
+                phase_spec,
+                dict,
+            ):
+                continue
+
+            planner_phase_id = str(
+                phase_spec.get(
+                    "id",
+                    "",
+                )
+            ).strip()
+
+            phase_title = str(
+                phase_spec.get(
+                    "title",
+                    phase_spec.get(
+                        "name",
+                        f"Phase {phase_index + 1}",
+                    ),
+                )
+            ).strip()
+
+            if not phase_title:
+                continue
+
+            normalized_phase_title = (
+                phase_title.lower()
+            )
+
+            existing_phase_id = (
+                existing_phase_titles.get(
+                    normalized_phase_title
+                )
+            )
+
+            if existing_phase_id:
+
+                persistent_phase_id = (
+                    existing_phase_id
+                )
+
+                skipped_existing_phases.append(
+                    phase_title
+                )
+
+            else:
+
+                created_phase = (
+                    self.project_workspace_service.add_phase(
+                        project_id=resolved_project_id,
+                        title=phase_title,
+                        description=str(
+                            phase_spec.get(
+                                "description",
+                                "",
+                            )
+                        ).strip(),
+                        status=phase_spec.get(
+                            "status",
+                            "planned",
+                        ),
+                        order=phase_spec.get(
+                            "order",
+                            phase_index,
+                        ),
+                        goal=str(
+                            phase_spec.get(
+                                "goal",
+                                "",
+                            )
+                        ).strip(),
+                        milestone=str(
+                            phase_spec.get(
+                                "milestone",
+                                "",
+                            )
+                        ).strip(),
+                    )
+                )
+
+                if not created_phase:
+                    continue
+
+                persistent_phase_id = (
+                    created_phase.get("id")
+                )
+
+                if not persistent_phase_id:
+                    continue
+
+                created_phases.append(
+                    created_phase
+                )
+
+                existing_phase_titles[
+                    normalized_phase_title
+                ] = persistent_phase_id
+
+            if planner_phase_id:
+                phase_id_map[
+                    planner_phase_id
+                ] = persistent_phase_id
+
+        # If the planner did not provide phases, preserve compatibility
+        # with the older task-only planner output.
+        if skipped_existing_phases:
+
+            print(
+                "[NOVA PROJECT BUILDER] "
+                f"Preserved {len(skipped_existing_phases)} "
+                "existing matching phases.",
+                flush=True,
+            )
+
+        if created_phases:
+
+            print(
+                "[NOVA PROJECT BUILDER] "
+                f"Added {len(created_phases)} new phases.",
+                flush=True,
+            )
+
+        # --------------------------------------------------------------
+        # TASK MERGE
+        #
+        # Existing tasks remain authoritative. New tasks are added only
+        # when their titles do not already exist.
+        # --------------------------------------------------------------
+
+        existing_tasks = project.get(
+            "tasks",
+            [],
+        )
+
+        if not isinstance(
+            existing_tasks,
+            list,
+        ):
+            existing_tasks = []
+
+        existing_titles = set()
+
+        for existing_task in existing_tasks:
+
+            if not isinstance(
+                existing_task,
+                dict,
+            ):
+                continue
+
+            existing_title = str(
+                existing_task.get(
+                    "title",
+                    "",
+                )
+            ).strip().lower()
+
+            if existing_title:
+                existing_titles.add(
+                    existing_title
+                )
+
+        created_tasks = []
+        skipped_existing_tasks = []
+
+        # Maps planner task IDs to persistent UUIDs.
+        task_id_map = {}
+
+        # Holds dependencies using planner IDs until all tasks exist.
+        pending_dependency_records = []
+
+        for task_spec in planned_tasks:
+
+            if not isinstance(
+                task_spec,
+                dict,
+            ):
+                continue
+
+            task_title = str(
+                task_spec.get(
+                    "title",
+                    "New Task",
+                )
+            ).strip()
+
+            if not task_title:
+                continue
+
+            normalized_title = (
+                task_title.lower()
+            )
+
+            planner_task_id = str(
+                task_spec.get(
+                    "id",
+                    "",
+                )
+            ).strip()
+
+            # Resolve the planner's phase ID to the persistent phase UUID.
+            planner_phase_id = str(
+                task_spec.get(
+                    "phase_id",
+                    "",
+                )
+            ).strip()
+
+            persistent_phase_id = (
+                phase_id_map.get(
+                    planner_phase_id,
+                    "",
+                )
+            )
+
+            # If phase_id is absent but phase title is present, resolve
+            # the phase by title.
+            if not persistent_phase_id:
+
+                phase_title_hint = str(
+                    task_spec.get(
+                        "phase",
+                        task_spec.get(
+                            "phase_title",
+                            "",
+                        ),
+                    )
+                ).strip().lower()
+
+                if phase_title_hint:
+
+                    persistent_phase_id = (
+                        existing_phase_titles.get(
+                            phase_title_hint,
+                            "",
+                        )
+                    )
+
+            # Do not duplicate existing work.
+            if normalized_title in existing_titles:
+
+                skipped_existing_tasks.append(
+                    task_title
+                )
+
+                # If the planner references this task by ID, connect that
+                # logical ID to the existing persistent task ID.
+                for existing_task in existing_tasks:
+
+                    if not isinstance(
+                        existing_task,
+                        dict,
+                    ):
+                        continue
+
+                    existing_task_title = str(
+                        existing_task.get(
+                            "title",
+                            "",
+                        )
+                    ).strip().lower()
+
+                    if (
+                        existing_task_title
+                        == normalized_title
+                    ):
+
+                        existing_task_id = (
+                            existing_task.get(
+                                "id"
+                            )
+                        )
+
+                        if (
+                            planner_task_id
+                            and existing_task_id
+                        ):
+                            task_id_map[
+                                planner_task_id
+                            ] = existing_task_id
+
+                        break
+
+                continue
+
+            task_action = str(
+                task_spec.get(
+                    "action",
+                    "",
+                )
+            ).strip().lower()
+
+            target_file = str(
+                task_spec.get(
+                    "target_file",
+                    "",
+                )
+            ).strip()
+
+            task_description = str(
+                task_spec.get(
+                    "description",
+                    "",
+                )
+            ).strip()
+
+            # ----------------------------------------------------------
+            # TARGET FILE RESOLUTION
+            # ----------------------------------------------------------
+
+            if not target_file:
+
+                task_text = (
+                    task_title
+                    + " "
+                    + task_description
+                )
+
+                file_match = re.search(
+                    r"\b[\w./\\-]+\.(?:py|md|txt|json|js|html|css|yaml|yml)\b",
+                    task_text,
+                    flags=re.IGNORECASE,
+                )
+
+                if file_match:
+                    target_file = (
+                        file_match.group(0)
+                    )
+
+            created_task = (
+                self.project_workspace_service.add_task(
+                    project_id=resolved_project_id,
+                    title=task_title,
+                    priority=task_spec.get(
+                        "priority",
+                        "medium",
+                    ),
+                    description=task_description,
+                    action=task_action,
+                    execution_mode=task_spec.get(
+                        "execution_mode",
+                        "",
+                    ),
+                    target_file=target_file,
+                    target_files=task_spec.get(
+                        "target_files",
+                        [],
+                    ),
+                    target_function=task_spec.get(
+                        "target_function",
+                        "",
+                    ),
+                    dependencies=[],
+                    expected_output=task_spec.get(
+                        "expected_output",
+                        "",
+                    ),
+                    completion_criteria=task_spec.get(
+                        "completion_criteria",
+                        [],
+                    ),
+                    phase_id=persistent_phase_id,
+                    steps=task_spec.get(
+                        "steps",
+                        [],
+                    ),
+                    content=task_spec.get(
+                        "content",
+                        "",
+                    ),
+                    code=task_spec.get(
+                        "code",
+                        "",
+                    ),
+                    replacement=task_spec.get(
+                        "replacement",
+                        "",
+                    ),
+                    command=task_spec.get(
+                        "command",
+                        "",
+                    ),
+                )
+            )
+
+            if not created_task:
+                continue
+
+            persistent_task_id = (
+                created_task.get("id")
+            )
+
+            if not persistent_task_id:
+                continue
+
+            created_tasks.append(
+                created_task
+            )
+
+            existing_titles.add(
+                normalized_title
+            )
+
+            if planner_task_id:
+                task_id_map[
+                    planner_task_id
+                ] = persistent_task_id
+
+            pending_dependency_records.append(
+                {
+                    "persistent_task_id": persistent_task_id,
+                    "dependencies": task_spec.get(
+                        "dependencies",
+                        [],
+                    ),
+                }
+            )
+
+        # --------------------------------------------------------------
+        # DEPENDENCY REMAPPING
+        #
+        # Workspace-generated task UUIDs differ from planner task IDs.
+        # Replace planner dependency IDs with persistent task IDs.
+        # --------------------------------------------------------------
+
+        if pending_dependency_records:
+
+            refreshed_project = (
+                self.project_workspace_service.get_project(
+                    resolved_project_id
+                )
+            )
+
+            persistent_tasks = refreshed_project.get(
+                "tasks",
+                [],
+            )
+
+            if isinstance(
+                persistent_tasks,
+                list,
+            ):
+
+                for dependency_record in (
+                    pending_dependency_records
+                ):
+
+                    persistent_task_id = (
+                        dependency_record[
+                            "persistent_task_id"
+                        ]
+                    )
+
+                    raw_dependencies = (
+                        dependency_record[
+                            "dependencies"
+                        ]
+                    )
+
+                    if not isinstance(
+                        raw_dependencies,
+                        list,
+                    ):
+                        raw_dependencies = []
+
+                    remapped_dependencies = []
+
+                    for dependency in raw_dependencies:
+
+                        dependency_id = str(
+                            dependency
+                        ).strip()
+
+                        if not dependency_id:
+                            continue
+
+                        remapped_id = (
+                            task_id_map.get(
+                                dependency_id,
+                                dependency_id,
+                            )
+                        )
+
+                        if remapped_id not in (
+                            remapped_dependencies
+                        ):
+                            remapped_dependencies.append(
+                                remapped_id
+                            )
+
+                    for persistent_task in persistent_tasks:
+
+                        if not isinstance(
+                            persistent_task,
+                            dict,
+                        ):
+                            continue
+
+                        if (
+                            persistent_task.get("id")
+                            == persistent_task_id
+                        ):
+
+                            persistent_task[
+                                "dependencies"
+                            ] = (
+                                remapped_dependencies
+                            )
+
+                            break
+
+                self.project_workspace_service.update_project_tasks(
+                    project_id=resolved_project_id,
+                    tasks=persistent_tasks,
+                )
+
+        if skipped_existing_tasks:
+
+            print(
+                "[NOVA PROJECT BUILDER] "
+                f"Preserved {len(skipped_existing_tasks)} "
+                "existing matching tasks.",
+                flush=True,
+            )
+
+        if created_tasks:
+
+            print(
+                "[NOVA PROJECT BUILDER] "
+                f"Added {len(created_tasks)} new tasks.",
+                flush=True,
+            )
+
+        # --------------------------------------------------------------
+        # PROJECT BRAIN
+        # --------------------------------------------------------------
+
+        self._update_project_brain(
+            project_id=resolved_project_id,
+            plan=plan,
+        )
+
+        self.project_workspace_service.add_activity(
+            project_id=resolved_project_id,
+            action="project_built",
+            details=clean_request,
+        )
+
+        final_project = (
+            self.project_workspace_service.get_project(
+                resolved_project_id
+            )
+        )
+
+        return {
+            "project_id": resolved_project_id,
+            "project": final_project,
+            "plan": plan,
+            "phases": created_phases,
+            "tasks": created_tasks,
+        }

@@ -1,4 +1,4 @@
-import os
+﻿import os
 
 from nova_backend.services import model_gateway_service
 
@@ -197,6 +197,44 @@ class AIExecutionService:
             "output": output,
         }
 
+    def _validate_generated_file_content(
+        self,
+        content,
+    ):
+        content = self._safe_str(
+            content
+        ).strip()
+
+        if not content:
+            raise RuntimeError(
+                "AI file replacement generation produced empty content."
+            )
+
+        first_line = content.splitlines()[0].strip().lower()
+
+        status_prefixes = (
+            "created file:",
+            "updated file:",
+            "modified file:",
+            "written file:",
+            "saved file:",
+            "successfully created",
+            "successfully updated",
+            "successfully modified",
+            "file created:",
+            "file updated:",
+            "file modified:",
+        )
+
+        if first_line.startswith(status_prefixes):
+            raise RuntimeError(
+                "AI file replacement generation returned a "
+                "status message instead of file contents: "
+                + content.splitlines()[0].strip()
+            )
+
+        return content
+
     def generate_file_replacement(
         self,
         session_id,
@@ -344,6 +382,10 @@ class AIExecutionService:
             output
         )
 
+        output = self._validate_generated_file_content(
+            output
+        )
+
         if not output.strip():
             raise RuntimeError(
                 "AI file replacement generation produced no usable content."
@@ -459,3 +501,7 @@ class AIExecutionService:
             return output_text
 
         return ""
+
+
+
+

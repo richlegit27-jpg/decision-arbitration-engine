@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 from nova_backend.services.project_execution_handler import (
     ProjectExecutionHandler,
@@ -6,6 +6,10 @@ from nova_backend.services.project_execution_handler import (
 
 from nova_backend.services.execution_handler import (
     default_executor,
+)
+
+from nova_backend.services.execution_step_service import (
+    ExecutionStepService,
 )
 
 from nova_backend.services.chat_execution_service import (
@@ -18,13 +22,15 @@ test_file = Path(
 )
 
 
+execution_step_service = ExecutionStepService()
+
 handler = ProjectExecutionHandler(
     default_executor=default_executor,
+    execution_step_service=execution_step_service,
 )
 
 
 service = ChatExecutionService()
-
 
 service.execution_handler = handler
 
@@ -46,58 +52,42 @@ service.start(
             "id": "implement-1",
             "action": "implement",
             "title": "Create chain execution test file",
+            "description": "Create the project execution chain test file.",
             "target_file": str(test_file),
             "content": (
-                "def project_execution_chain_test():\n"
-                "    return 'CHAIN_EXECUTION_OK'\n"
+                "print('Nova project execution chain test passed.')\n"
             ),
         },
     ],
-    context={
-        "project_execution": True,
-    },
 )
 
 
-print("\nINITIAL STATE:")
-print(
-    service.get_state(
-        session_id=session_id,
-    )
-)
+print("\nINITIAL STATE")
+print(service.get_state(session_id))
 
 
-print("\nADVANCE 1:")
-result_1 = service.advance(
+print("\nADVANCE 1")
+result_one = service.advance(
     session_id=session_id,
 )
 
-print(result_1)
+print(result_one)
+print(service.get_state(session_id))
 
 
-print("\nADVANCE 2:")
-result_2 = service.advance(
+print("\nADVANCE 2")
+result_two = service.advance(
     session_id=session_id,
 )
 
-print(result_2)
-
-
-print("\nFINAL STATE:")
-final_state = service.get_state(
-    session_id=session_id,
-)
-
-print(final_state)
+print(result_two)
+print(service.get_state(session_id))
 
 
 print("\nFILE EXISTS =", test_file.exists())
 
-
 if test_file.exists():
-    print("\nFILE CONTENT:")
     print(
-        test_file.read_text(
-            encoding="utf-8",
-        )
+        "FILE CONTENT =",
+        test_file.read_text(encoding="utf-8"),
     )

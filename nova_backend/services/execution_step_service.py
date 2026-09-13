@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 from nova_backend.services.execution_approval_service import (
     ExecutionApprovalService,
@@ -124,10 +124,91 @@ class ExecutionStepService:
 
         return ""
 
+    def _execute_project_python_file(
+        self,
+        step,
+        execution_file,
+    ):
+        if self.python_runner is None:
+            raise RuntimeError(
+                "Python runner is not configured "
+                "for explicit execution."
+            )
+
+        execution_path = Path(
+            execution_file
+        ).expanduser()
+
+        if not execution_path.is_absolute():
+            execution_path = (
+                Path.cwd()
+                / execution_path
+            )
+
+        python_result = (
+            self.python_runner.run_file(
+                execution_path
+            )
+        )
+
+        if not isinstance(
+            python_result,
+            dict,
+        ):
+            raise RuntimeError(
+                "Python runner returned an invalid "
+                "execution result."
+            )
+
+        stdout = self._safe_str(
+            python_result.get("stdout")
+        )
+
+        stderr = self._safe_str(
+            python_result.get("stderr")
+        )
+
+        error = self._safe_str(
+            python_result.get("error")
+        )
+
+        ok = bool(
+            python_result.get("ok")
+        )
+
+        step["result"] = stdout
+        step["execution_file"] = str(
+            execution_path
+        )
+        step["execution_output"] = stdout
+        step["execution_stderr"] = stderr
+        step["execution_returncode"] = (
+            python_result.get("returncode")
+        )
+
+        if not ok:
+            step["status"] = "failed"
+            step["error"] = (
+                error
+                or stderr
+                or "Explicit Python execution failed."
+            )
+            return step
+
+        step["status"] = "completed"
+        step["error"] = None
+
+        return step
+
     def _execute_tool_step(
         self,
         step,
     ):
+        confirm = bool(
+            step.get("confirm")
+            or step.get("confirmed")
+        )
+
         if self.tool_executor is None:
             raise RuntimeError(
                 "Nova tool executor is not configured."
@@ -154,10 +235,8 @@ class ExecutionStepService:
         if not isinstance(payload, dict):
             payload = {}
 
-        confirm = bool(
-            step.get("confirm")
-            or step.get("confirmed")
-        )
+        step["payload"] = payload
+        step["confirm"] = True
 
         result = self.tool_executor.run(
             tool_name,
@@ -167,25 +246,52 @@ class ExecutionStepService:
 
         if not isinstance(result, dict):
             raise RuntimeError(
-                "Tool executor returned an invalid result."
-            )
-
-        if not result.get("ok"):
-            raise RuntimeError(
-                self._safe_str(
-                    result.get("error")
-                    or "Tool execution failed."
-                )
+                "Tool execution returned an invalid result."
             )
 
         step["result"] = result
-        step["error"] = None
 
-        step["execution_metadata"] = {
-            "executor": "unified_tool_executor",
-            "tool_name": tool_name,
-            "success": True,
-        }
+        execution_metadata = step.get(
+            "execution_metadata"
+        )
+
+        if not isinstance(
+            execution_metadata,
+            dict,
+        ):
+            execution_metadata = {}
+
+        execution_metadata.update(
+            {
+                "executor": "unified_tool_executor",
+                "tool_name": tool_name,
+                "success": bool(
+                    result.get("ok")
+                ),
+            }
+        )
+
+        step["execution_metadata"] = (
+            execution_metadata
+        )
+
+        if not result.get("ok"):
+            error_message = self._safe_str(
+                result.get("error")
+                or result.get("stderr")
+                or result.get("message")
+                or "Tool execution failed."
+            ).strip()
+
+            step["status"] = "failed"
+            step["error"] = error_message
+
+            raise RuntimeError(
+                error_message
+            )
+
+        step["status"] = "completed"
+        step["error"] = ""
 
         return step
 
@@ -711,6 +817,10 @@ class ExecutionStepService:
                 step.get("target_file")
             ).strip()
 
+            execution_file = self._safe_str(
+                step.get("execution_file")
+            ).strip()
+
             content = (
                 self._implementation_content(
                     step
@@ -769,8 +879,75 @@ class ExecutionStepService:
             # ---------------------------------
             # REAL NOVA TOOL EXECUTION
             # ---------------------------------
+            # Explicit Python execution takes
+            # priority over every other branch.
 
-            if (
+            if execution_file:
+                print(
+                    "DEBUG EXECUTOR EXPLICIT PYTHON FILE =",
+                    execution_file,
+                    flush=True,
+                )
+
+                self._execute_project_python_file(
+                    step=step,
+                    execution_file=execution_file,
+                )
+
+            elif step_action in {
+                "command",
+                "shell",
+                "run_command",
+            }:
+                step["tool_name"] = (
+                    self._safe_str(
+                        step.get("tool_name")
+                        or step.get("tool")
+                        or step.get("tool_action")
+                    ).strip()
+                    or "terminal_execute"
+                )
+
+                payload = step.get("payload")
+
+                if not isinstance(
+                    payload,
+                    dict,
+                ):
+                    payload = {}
+
+                command = self._safe_str(
+                    step.get("command")
+                ).strip()
+
+                if command and not payload.get("command"):
+                    payload["command"] = command
+
+                step["payload"] = payload
+
+                # Explicit project command steps are
+                # authorized for execution.
+                step["confirm"] = True
+
+                print(
+                    "DEBUG EXECUTOR COMMAND TOOL =",
+                    {
+                        "tool_name": step["tool_name"],
+                        "command": payload.get("command"),
+                        "confirm": step["confirm"],
+                    },
+                    flush=True,
+                )
+
+                self._execute_tool_step(
+                    step=step,
+                )
+
+            # ---------------------------------
+            # REAL NOVA TOOL EXECUTION
+            # ---------------------------------
+
+            elif (
                 step.get("tool_name")
                 or step.get("tool")
                 or step.get("tool_action")
@@ -810,10 +987,6 @@ class ExecutionStepService:
 
             # ---------------------------------
             # AI IMPLEMENTATION FALLBACK
-            #
-            # "implement" without an explicit
-            # target file and code is reasoning
-            # work, not a failed file operation.
             # ---------------------------------
 
             elif step_action in self.IMPLEMENT_ACTIONS:
@@ -834,11 +1007,6 @@ class ExecutionStepService:
 
             # ---------------------------------
             # UNKNOWN ACTION
-            #
-            # Unknown natural-language actions
-            # should still be given to the AI
-            # execution engine rather than
-            # immediately killing the plan.
             # ---------------------------------
 
             else:
@@ -853,6 +1021,27 @@ class ExecutionStepService:
                     session_id=session_id,
                     step=step,
                 )
+
+            result_status = self._safe_str(
+                step.get("status")
+            ).strip().lower()
+
+            if result_status in {
+                "failed",
+                "error",
+            }:
+                raise RuntimeError(
+                    self._safe_str(
+                        step.get("error")
+                        or "Execution step failed."
+                    )
+                )
+
+            if result_status in {
+                "waiting",
+                "waiting_approval",
+            }:
+                return step
 
             step["status"] = "completed"
 

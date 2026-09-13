@@ -675,3 +675,37 @@ label.small input[type="checkbox"]{
 /* ===== /NOVA_COPY_QUOTE_CSS_V1 ===== */
 
 
+
+/* NOVA TASK EXECUTION CONTROLS */
+#nova-left-execution-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    width: 100%;
+}
+
+#nova-left-execution-controls .nova-left-execution-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+}
+
+#nova-left-execution-controls
+.nova-left-execution-row-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#nova-left-execution-controls button {
+    width: 100%;
+    min-height: 34px;
+    padding: 7px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+#nova-left-execution-controls button:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
