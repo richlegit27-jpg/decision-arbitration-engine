@@ -69,7 +69,7 @@ class ProjectExecutionHandler:
         }:
             execution_file = str(
                 current_step.get("execution_file")
-                or current_step.get("target_file")
+                or ""
                 or ""
             ).strip()
 
@@ -107,7 +107,7 @@ class ProjectExecutionHandler:
         }:
             execution_file = str(
                 current_step.get("execution_file")
-                or current_step.get("target_file")
+                or ""
                 or ""
             ).strip()
 
@@ -1885,7 +1885,7 @@ class ProjectExecutionHandler:
         }:
             execution_file = str(
                 current_step.get("execution_file")
-                or current_step.get("target_file")
+                or ""
                 or ""
             ).strip()
 
@@ -2343,6 +2343,7 @@ class ProjectExecutionHandler:
             "error": current_step["error"],
             "execution_state": state,
         }
+
 
 
 
