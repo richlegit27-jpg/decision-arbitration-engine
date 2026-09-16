@@ -1,4 +1,4 @@
-﻿
+
 from __future__ import annotations
 
 
@@ -480,34 +480,6 @@ class ChatExecutionService:
                     state
                 )
 
-            if current_step_status in terminal_step_statuses:
-                state["current_index"] = (
-                    current_index + 1
-                )
-                state["current_step"] = None
-
-                if state["current_index"] >= len(
-                    normalized_steps
-                ):
-                    state["status"] = "complete"
-                    state["complete"] = True
-                    state["waiting"] = False
-                    state["next_action"] = None
-
-                self._states[
-                    safe_session_id
-                ] = state
-
-                self._sync_state_to_session(
-                    safe_session_id,
-                    state,
-                )
-
-                self._save_states()
-
-                return self._copy_state(
-                    state
-                )
 
 
 
