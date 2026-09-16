@@ -480,34 +480,6 @@ class ChatExecutionService:
                     state
                 )
 
-
-
-
-
-        execution_result = (
-            self.execution_handler.run_next_move(
-                action="run_step",
-                session_id=safe_session_id,
-                execution_state=state,
-            )
-        )
-
-        returned_state = None
-
-        if isinstance(
-            execution_result,
-            dict,
-        ):
-            returned_state = execution_result.get(
-                "execution_state"
-            )
-
-        if isinstance(
-            returned_state,
-            dict,
-        ):
-            state = returned_state
-
         self._states[
             safe_session_id
         ] = state
