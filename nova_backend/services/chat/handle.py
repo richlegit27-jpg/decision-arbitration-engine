@@ -320,173 +320,238 @@ def chat_handle(
                     "converted into an execution plan."
                 )
 
-        print(
-            "[CHAT_HANDLE EXECUTION READY]",
-            {
-                "session_id": session_id,
-                "goal": execution_state.get(
-                    "goal"
-                ),
-                "step_count": len(steps),
-                "current_index": execution_state.get(
-                    "current_index"
-                ),
-            },
-            flush=True,
-        )
-
-        # ======================================
-        # EXECUTION RUN
-        # ======================================
-
-        execution_result = orchestrator.process_execution(
-            session_id=session_id,
-            state=execution_state,
-            command="run_step",
-        )
-
-        print(
-            "[CHAT_HANDLE EXECUTION RESULT]",
-            repr(execution_result),
-            flush=True,
-        )
-
-        if execution_result is None:
-
-            raise RuntimeError(
-                "Execution orchestrator returned "
-                "None after receiving a valid plan."
+            print(
+                "[CHAT_HANDLE EXECUTION READY]",
+                {
+                    "session_id": session_id,
+                    "goal": execution_state.get(
+                        "goal"
+                    ),
+                    "step_count": len(steps),
+                    "current_index": execution_state.get(
+                        "current_index"
+                    ),
+                },
+                flush=True,
             )
 
-        if isinstance(
-            execution_result,
-            dict,
-        ):
+            # ======================================
+            # EXECUTION RUN
+            # ======================================
 
-            nested_execution_state = (
-                execution_result.get(
-                    "execution_state"
+            execution_result = orchestrator.process_execution(
+                session_id=session_id,
+                state=execution_state,
+                command="run_step",
+            )
+
+
+            if execution_result is None:
+
+                raise RuntimeError(
+                    "Execution orchestrator returned "
+                    "None after receiving a valid plan."
                 )
-            )
 
             if isinstance(
-                nested_execution_state,
+                execution_result,
                 dict,
-            ) and nested_execution_state.get(
-                "steps"
             ):
 
-                merged_execution_state = dict(
-                    execution_state
+                nested_execution_state = (
+                    execution_result.get(
+                        "execution_state"
+                    )
                 )
 
-                merged_execution_state.update(
-                    nested_execution_state
-                )
-
-                execution_state = (
-                    merged_execution_state
-                )
-
-            else:
-
-                # The orchestrator may return only
-                # completion metadata. Preserve the
-                # original plan and merge the metadata.
-                execution_state = dict(
-                    execution_state
-                )
-
-                for key in (
-                    "status",
-                    "complete",
-                    "waiting",
-                    "current_index",
-                    "current_step",
-                    "current_step_title",
-                    "current_step_index",
-                    "history",
-                    "last_action",
-                    "updated_at",
-                    "error",
+                if isinstance(
+                    nested_execution_state,
+                    dict,
+                ) and nested_execution_state.get(
+                    "steps"
                 ):
 
-                    if key in execution_result:
-                        execution_state[key] = (
-                            execution_result[key]
+                    merged_execution_state = dict(
+                        execution_state
+                    )
+
+                    merged_execution_state.update(
+                        nested_execution_state
+                    )
+
+                    execution_state = (
+                        merged_execution_state
+                    )
+
+                else:
+
+                    # The orchestrator may return only
+                    # completion metadata. Preserve the
+                    # original plan and merge the metadata.
+                    execution_state = dict(
+                        execution_state
+                    )
+
+                    for key in (
+                        "status",
+                        "complete",
+                        "waiting",
+                        "current_index",
+                        "current_step",
+                        "current_step_title",
+                        "current_step_index",
+                        "history",
+                        "last_action",
+                        "updated_at",
+                        "error",
+                    ):
+
+                        if key in execution_result:
+                            execution_state[key] = (
+                                execution_result[key]
+                            )
+
+                    approval_prompt = ""
+
+                    steps = execution_state.get(
+                        "steps"
+                    ) or []
+
+                    for step in steps:
+                        if not isinstance(
+                            step,
+                            dict,
+                        ):
+                            continue
+
+                        result_text = str(
+                            step.get("result") or ""
+                        ).strip()
+
+                        if (
+                            "approval is required" in result_text.lower()
+                            or "do you approve" in result_text.lower()
+                            or "approve? (yes/no)" in result_text.lower()
+                        ):
+                            approval_prompt = result_text
+
+                            step["status"] = "waiting"
+                            step["waiting"] = True
+                            step["approval_required"] = True
+                            step["approval_prompt"] = result_text
+
+                            break
+
+                    if approval_prompt:
+
+                        execution_state["status"] = (
+                            "waiting"
                         )
 
-                if execution_result.get(
-                    "status"
-                ) == "success":
+                        execution_state["complete"] = (
+                            False
+                        )
 
-                    execution_state["status"] = (
-                        "success"
+                        execution_state["waiting"] = (
+                            True
+                        )
+
+                        execution_state["approval_required"] = (
+                            True
+                        )
+
+                        execution_state["approval_prompt"] = (
+                            approval_prompt
+                        )
+
+                        execution_state["current_index"] = max(
+                            0,
+                            len(steps) - 1,
+                        )
+
+                        execution_state[
+                            "current_step_index"
+                        ] = execution_state[
+                            "current_index"
+                        ]
+
+                        execution_state[
+                            "current_step"
+                        ] = steps[
+                            execution_state["current_index"]
+                        ].get(
+                            "title"
+                        ) or ""
+
+                        execution_state[
+                            "current_step_title"
+                        ] = execution_state[
+                            "current_step"
+                        ]
+
+                    elif execution_result.get(
+                        "status"
+                    ) == "success":
+
+                        execution_state["status"] = (
+                            "success"
+                        )
+
+                        execution_state["complete"] = (
+                            True
+                        )
+
+                        execution_state["waiting"] = (
+                            False
+                        )
+
+                        execution_state[
+                            "current_index"
+                        ] = len(
+                            execution_state.get(
+                                "steps"
+                            ) or []
+                        )
+
+                        execution_state[
+                            "current_step_index"
+                        ] = execution_state[
+                            "current_index"
+                        ]
+
+                        execution_state[
+                            "current_step"
+                        ] = ""
+
+                        execution_state[
+                            "current_step_title"
+                        ] = ""
+
+                    if not isinstance(
+                        steps,
+                        list,
+                    ) or not steps:
+
+                        raise RuntimeError(
+                            "Execution orchestrator returned "
+                            "an execution state without steps."
+                        )
+
+                    service._save_execution_state(
+                        session_id,
+                        execution_state,
                     )
 
-                    execution_state["complete"] = (
-                        True
+                    service._set_session_meta(
+                        session_id,
+                        "active_execution",
+                        execution_state,
                     )
 
-                    execution_state["waiting"] = (
-                        False
-                    )
-
-                    execution_state[
-                        "current_index"
-                    ] = len(
-                        execution_state.get(
-                            "steps"
-                        ) or []
-                    )
-
-                    execution_state[
-                        "current_step_index"
-                    ] = execution_state[
-                        "current_index"
-                    ]
-
-                    execution_state[
-                        "current_step"
-                    ] = ""
-
-                    execution_state[
-                        "current_step_title"
-                    ] = ""
-
-                steps = execution_state.get(
-                    "steps"
-                ) or []
-
-                if not isinstance(
-                    steps,
-                    list,
-                ) or not steps:
-
-                    raise RuntimeError(
-                        "Execution orchestrator returned "
-                        "an execution state without steps."
-                    )
-
-                service._save_execution_state(
-                    session_id,
-                    execution_state,
-                )
-
-                service._set_session_meta(
-                    session_id,
-                    "active_execution",
-                    execution_state,
-                )
-
-                return {
-                    "ok": execution_result.get(
-                        "ok",
-                        True,
-                    ),
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": (
+                    assistant_text = (
+                        approval_prompt
+                        if approval_prompt
+                        else (
                             execution_result.get("message")
                             if execution_state.get("status")
                             not in {"failed", "error", "cancelled"}
@@ -494,30 +559,63 @@ def chat_handle(
                                 execution_result.get("message")
                                 or "Execution step failed."
                             )
+                        )
+                    )
+
+                    execution_result = (
+                        service.execution_orchestrator_service.process_execution(
+                            session_id=session_id,
+                            state=execution_state,
+                            command="run_step",
+                        )
+                    )
+
+
+                    return {
+                        "ok": execution_result.get(
+                            "ok",
+                            True,
+                        ),
+                        "assistant_message": (
+                            execution_result.get(
+                                "assistant_message"
+                            )
+                            or {
+                                "role": "assistant",
+                                "text": "",
+                            }
+                        ),
+                        "session_id": session_id,
+                        "execution": execution_result.get(
+                            "execution",
+                            execution_state,
+                        ),
+                        "execution_state": execution_result.get(
+                            "execution",
+                            execution_state,
+                        ),
+                        "step_output": execution_result.get(
+                            "step_output",
+                            "",
+                        ),
+                    }
+
+                return {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": str(
+                            execution_result
                         ),
                     },
                     "session_id": session_id,
-                    "execution": execution_state,
-                    "execution_state": execution_state,
+                    "execution": execution_result,
+                    "execution_state": execution_result,
                 }
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": str(
-                        execution_result
-                    ),
-                },
-                "session_id": session_id,
-                "execution": execution_result,
-                "execution_state": execution_result,
-            }
 
         # ==========================================
         # WEB FETCH ROUTE
         # ==========================================
-
         if route == "web_fetch":
 
             return service._execute_web_fetch(

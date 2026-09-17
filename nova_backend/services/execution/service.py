@@ -1,7 +1,7 @@
 ﻿import re
 import uuid
 from datetime import datetime
-
+from pathlib import Path
 
 class ExecutionService:
 
@@ -444,6 +444,57 @@ class ExecutionService:
         )
 
         if action in {
+            "create_file",
+            "write_file",
+        }:
+            target_file = (
+                step.get("target_file")
+                or step.get("payload", {}).get(
+                    "target_file"
+                )
+                or ""
+            )
+
+            content = (
+                step.get("content")
+                or step.get("file_content")
+                or step.get("payload", {}).get(
+                    "content"
+                )
+                or ""
+            )
+
+            if not target_file:
+                return (
+                    "create_file failed: "
+                    "missing target_file"
+                )
+
+            try:
+                target_path = Path(target_file)
+
+                target_path.parent.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
+
+                target_path.write_text(
+                    str(content),
+                    encoding="utf-8",
+                )
+
+                return (
+                    f"Created file: "
+                    f"{target_path}"
+                )
+
+            except Exception as exc:
+                return (
+                    "create_file failed: "
+                    f"{exc}"
+                )
+
+        if action in {
             "execute",
             "run_step",
         }:
@@ -504,6 +555,180 @@ class ExecutionService:
             return f"response: {input_data}"
 
         return f"unknown action: {action}"
+
+    def build_planning_execution(
+        self,
+        user_text: str,
+        title: str = "Nova Execution Plan",
+        max_steps: int = 5,
+    ) -> dict:
+        """
+        Build an execution plan compatible with the active executor.
+
+        Mutation requests receive explicit action metadata so the executor
+        does not fall back to a generic AI design response.
+        """
+        goal = self.safe_str(user_text).strip()
+        now_iso = self.chat_service._iso_now()
+
+        file_request = self._extract_file_creation_request(goal)
+
+        if file_request:
+            target_file = self.safe_str(
+                file_request.get("target_file")
+            ).strip()
+            content = self.safe_str(
+                file_request.get("content")
+            )
+
+            step_objs = [
+                {
+                    "id": "step_1",
+                    "title": "Create the requested file",
+                    "text": goal,
+                    "description": goal,
+                    "action": "create_file",
+                    "target_file": target_file,
+                    "content": content,
+                    "file_content": content,
+                    "status": "planned",
+                    "notes": "",
+                    "payload": {
+                        "target_file": target_file,
+                        "content": content,
+                        "file_content": content,
+                    },
+                }
+            ]
+        else:
+            step_titles = (
+                self.chat_service
+                ._execution_step_titles_for_goal(goal)
+            )
+
+            if not isinstance(step_titles, list):
+                step_titles = list(step_titles or [])
+
+            step_titles = [
+                self.safe_str(step).strip()
+                for step in step_titles
+                if self.safe_str(step).strip()
+            ]
+
+            if max_steps:
+                step_titles = step_titles[:max_steps]
+
+            step_objs = [
+                {
+                    "id": f"step_{index}",
+                    "title": step_title,
+                    "text": step_title,
+                    "description": step_title,
+                    "action": "design",
+                    "target_file": "",
+                    "content": "",
+                    "file_content": "",
+                    "status": "planned",
+                    "notes": "",
+                    "payload": {},
+                }
+                for index, step_title in enumerate(
+                    step_titles,
+                    start=1,
+                )
+            ]
+
+        first_step = step_objs[0] if step_objs else {}
+
+        return {
+            "id": f"exec_{uuid.uuid4().hex[:12]}",
+            "mode": "plan_run",
+            "title": (
+                self.safe_str(title).strip()
+                or "Nova Execution Plan"
+            ),
+            "goal": goal,
+            "status": "planned",
+            "current_step": first_step.get(
+                "title",
+                "",
+            ),
+            "summary": goal[:200],
+            "steps": step_objs,
+            "started_at": now_iso,
+            "updated_at": now_iso,
+        }
+
+
+    def normalize_execution(
+        self,
+        execution,
+    ) -> dict:
+        """
+        Normalize execution data returned to ChatService.
+        """
+
+        if not isinstance(execution, dict):
+            execution = {}
+
+        execution.setdefault(
+            "id",
+            f"exec_{uuid.uuid4().hex[:12]}",
+        )
+
+        execution.setdefault(
+            "mode",
+            "plan_run",
+        )
+
+        execution.setdefault(
+            "goal",
+            "",
+        )
+
+        execution.setdefault(
+            "status",
+            "planned",
+        )
+
+        execution.setdefault(
+            "steps",
+            [],
+        )
+
+        execution.setdefault(
+            "current_step",
+            (
+                execution["steps"][0].get("title", "")
+                if execution["steps"]
+                and isinstance(execution["steps"][0], dict)
+                else ""
+            ),
+        )
+
+        execution.setdefault(
+            "summary",
+            self.safe_str(
+                execution.get("goal")
+            )[:200],
+        )
+
+        now_iso = (
+            self.chat_service
+            ._iso_now()
+        )
+
+        execution.setdefault(
+            "started_at",
+            now_iso,
+        )
+
+        execution.setdefault(
+            "updated_at",
+            now_iso,
+        )
+
+        return execution
 
 
     def _build_execution(

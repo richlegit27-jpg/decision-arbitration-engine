@@ -1649,16 +1649,17 @@ class ChatService:
 
         execution = (
             self.execution_service.build_planning_execution(
-                user_text=self.safe_str(
-                    user_text
-                ).strip(),
+                user_text=self.safe_str(user_text).strip(),
                 title="Nova Execution Plan",
                 max_steps=5,
             )
         )
 
-        if isinstance(plan, list) and plan:
-
+        if (
+            isinstance(plan, list)
+            and plan
+            and not execution.get("steps")
+        ):
             execution["steps"] = [
                 {
                     "id": f"step_{index + 1}",
@@ -12414,8 +12415,70 @@ Rules:
             step_output = f"Step execution failed: {exc}"
 
         if not step_output:
-
             step_output = f"Completed step: {step_title}"
+
+        approval_prompt = self.safe_str(
+            step_output
+        ).lower()
+
+        approval_required = (
+            "approval is required" in approval_prompt
+            or "do you approve" in approval_prompt
+            or "approve? (yes/no)" in approval_prompt
+            or "approval required before" in approval_prompt
+        )
+
+        if approval_required:
+            execution["status"] = "waiting"
+            execution["waiting"] = True
+            execution["complete"] = False
+            execution["lock"] = False
+            execution["current_step"] = step_title
+            execution["current_step_title"] = step_title
+            execution["approval_required"] = True
+            execution["approval_prompt"] = step_output
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution,
+            )
+
+            self._save_active_execution(
+                session_id,
+                execution,
+            )
+
+            self._save_execution_state(
+                session_id,
+                execution,
+            )
+
+            return {
+                "execution": execution,
+                "step_output": step_output,
+                "saved_artifact": {
+                    "kind": "execution",
+                    "title": goal or "Execution",
+                    "body": self._render_execution(execution),
+                    "execution": execution,
+                    "meta": {
+                        "execution": execution,
+                        "goal": goal,
+                        "step_index": current_index,
+                        "step_title": step_title,
+                        "execution_id": self.safe_str(
+                            execution.get("id")
+                        ),
+                        "status": "waiting",
+                        "progress": execution.get(
+                            "progress",
+                            0,
+                        ),
+                        "current_step": step_title,
+                    },
+                },
+            }
 
         step_result = {
             "step_index": current_index,
