@@ -874,6 +874,7 @@ class ExecutionService:
             reusable_status = execution_status in {
                 "running",
                 "waiting",
+                "waiting_approval",
                 "paused",
                 "pending",
             }

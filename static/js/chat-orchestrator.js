@@ -263,32 +263,59 @@ function persistCurrentMessages(){
     }
   }
 
-  function bindStreamCallbacks(){
-    const streamService =
-      typeof getStreamService === "function"
-        ? getStreamService()
-        : null
+function bindStreamCallbacks(){
+  const streamService =
+    typeof getStreamService === "function"
+      ? getStreamService()
+      : null
 
-    if(!streamService || typeof streamService.setCallbacks !== "function"){
-      return
-    }
-
-    streamService.setCallbacks({
-      onStart(){
-        state.isStreaming = true
-      },
-      onDone(){
-        state.isStreaming = false
-        persistCurrentMessages()
-        renderShell()
-        scrollMessagesToBottom(true)
-      },
-      onError(err){
-        console.error("NovaChatApp stream error:", err)
-        state.isStreaming = false
-      },
-    })
+  if(!streamService || typeof streamService.setCallbacks !== "function"){
+    console.warn("[NOVA STREAM CALLBACK] Stream service unavailable")
+    return
   }
+
+  streamService.setCallbacks({
+    onStart(){
+      console.log("[NOVA STREAM CALLBACK] onStart")
+
+      state.isStreaming = true
+      state.isSending = true
+
+      composer?.updateComposerState?.()
+      renderShell()
+    },
+
+    onDone(){
+      console.log("[NOVA STREAM CALLBACK] onDone BEFORE CLEAR", {
+        isStreaming: state.isStreaming,
+        isSending: state.isSending,
+      })
+
+      state.isStreaming = false
+      state.isSending = false
+
+      composer?.updateComposerState?.()
+      persistCurrentMessages()
+      renderShell()
+      scrollMessagesToBottom(true)
+
+      console.log("[NOVA STREAM CALLBACK] onDone AFTER CLEAR", {
+        isStreaming: state.isStreaming,
+        isSending: state.isSending,
+      })
+    },
+
+    onError(err){
+      console.error("[NOVA STREAM CALLBACK] onError", err)
+
+      state.isStreaming = false
+      state.isSending = false
+
+      composer?.updateComposerState?.()
+      renderShell()
+    },
+  })
+}
 
   function bindAttachmentCallbacks(){
     const attachmentsService =

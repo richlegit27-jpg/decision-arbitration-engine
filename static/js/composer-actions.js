@@ -687,10 +687,15 @@ responseAttachments.length){
       options.assistantId
     )
   }else{
-    appendAssistantMessage(
-      responseText,
-      responseAttachments
-    )
+
+appendAssistantMessage(
+  responseText,
+  responseAttachments,
+  {
+    execution: reply?.execution || null,
+    execution_state: reply?.execution_state || null,
+  }
+)
   }
 
 }else{
@@ -979,10 +984,15 @@ if(streamText.trim()){
             replaced
         )
     }else{
-        const appended = appendAssistantMessage(
-            streamText,
-            responseAttachments
-        )
+
+const appended = appendAssistantMessage(
+    streamText,
+    responseAttachments,
+    {
+        execution: reply?.execution || null,
+        execution_state: reply?.execution_state || null,
+    }
+)
 
         console.log(
             "[NORMAL SEND APPEND ASSISTANT]",
