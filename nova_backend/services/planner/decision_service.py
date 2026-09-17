@@ -6,6 +6,185 @@
     def safe_str(self, value):
         return str(value or "").strip()
 
+    def _execution_decision(
+        self,
+        user_text: str,
+        intent: str,
+        reason: str,
+        command: str = "",
+        mode: str = "execution",
+    ) -> dict:
+        decision = {
+            "route": "execution",
+            "mode": mode,
+            "intent": intent,
+            "confidence": 1.0,
+            "reasons": [
+                reason,
+            ],
+            "save_artifact": False,
+            "save_memory": False,
+            "use_memory": False,
+            "prompt": user_text,
+        }
+
+        if command:
+            decision["command"] = command
+
+        return decision
+
+    def _extract_explicit_command(self, user_text: str) -> str:
+        text = self.safe_str(user_text).strip()
+
+        if not text:
+            return ""
+
+        lower_text = text.lower()
+
+        command_markers = (
+            "terminal command now:",
+            "terminal command:",
+            "execute this terminal command now:",
+            "execute this terminal command:",
+            "execute this command now:",
+            "execute this command:",
+            "run this terminal command now:",
+            "run this terminal command:",
+            "run this command now:",
+            "run this command:",
+            "that runs:",
+            "which runs:",
+            "to run:",
+            "execute:",
+            "run:",
+        )
+
+        for marker in command_markers:
+            marker_index = lower_text.find(marker)
+
+            if marker_index >= 0:
+                command = text[
+                    marker_index + len(marker):
+                ].strip()
+
+                if command:
+                    return command
+
+        # Standalone commands are already complete commands.
+        command_prefixes = (
+            "write-output ",
+            "write-host ",
+            "get-childitem ",
+            "get-content ",
+            "set-content ",
+            "add-content ",
+            "remove-item ",
+            "copy-item ",
+            "move-item ",
+            "new-item ",
+            "invoke-restmethod ",
+            "invoke-webrequest ",
+            "python ",
+            "py ",
+            "python3 ",
+            "node ",
+            "npm ",
+            "npx ",
+            "git ",
+            "curl ",
+            "curl.exe ",
+            "powershell ",
+            "pwsh ",
+            "bash ",
+            "sh ",
+            "cmd ",
+            "echo ",
+        )
+
+        if lower_text.startswith(command_prefixes):
+            return text
+
+        if (
+            lower_text.endswith(".ps1")
+            or " -file " in lower_text
+            or lower_text.startswith(".\\")
+            or lower_text.startswith("./")
+        ):
+            return text
+
+        return ""
+
+    def _has_explicit_execution_intent(self, lower_text: str) -> bool:
+        lower_text = self.safe_str(lower_text).strip().lower()
+
+        explicit_phrases = (
+            "execute this terminal command",
+            "execute this command",
+            "run this terminal command",
+            "run this command",
+            "execute the terminal command",
+            "execute the command",
+            "run the terminal command",
+            "run the command",
+            "create a project execution step",
+            "create an execution step",
+            "create a terminal execution step",
+            "make a project execution step",
+            "make an execution step",
+            "terminal command now",
+            "execute now",
+            "run now",
+        )
+
+        if any(
+            phrase in lower_text
+            for phrase in explicit_phrases
+        ):
+            return True
+
+        command_prefixes = (
+            "write-output ",
+            "write-host ",
+            "get-childitem ",
+            "get-content ",
+            "set-content ",
+            "add-content ",
+            "remove-item ",
+            "copy-item ",
+            "move-item ",
+            "new-item ",
+            "invoke-restmethod ",
+            "invoke-webrequest ",
+            "python ",
+            "py ",
+            "python3 ",
+            "node ",
+            "npm ",
+            "npx ",
+            "git ",
+            "curl ",
+            "curl.exe ",
+            "powershell ",
+            "pwsh ",
+            "bash ",
+            "sh ",
+            "cmd ",
+            "echo ",
+        )
+
+        if lower_text.startswith(command_prefixes):
+            return True
+
+        if (
+            lower_text.endswith(".ps1")
+            or " -file " in lower_text
+            or lower_text.startswith(".\\")
+            or lower_text.startswith("./")
+        ):
+            return True
+
+        return False
+
     def _decide_route(
         self,
         user_text: str,
@@ -14,8 +193,92 @@
     ) -> dict:
 
         user_text = self.safe_str(user_text)
-
         lower_text = user_text.lower()
+
+        # Resume an existing unfinished execution before normal route
+        # classification can send the continuation to general_chat or
+        # project_brain.
+        pending_execution = False
+
+        try:
+            execution_state = self.chat_service._load_execution_state(
+                session_id
+            )
+
+            if isinstance(execution_state, dict):
+                steps = execution_state.get("steps") or []
+                current_index = execution_state.get(
+                    "current_index",
+                    0,
+                )
+                execution_status = self.safe_str(
+                    execution_state.get("status")
+                ).lower()
+
+                try:
+                    current_index = int(current_index or 0)
+                except (TypeError, ValueError):
+                    current_index = 0
+
+                pending_execution = (
+                    isinstance(steps, list)
+                    and bool(steps)
+                                        and execution_status in {
+                        "pending",
+                        "running",
+                        "in_progress",
+                        "paused",
+                        "waiting",
+                    }
+                    and current_index < len(steps)
+                )
+
+        except Exception as exc:
+            print(
+                "[DECISION PENDING EXECUTION CHECK FAILED]",
+                repr(exc),
+            )
+
+        if pending_execution:
+            return self._execution_decision(
+                user_text=user_text,
+                intent="execution_continuation",
+                reason="pending_execution_priority",
+            )
+
+        # Explicit terminal-command execution must be evaluated before
+        # general action classification and before the default chat route.
+        explicit_command = self._extract_explicit_command(
+            user_text
+        )
+
+        if (
+            explicit_command
+            and self._has_explicit_execution_intent(
+                lower_text
+            )
+        ):
+            return self._execution_decision(
+                user_text=user_text,
+                intent="terminal_command_execution",
+                reason="explicit_terminal_command",
+                command=explicit_command,
+            )
+
+        # Explicit project-execution-step creation.
+        if (
+            "create a project execution step" in lower_text
+            or "create an execution step" in lower_text
+            or "create a terminal execution step" in lower_text
+            or "make a project execution step" in lower_text
+            or "make an execution step" in lower_text
+        ):
+            return self._execution_decision(
+                user_text=user_text,
+                intent="execution_step_creation",
+                reason="explicit_execution_step_request",
+                command=explicit_command,
+            )
 
         if any(
             phrase in lower_text
@@ -133,24 +396,17 @@
         )
 
         if lower_text.strip() in execution_triggers:
-            return {
-                "route": "execution",
-                "mode": "execution",
-                "intent": "execution_control",
-                "confidence": 1.0,
-                "reasons": [
-                    "execution_command",
-                ],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": False,
-                "prompt": user_text,
-            }
+            return self._execution_decision(
+                user_text=user_text,
+                intent="execution_control",
+                reason="execution_command",
+            )
 
         execution_action_prefixes = (
             "create ",
             "make ",
             "write ",
+                        "fix ",
             "edit ",
             "modify ",
             "update ",
@@ -165,6 +421,7 @@
             "restart ",
             "install ",
             "uninstall ",
+            "execute ",
         )
 
         execution_action_terms = (
@@ -186,10 +443,14 @@
             "class",
             "endpoint",
             "service",
+            "terminal",
+            "execution step",
         )
 
         is_execution_action = (
-            lower_text.startswith(execution_action_prefixes)
+            lower_text.startswith(
+                execution_action_prefixes
+            )
             and any(
                 term in lower_text
                 for term in execution_action_terms
@@ -197,19 +458,12 @@
         )
 
         if is_execution_action:
-            return {
-                "route": "execution",
-                "mode": "execution",
-                "intent": "task_execution",
-                "confidence": 0.95,
-                "reasons": [
-                    "explicit_execution_action",
-                ],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": True,
-                "prompt": user_text,
-            }
+            return self._execution_decision(
+                user_text=user_text,
+                intent="task_execution",
+                reason="explicit_execution_action",
+                command=explicit_command,
+            )
 
         planning_triggers = (
             "plan",
@@ -257,3 +511,11 @@
             "use_memory": True,
             "prompt": user_text,
         }
+
+
+
+
+
+
+
+

@@ -350,9 +350,11 @@ class AttachmentAnalysisService:
                 mime_type or ""
             ).lower()
 
+            suffix = path_obj.suffix.lower()
+
             if (
                 "pdf" in mime
-                or path_obj.suffix.lower() == ".pdf"
+                or suffix == ".pdf"
             ):
                 try:
                     import fitz
@@ -364,13 +366,50 @@ class AttachmentAnalysisService:
                     pieces = []
 
                     for page in document:
-                        text = page.get_text("text")
+                        page_text = page.get_text("text")
 
-                        if text:
-                            pieces.append(text)
+                        if page_text:
+                            pieces.append(page_text)
 
                     return "\n\n".join(
                         pieces
+                    ).strip()
+
+                except Exception:
+                    return ""
+
+            if (
+                mime.startswith("text/")
+                or suffix in {
+                    ".txt",
+                    ".md",
+                    ".markdown",
+                    ".csv",
+                    ".json",
+                    ".xml",
+                    ".html",
+                    ".htm",
+                    ".py",
+                    ".js",
+                    ".ts",
+                    ".tsx",
+                    ".jsx",
+                    ".css",
+                    ".yaml",
+                    ".yml",
+                    ".log",
+                    ".ini",
+                    ".cfg",
+                    ".sql",
+                    ".ps1",
+                    ".bat",
+                    ".cmd",
+                }
+            ):
+                try:
+                    return path_obj.read_text(
+                        encoding="utf-8",
+                        errors="replace",
                     ).strip()
 
                 except Exception:
@@ -380,7 +419,6 @@ class AttachmentAnalysisService:
 
         except Exception:
             return ""
-
 
     def read_attachment_text(
         self,

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -681,6 +681,15 @@ class ProjectExecutionController:
             "code",
             "replacement",
             "command",
+            "mutation_mode",
+            "mutation_ready",
+            "next_action",
+            "payload_required",
+            "write_mode",
+            "operation",
+            "path",
+            "file_path",
+            "filename",
         )
 
         for task in tasks:
@@ -720,40 +729,47 @@ class ProjectExecutionController:
                 )
             )
 
-            step = {
-                "id": (
-                    f"project_task_{task_id}"
-                ),
-                "task_id": str(
-                    task_id
-                ),
-                "title": (
-                    title
-                    or "Project task"
-                ),
-                "description": description,
-                "action": action,
-                "status": "pending",
-            }
+            # Preserve the complete original task so that execution
+            # metadata is not lost during controller normalization.
+            step = dict(task)
 
+            step.update(
+                {
+                    "id": (
+                        f"project_task_{task_id}"
+                    ),
+                    "task_id": str(
+                        task_id
+                    ),
+                    "title": (
+                        title
+                        or "Project task"
+                    ),
+                    "description": description,
+                    "action": action,
+                    "status": (
+                        task.get(
+                            "status",
+                            "pending",
+                        )
+                        or "pending"
+                    ),
+                }
+            )
+
+            # Preserve known execution fields explicitly, including
+            # direct mutation metadata used by file creation tasks.
             for field_name in execution_fields:
-                value = task.get(
-                    field_name
-                )
-
-                if value not in (
-                    None,
-                    "",
-                    [],
-                ):
-                    step[field_name] = value
+                if field_name in task:
+                    step[field_name] = task.get(
+                        field_name
+                    )
 
             steps.append(
                 step
             )
 
         return steps
-
     def _execute_with_existing_orchestrator(
         self,
         project_id,
@@ -1900,7 +1916,7 @@ class ProjectExecutionController:
                     self._execute_with_existing_orchestrator(
                         project_id=project_id,
                         tasks=[current_task],
-                        command="run_step",
+                        command="run_all",
                     )
                 )
 
@@ -2076,6 +2092,40 @@ class ProjectExecutionController:
                                 )
                             )
 
+                            if not isinstance(
+                                task_update_result,
+                                dict,
+                            ):
+                                raise RuntimeError(
+                                    "Task completion was not persisted: "
+                                    "update_task_status returned no task"
+                                )
+
+                            persisted_task_id = str(
+                                task_update_result.get("id") or ""
+                            ).strip()
+
+                            if persisted_task_id != current_task_id:
+                                raise RuntimeError(
+                                    "Task completion persistence returned "
+                                    "the wrong task"
+                                )
+
+                            persisted_status = str(
+                                task_update_result.get("status") or ""
+                            ).strip().lower()
+
+                            if persisted_status not in {
+                                "completed",
+                                "complete",
+                                "done",
+                                "success",
+                            }:
+                                raise RuntimeError(
+                                    "Task completion was not persisted: "
+                                    f"returned status={persisted_status!r}"
+                                )
+
                             current_task["status"] = "completed"
 
                             print(
@@ -2091,15 +2141,98 @@ class ProjectExecutionController:
                             )
 
                         except Exception as exc:
+                            error_message = (
+                                "Execution succeeded, but the task status "
+                                f"could not be persisted: {exc}"
+                            )
+
                             print(
                                 "[PROJECT RUN-ALL TASK COMPLETION ERROR]",
                                 {
                                     "project_id": project_id,
                                     "task_id": current_task_id,
-                                    "error": str(exc),
+                                    "error": error_message,
                                 },
                                 flush=True,
                             )
+
+                            current_task["status"] = "failed"
+                            current_task["error"] = error_message
+
+
+                            try:
+                                failed_task_update_result = (
+                                    self.project_workspace_service
+                                    .update_task_status(
+                                        project_id,
+                                        current_task_id,
+                                        "failed",
+                                    )
+                                )
+
+                                if not isinstance(
+                                    failed_task_update_result,
+                                    dict,
+                                ):
+                                    raise RuntimeError(
+                                        "update_task_status returned no "
+                                        "persisted failed task"
+                                    )
+
+                                failed_task_id = str(
+                                    failed_task_update_result.get("id") or ""
+                                ).strip()
+
+                                failed_task_status = str(
+                                    failed_task_update_result.get("status")
+                                    or ""
+                                ).strip().lower()
+
+                                if failed_task_id != current_task_id:
+                                    raise RuntimeError(
+                                        "Failure persistence returned the "
+                                        "wrong task"
+                                    )
+
+                                if failed_task_status != "failed":
+                                    raise RuntimeError(
+                                        "Failure persistence returned "
+                                        f"status={failed_task_status!r}"
+                                    )
+
+                                print(
+                                    "[PROJECT RUN-ALL TASK FAILURE PERSISTED]",
+                                    {
+                                        "project_id": project_id,
+                                        "task_id": current_task_id,
+                                        "update_result": (
+                                            failed_task_update_result
+                                        ),
+                                    },
+                                    flush=True,
+                                )
+
+                            except Exception as failure_exc:
+                                print(
+                                    "[PROJECT RUN-ALL TASK FAILURE "
+                                    "PERSISTENCE ERROR]",
+                                    {
+                                        "project_id": project_id,
+                                        "task_id": current_task_id,
+                                        "error": str(failure_exc),
+                                    },
+                                    flush=True,
+                                )
+                                print(
+                                    "[PROJECT RUN-ALL TASK FAILURE "
+                                    "PERSISTENCE ERROR]",
+                                    {
+                                        "project_id": project_id,
+                                        "task_id": current_task_id,
+                                        "error": str(failure_exc),
+                                    },
+                                    flush=True,
+                                )
 
                             current_task["status"] = "failed"
                             current_task["error"] = (
@@ -3646,6 +3779,7 @@ class ProjectExecutionController:
                 projects
             )
             break
+
 
 
 

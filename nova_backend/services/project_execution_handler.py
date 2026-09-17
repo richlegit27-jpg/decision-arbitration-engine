@@ -1,11 +1,18 @@
 ﻿from __future__ import annotations
 
+from pathlib import Path
+
 from typing import Any, Dict
 
 from nova_backend.services.execution_handler import (
     NextMove,
 )
 
+print(
+    "[PROJECT EXECUTION HANDLER LOADED]",
+    __file__,
+    flush=True,
+)
 
 class ProjectExecutionHandler:
     """
@@ -15,6 +22,14 @@ class ProjectExecutionHandler:
     Project tasks are translated into NextMove objects and sent to
     the existing default_executor when execution is possible.
     """
+
+    def __init__(
+        self,
+        default_executor=None,
+        execution_step_service=None,
+    ):
+        self.default_executor = default_executor
+        self.execution_step_service = execution_step_service
 
     def _make_move(
         self,
@@ -48,7 +63,6 @@ class ProjectExecutionHandler:
             "specify",
             "specification",
         }:
-
             return NextMove(
                 id=step_id or "project-analysis",
                 type="log",
@@ -70,7 +84,6 @@ class ProjectExecutionHandler:
             execution_file = str(
                 current_step.get("execution_file")
                 or ""
-                or ""
             ).strip()
 
             command = str(
@@ -78,1485 +91,88 @@ class ProjectExecutionHandler:
                 or ""
             ).strip()
 
-            if not execution_file and not command:
-                return None
-
-            payload = dict(current_step)
-
-            if execution_file:
-                payload["execution_file"] = execution_file
-
-            if command:
-                payload["command"] = command
-
-            return NextMove(
-                id=step_id or "project-execute",
-                type="run_step",
-                payload={
-                    "step": payload,
-                    "execution_file": execution_file,
-                    "command": command,
-                },
-            )
-
-        if step_action in {
-            "execute",
-            "run",
-            "run_file",
-            "run_script",
-        }:
-            execution_file = str(
-                current_step.get("execution_file")
-                or ""
+            description = str(
+                current_step.get("description")
+                or current_step.get("text")
+                or current_step.get("title")
                 or ""
             ).strip()
-
-            command = str(
-                current_step.get("command")
-                or ""
-            ).strip()
-
-            if not execution_file and not command:
-                return None
-
-            payload = dict(current_step)
-
-            if execution_file:
-                payload["execution_file"] = execution_file
-
-            if command:
-                payload["command"] = command
-
-            return NextMove(
-                id=step_id or "project-execute",
-                type="run_step",
-                payload={
-                    "step": payload,
-                    "execution_file": execution_file,
-                    "command": command,
-                },
-            )
-
-        if step_action == "create":
-            target_files = (
-                current_step.get("target_files")
-                or []
-            )
-
-            if isinstance(target_files, str):
-                target_files = [target_files]
 
             target_file = str(
-                current_step.get("target_file") or ""
+                current_step.get("target_file")
+                or ""
             ).strip()
 
-            if not target_files and target_file:
-                target_files = [target_file]
-
-            code = str(
-                current_step.get("content")
-                or current_step.get("code")
-                or ""
-            )
-
-            if target_files and code.strip():
-                return NextMove(
-                    id=step_id or "project-create",
-                    type="fix_file",
-                    payload={
-                        "file_paths": target_files,
-                        "file_path": target_files[0],
-                        "code": code,
-                    },
+            if not target_file:
+                target_files = (
+                    current_step.get("target_files")
+                    or []
                 )
 
-            return NextMove(
-                id=step_id or "project-create-log",
-                type="log",
-                payload={
-                    "message": str(
-                        current_step.get("description")
-                        or current_step.get("title")
-                        or "Project creation step completed."
-                    )
-                },
-            )
+                if isinstance(target_files, str):
+                    target_files = [
+                        target_files
+                    ]
 
-
-        if step_action in {
-            "build",
-            "implement",
-            "edit",
-            "write",
-            "modify",
-        }:
-            target_files = (
-                current_step.get("target_files")
-                or []
-            )
-
-            if isinstance(target_files, str):
-                target_files = [
-                    target_files
-                ]
-
-            target_file = str(
-                current_step.get("target_file") or ""
-            ).strip()
-
-            if not target_files and target_file:
-                target_files = [
-                    target_file
-                ]
-
-            code = str(
-                current_step.get("content")
-                or current_step.get("code")
-                or ""
-            )
-
-            if not target_files or not code.strip():
-                return None
-
-            return NextMove(
-                id=step_id or "project-fix-file",
-                type="fix_file",
-                payload={
-                    "file_paths": target_files,
-                    "file_path": (
+                if target_files:
+                    target_file = str(
                         target_files[0]
-                        if target_files
-                        else ""
-                    ),
-                    "code": code,
-                },
-            )
-
-        if step_action == "patch":
-            target_files = (
-                current_step.get("target_files")
-                or []
-            )
-
-            if isinstance(target_files, str):
-                target_files = [
-                    target_files
-                ]
-
-            target_file = str(
-                current_step.get("target_file") or ""
-            ).strip()
-
-            if not target_files and target_file:
-                target_files = [
-                    target_file
-                ]
-
-            function_name = str(
-                current_step.get("target_function") or ""
-            ).strip()
-
-            replacement = str(
-                current_step.get("replacement")
-                or current_step.get("content")
-                or current_step.get("code")
-                or ""
-            )
+                    ).strip()
 
             if (
-                target_files
-                and function_name
-                and replacement.strip()
+                not execution_file
+                and not command
+                and target_file
             ):
-                return NextMove(
-                    id=step_id or "project-function-fix",
-                    type="apply_function_fix",
-                    payload={
-                        "file_paths": target_files,
-                        "file_path": (
-                            target_files[0]
-                            if target_files
-                            else ""
-                        ),
-                        "function_name": function_name,
-                        "replacement": replacement,
-                    },
+                execution_file = target_file
+
+            if (
+                not execution_file
+                and not command
+                and description
+            ):
+                import re
+
+                path_match = re.search(
+                    r"([A-Za-z]:\\[^<>:\"|?*\r\n]+\.py)",
+                    description,
+                    flags=re.IGNORECASE,
                 )
 
-            if target_files and replacement.strip():
-                return NextMove(
-                    id=step_id or "project-fix-file",
-                    type="fix_file",
-                    payload={
-                        "file_paths": target_files,
-                        "file_path": (
-                            target_files[0]
-                            if target_files
-                            else ""
-                        ),
-                        "code": replacement,
-                    },
-                )
+                if path_match:
+                    execution_file = path_match.group(1).strip()
 
-            return None
-
-        if step_action in {
-            "command",
-            "shell",
-            "run_command",
-        }:
-            command = str(
-                current_step.get("command") or ""
-            ).strip()
-
-            if not command:
+            if (
+                not execution_file
+                and not command
+            ):
                 return None
 
+            payload = dict(current_step)
+
+            if execution_file:
+                payload["execution_file"] = execution_file
+
+            if command:
+                payload["command"] = command
+
             return NextMove(
-                id=step_id or "project-command",
-                type="run_step",
-                payload={
-                    "command": command,
-                    "step": current_step,
-                },
+                id=step_id or "project-execution",
+                type="execute",
+                payload=payload,
             )
 
-        return None
-
-    def __init__(
-        self,
-        default_executor=None,
-        execution_step_service=None,
-    ):
-        self.default_executor = default_executor
-        self.execution_step_service = execution_step_service
-
-    def _validate_completion(
-        self,
-        session_id: str,
-        current_step: Dict[str, Any],
-        result: str,
-    ) -> bool:
-        """
-        Validate execution results deterministically when an exact expected
-        output is declared. Fall back to the AI validator only for ordinary
-        completion criteria.
-        """
-
-        completion_criteria = (
-            current_step.get(
-                "completion_criteria"
-            )
-            or []
-        )
-
-        expected_output = str(
-            current_step.get(
-                "expected_output"
-            )
-            or ""
-        )
-
-        if isinstance(
-            completion_criteria,
-            str,
-        ):
-            completion_criteria = [
-                completion_criteria
-            ]
-
-        completion_criteria = [
-            str(item).strip()
-            for item in completion_criteria
-            if str(item).strip()
-        ]
-
-        result_text = str(
-            result
-            or ""
-        ).strip()
-
-        normalized_action = self._normalize_step_action(
-            current_step.get("action")
-            or current_step.get("type")
-            or "analysis"
-        )
-
-        # Analyze/review tasks commonly use expected_output as a
-        # description of the information they must produce. It is not
-        # necessarily a literal string that the model must echo.
-        #
-        # Exact-output validation is reserved for execution-style tasks,
-        # where expected_output represents the literal subprocess output.
-        if expected_output and normalized_action not in {
-            "analysis",
-            "review",
-        }:
-            return (
-                result_text.rstrip("\r\n")
-                == expected_output.rstrip("\r\n")
-            )
-
-        # An analysis/review task with no explicit criteria is complete
-        # when it produced a substantive result. The result is still
-        # required; an empty response is not accepted.
-        if normalized_action in {
-            "analysis",
-            "review",
-        } and not completion_criteria:
-            return bool(result_text)
-
-        # Do not automatically accept arbitrary output for other task
-        # types when no criteria are declared.
-        if not completion_criteria:
-            return False
-
-        validation_prompt = (
-            "Evaluate whether the execution result satisfies "
-            "the required completion conditions.\n\n"
-            f"Execution result:\n{result_text}\n\n"
-            f"Completion criteria:\n"
-            f"{completion_criteria}\n\n"
-            "Return only one word: PASS or FAIL."
-        )
-
-        validation_result = (
-            self.execution_step_service.execute_step_logic(
-                session_id=session_id,
-                step={
-                    "id": (
-                        f"{current_step.get('id', 'project-step')}"
-                        "-completion-validation"
-                    ),
-                    "title": "Validate completion",
-                    "description": validation_prompt,
-                    "type": "analysis",
-                    "status": "pending",
-                },
-            )
-        )
-
-        if isinstance(
-            validation_result,
-            dict,
-        ):
-            validation_text = str(
-                validation_result.get("result")
-                or validation_result.get("output")
-                or ""
-            ).strip().upper()
-        else:
-            validation_text = str(
-                validation_result
-                or ""
-            ).strip().upper()
-
-        return validation_text.startswith("PASS")
-
-    def _normalize_step_action(
-        self,
-        action,
-    ):
-        normalized = str(
-            action or "analysis"
-        ).strip().lower()
-
-        if not normalized:
-            return "analysis"
-
-        action_aliases = {
-            "create": {
-                "create",
-                "create artifact",
-                "create a small test artifact",
-                "create the second phase artifact",
-                "generate",
-                "generate artifact",
-                "make",
-                "produce",
+        return NextMove(
+            id=step_id or "project-step",
+            type="log",
+            payload={
+                "message": str(
+                    current_step.get("description")
+                    or current_step.get("title")
+                    or "Project step completed."
+                )
             },
-            "validate": {
-                "validate",
-                "validate artifact",
-                "validate the test artifact",
-                "validate the second phase artifact",
-                "verify",
-                "check",
-                "test",
-                "verification",
-            },
-            "analysis": {
-                "analysis",
-                "analyze",
-                "inspect",
-                "research",
-                "review",
-                "plan",
-                "planning",
-                "design",
-                "architecture",
-                "architect",
-                "document",
-                "documentation",
-                "specify",
-                "specification",
-            },
-            "implement": {
-                "implement",
-                "implementation",
-                "build",
-                "edit",
-                "write",
-                "modify",
-                "patch",
-                "fix",
-            },
-            "command": {
-                "command",
-                "shell",
-                "run command",
-                "run_command",
-            },
-        }
-
-        for canonical_action, aliases in action_aliases.items():
-            if normalized in aliases:
-                return canonical_action
-
-        if normalized.startswith("create "):
-            return "create"
-
-        if normalized.startswith("generate "):
-            return "create"
-
-        if normalized.startswith("make "):
-            return "create"
-
-        if normalized.startswith("produce "):
-            return "create"
-
-        if normalized.startswith("validate "):
-            return "validate"
-
-        if normalized.startswith("verify "):
-            return "validate"
-
-        if normalized.startswith("check "):
-            return "validate"
-
-        if normalized.startswith("test "):
-            return "validate"
-
-        if normalized.startswith("build "):
-            return "implement"
-
-        if normalized.startswith("implement "):
-            return "implement"
-
-        if normalized.startswith("write "):
-            return "implement"
-
-        if normalized.startswith("modify "):
-            return "implement"
-
-        if normalized.startswith("patch "):
-            return "implement"
-
-        if normalized.startswith("fix "):
-            return "implement"
-
-        if normalized.startswith("run "):
-            return "command"
-
-        return normalized
-    def _advance_after_success(
-        self,
-        state: Dict[str, Any],
-        steps,
-        current_index: int,
-        current_step: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        current_step["status"] = "completed"
-
-        steps[current_index] = current_step
-
-        history = list(
-            state.get("history") or []
         )
-
-        history.append(
-            {
-                "step_id": current_step.get("id"),
-                "task_id": current_step.get(
-                    "task_id"
-                ),
-                "status": "completed",
-                "action": current_step.get(
-                    "action"
-                ),
-                "result": current_step.get(
-                    "result"
-                ),
-            }
-        )
-
-        state["history"] = history
-
-        completed_ids = set()
-        completed_titles = set()
-
-        for step in steps:
-            if not isinstance(step, dict):
-                continue
-
-            status = str(
-                step.get("status") or ""
-            ).strip().lower()
-
-            if status not in {
-                "completed",
-                "complete",
-                "done",
-                "success",
-            }:
-                continue
-
-            for key in (
-                "id",
-                "task_id",
-            ):
-                value = str(
-                    step.get(key) or ""
-                ).strip()
-
-                if value:
-                    completed_ids.add(value)
-
-            title = str(
-                step.get("title") or ""
-            ).strip().lower()
-
-            if title:
-                completed_titles.add(title)
-
-        def dependency_variants(value):
-            text = str(value or "").strip().lower()
-
-            if not text:
-                return set()
-
-            variants = {
-                text,
-            }
-
-            prefixes = (
-                "project_task_project_task_",
-                "project_task_",
-                "task_",
-                "step_",
-            )
-
-            changed = True
-
-            while changed:
-                changed = False
-
-                for variant in list(variants):
-                    for prefix in prefixes:
-                        if variant.startswith(prefix):
-                            stripped = variant[len(prefix):].strip()
-
-                            if stripped and stripped not in variants:
-                                variants.add(stripped)
-                                changed = True
-
-            return variants
-
-        completed_id_variants = set()
-
-        for completed_id in completed_ids:
-            completed_id_variants.update(
-                dependency_variants(completed_id)
-            )
-
-        completed_title_variants = {
-            str(title or "").strip().lower()
-            for title in completed_titles
-            if str(title or "").strip()
-        }
-
-        def dependency_is_satisfied(dependency):
-            dependency_text = str(
-                dependency or ""
-            ).strip()
-
-            if not dependency_text:
-                return True
-
-            dependency_lower = dependency_text.lower()
-
-            if dependency_lower in completed_title_variants:
-                return True
-
-            dependency_variants_set = dependency_variants(
-                dependency_text
-            )
-
-            if (
-                dependency_variants_set
-                & completed_id_variants
-            ):
-                return True
-
-            for completed_id in completed_ids:
-                completed_lower = str(
-                    completed_id or ""
-                ).strip().lower()
-
-                if not completed_lower:
-                    continue
-
-                if completed_lower.endswith(
-                    "-" + dependency_lower
-                ):
-                    return True
-
-                if dependency_lower.endswith(
-                    "-" + completed_lower
-                ):
-                    return True
-
-            return False
-
-        next_index = current_index + 1
-        next_runnable_index = None
-        blocked_indexes = []
-
-        while next_index < len(steps):
-            candidate = steps[next_index]
-
-            if not isinstance(candidate, dict):
-                blocked_indexes.append(next_index)
-                next_index += 1
-                continue
-
-            candidate_status = str(
-                candidate.get("status") or ""
-            ).strip().lower()
-
-            if candidate_status in {
-                "completed",
-                "complete",
-                "done",
-                "success",
-            }:
-                next_index += 1
-                continue
-
-            dependencies = (
-                candidate.get("dependencies")
-                or candidate.get("depends_on")
-                or candidate.get("dependency_ids")
-                or []
-            )
-
-            if isinstance(dependencies, str):
-                dependencies = [
-                    dependencies
-                ]
-
-            unresolved_dependencies = [
-                dependency
-                for dependency in dependencies
-                if not dependency_is_satisfied(
-                    dependency
-                )
-            ]
-
-            if unresolved_dependencies:
-                candidate["status"] = "blocked"
-                candidate["blocked"] = True
-                candidate["waiting"] = True
-                candidate["unresolved_dependencies"] = (
-                    unresolved_dependencies
-                )
-
-                steps[next_index] = candidate
-                blocked_indexes.append(next_index)
-
-                print(
-                    "[PROJECT DEPENDENCY BLOCKED]",
-                    {
-                        "step_id": candidate.get("id"),
-                        "title": candidate.get("title"),
-                        "unresolved_dependencies": (
-                            unresolved_dependencies
-                        ),
-                    },
-                    flush=True,
-                )
-
-                next_index += 1
-                continue
-
-            next_runnable_index = next_index
-            break
-
-        state["steps"] = steps
-
-        if next_runnable_index is None:
-            incomplete_steps = []
-
-            for index, step in enumerate(steps):
-                if not isinstance(step, dict):
-                    continue
-
-                status = str(
-                    step.get("status") or ""
-                ).strip().lower()
-
-                if status not in {
-                    "completed",
-                    "complete",
-                    "done",
-                    "success",
-                }:
-                    incomplete_steps.append(
-                        {
-                            "index": index,
-                            "id": step.get("id"),
-                            "title": step.get("title"),
-                            "status": step.get("status"),
-                            "dependencies": (
-                                step.get("dependencies")
-                                or step.get("depends_on")
-                                or []
-                            ),
-                        }
-                    )
-
-            state["current_index"] = len(steps)
-            state["current_step"] = None
-            state["waiting"] = bool(
-                incomplete_steps
-            )
-            state["complete"] = not bool(
-                incomplete_steps
-            )
-            state["status"] = (
-                "waiting"
-                if incomplete_steps
-                else "complete"
-            )
-
-            if incomplete_steps:
-                state["error"] = (
-                    "Execution is waiting for unresolved "
-                    "task dependencies."
-                )
-            else:
-                state.pop("error", None)
-
-            return state
-
-        next_step = steps[next_runnable_index]
-
-        if isinstance(next_step, dict):
-            next_step["status"] = "active"
-            next_step["blocked"] = False
-            next_step["waiting"] = False
-            next_step.pop(
-                "unresolved_dependencies",
-                None,
-            )
-            steps[next_runnable_index] = next_step
-
-        state["steps"] = steps
-        state["current_index"] = next_runnable_index
-        state["status"] = "running"
-        state["complete"] = False
-        state["waiting"] = False
-        state["current_step"] = next_step
-
-        return state
-    def run_next_move(
-        self,
-        action: str,
-        session_id: str,
-        execution_state: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        return self.run_next_step(
-            action=action,
-            session_id=session_id,
-            execution_state=execution_state,
-        )
-
-    def run_next_step(
-        self,
-        action: str,
-        session_id: str,
-        execution_state: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        state = (
-            dict(execution_state)
-            if isinstance(execution_state, dict)
-            else {}
-        )
-
-        steps = state.get("steps") or []
-
-        current_index = int(
-            state.get("current_index") or 0
-        )
-
-        if current_index >= len(steps):
-            dependency_waiting = bool(
-                state.get("waiting")
-            ) or any(
-                isinstance(step, dict)
-                and (
-                    str(
-                        step.get("status") or ""
-                    ).strip().lower()
-                    in {
-                        "blocked",
-                        "waiting",
-                    }
-                    or bool(
-                        step.get("blocked")
-                    )
-                    or bool(
-                        step.get("waiting")
-                    )
-                    or bool(
-                        step.get(
-                            "unresolved_dependencies"
-                        )
-                    )
-                )
-                for step in steps
-            )
-
-            if dependency_waiting:
-                state["status"] = "waiting"
-                state["waiting"] = True
-                state["complete"] = False
-                state["current_step"] = None
-                state["error"] = (
-                    state.get("error")
-                    or
-                    "Execution is waiting for unresolved task dependencies."
-                )
-            else:
-                state["status"] = "complete"
-                state["complete"] = True
-                state["waiting"] = False
-                state["current_step"] = None
-                state.pop("error", None)
-
-            return {
-                "ok": True,
-                "execution_state": state,
-            }
-
-        current_step = steps[current_index]
-
-        if not isinstance(current_step, dict):
-            state["status"] = "failed"
-            state["complete"] = False
-            state["waiting"] = False
-            state["error"] = (
-                "Current execution step is invalid."
-            )
-
-            return {
-                "ok": False,
-                "error": state["error"],
-                "execution_state": state,
-            }
-
-        current_step = dict(current_step)
-
-        current_step["status"] = "active"
-
-        step_action = self._normalize_step_action(
-            current_step.get("action")
-        )
-
-        print(
-            "LIVE STEP ACTION DISPATCH",
-            {
-                "incoming_action": repr(action),
-                "normalized_step_action": repr(step_action),
-                "current_step_id": current_step.get("id"),
-                "current_step_title": current_step.get("title"),
-                "current_step_action": repr(current_step.get("action")),
-                "step_keys": list(current_step.keys()),
-                "analysis_match": step_action in {
-                    "analysis",
-                    "analyze",
-                    "inspect",
-                    "research",
-                    "review",
-                    "plan",
-                    "planning",
-                    "design",
-                    "document",
-                    "documentation",
-                },
-            },
-            flush=True,
-        )
-
-        title = str(
-            current_step.get("title")
-            or "Project task"
-        ).strip()
-
-        description = str(
-            current_step.get("description") or ""
-        ).strip()
-
-        context = dict(
-            state.get("context") or {}
-        )
-
-        context["project_execution"] = True
-        context["execution_action"] = action
-        context["current_task"] = {
-            "id": current_step.get("id"),
-            "task_id": current_step.get(
-                "task_id"
-            ),
-            "title": title,
-            "description": description,
-            "action": step_action,
-            "target_file": current_step.get(
-                "target_file"
-            ),
-            "target_files": current_step.get(
-                "target_files"
-            ),
-            "target_function": current_step.get(
-                "target_function"
-            ),
-            "command": current_step.get(
-                "command"
-            ),
-        }
-
-        state["context"] = context
-        state["current_step"] = current_step
-        state["steps"] = steps
-
-        print(
-            "PROJECT EXECUTION HANDLER STEP",
-            {
-                "session_id": session_id,
-                "action": action,
-                "step_action": step_action,
-                "step_id": current_step.get("id"),
-                "title": title,
-            },
-            flush=True,
-        )
-
-        # ---------------------------------------------------------
-        # ANALYSIS / REVIEW / PLANNING
-        # ---------------------------------------------------------
-
-        if step_action in {
-            "analysis",
-            "analyze",
-            "inspect",
-            "research",
-            "review",
-            "plan",
-            "planning",
-            "design",
-            "document",
-            "documentation",
-        }:
-
-            if self.execution_step_service is None:
-                current_step["status"] = "failed"
-                current_step["error"] = (
-                    "ExecutionStepService is unavailable for "
-                    "AI execution."
-                )
-
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["status"] = "failed"
-                state["waiting"] = False
-                state["complete"] = False
-                state["error"] = current_step["error"]
-                state["current_step"] = current_step
-
-                return {
-                    "ok": False,
-                    "error": current_step["error"],
-                    "execution_state": state,
-                }
-
-            try:
-                generated_step = (
-                    self.execution_step_service.execute_step_logic(
-                        session_id=session_id,
-                        step=current_step,
-                    )
-                )
-
-                if isinstance(generated_step, dict):
-                    current_step = generated_step
-
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["current_step"] = current_step
-                state["waiting"] = False
-
-                step_status = str(
-                    current_step.get("status") or ""
-                ).strip().lower()
-
-                result = str(
-                    current_step.get("result") or ""
-                ).strip()
-
-                completion_status = str(
-                    current_step.get("completion_status")
-                    or current_step.get("execution_status")
-                    or ""
-                ).strip().lower()
-
-                # Explicit failure returned by the AI service.
-                if step_status in {
-                    "failed",
-                    "error",
-                }:
-                    raise RuntimeError(
-                        current_step.get("error")
-                        or "AI execution step failed."
-                    )
-
-                if completion_status in {
-                    "failed",
-                    "error",
-                    "incomplete",
-                }:
-                    raise RuntimeError(
-                        current_step.get("error")
-                        or (
-                            "AI execution step did not complete. "
-                            f"Completion status: {completion_status}"
-                        )
-                    )
-
-                # Explicit waiting state must not advance the project.
-                if step_status in {
-                    "waiting",
-                    "waiting_approval",
-                    "needs_input",
-                } or completion_status in {
-                    "waiting",
-                    "waiting_approval",
-                }:
-                    current_step["status"] = "waiting"
-                    state["steps"] = steps
-                    state["current_step"] = current_step
-                    state["status"] = "waiting"
-                    state["waiting"] = True
-                    state["complete"] = False
-
-                    return {
-                        "ok": True,
-                        "execution_state": state,
-                        "result": result,
-                    }
-
-                # An AI step cannot complete without a usable result.
-                if not result:
-                    raise RuntimeError(
-                        "AI execution returned an empty result."
-                    )
-
-                if not self._validate_completion(
-                    session_id=session_id,
-                    current_step=current_step,
-                    result=result,
-                ):
-                    current_step["status"] = "waiting"
-                    current_step["completion_status"] = "needs_input"
-                    current_step["next_action"] = (
-                        "Satisfy the completion criteria and retry."
-                    )
-                    current_step["mutation_ready"] = False
-                    current_step["payload_required"] = False
-                    current_step["mutation_mode"] = None
-                    current_step["error"] = None
-
-                    steps[current_index] = current_step
-                    state["steps"] = steps
-                    state["current_step"] = current_step
-                    state["waiting"] = True
-                    state["complete"] = False
-                    state["status"] = "waiting"
-
-                    return {
-                        "ok": True,
-                        "execution_state": state,
-                        "result": result,
-                        "completion_validated": False,
-                    }
-
-                current_step["result"] = result
-                current_step["status"] = "completed"
-                current_step["completion_status"] = "completed"
-                current_step["next_action"] = None
-                current_step["mutation_ready"] = False
-                current_step["error"] = None
-
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["current_step"] = current_step
-
-                return {
-                    "ok": True,
-                    "execution_state": (
-                        self._advance_after_success(
-                            state=state,
-                            steps=steps,
-                            current_index=current_index,
-                            current_step=current_step,
-                        )
-                    ),
-                    "result": result,
-                    "completion_validated": True,
-                }
-
-            except Exception as exc:
-                current_step["status"] = "failed"
-                current_step["error"] = (
-                    f"AI execution failed: {exc}"
-                )
-
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["status"] = "failed"
-                state["waiting"] = False
-                state["complete"] = False
-                state["error"] = current_step["error"]
-                state["current_step"] = current_step
-
-                return {
-                    "ok": False,
-                    "error": current_step["error"],
-                    "execution_state": state,
-                }
-
-        # ---------------------------------------------------------
-        # TEST / VERIFICATION EXECUTION
-        # ---------------------------------------------------------
-
-        if step_action in {
-            "test",
-            "verify",
-            "verification",
-            "validate",
-            "validation",
-            "check",
-        }:
-
-            if self.execution_step_service is None:
-
-                current_step["status"] = "failed"
-
-                current_step["error"] = (
-                    "ExecutionStepService is unavailable for "
-                    "test execution."
-                )
-
-                steps[current_index] = current_step
-
-                state["steps"] = steps
-                state["status"] = "failed"
-                state["waiting"] = False
-                state["complete"] = False
-                state["error"] = current_step["error"]
-                state["current_step"] = current_step
-
-                return {
-                    "ok": False,
-                    "error": current_step["error"],
-                    "execution_state": state,
-                }
-
-            try:
-
-                generated_step = (
-                    self.execution_step_service.execute_step_logic(
-                        session_id=session_id,
-                        step=current_step,
-                    )
-                )
-
-                if isinstance(
-                    generated_step,
-                    dict,
-                ):
-                    current_step = generated_step
-
-                result = str(
-                    current_step.get(
-                        "result",
-                        "",
-                    )
-                    or ""
-                ).strip()
-
-                if not result:
-                    raise RuntimeError(
-                        "AI execution returned an empty result."
-                    )
-
-                if not self._validate_completion(
-                    session_id=session_id,
-                    current_step=current_step,
-                    result=result,
-                ):
-                    current_step["status"] = "running"
-                    current_step["completion_status"] = "incomplete"
-                    current_step["next_action"] = (
-                        "Satisfy the completion criteria and retry."
-                    )
-                    current_step["mutation_ready"] = False
-                    current_step["payload_required"] = False
-                    current_step["mutation_mode"] = None
-                    current_step["error"] = None
-
-                    steps[current_index] = current_step
-                    state["steps"] = steps
-                    state["current_step"] = current_step
-                    state["waiting"] = False
-                    state["complete"] = False
-                    state["status"] = "running"
-
-                    return {
-                        "ok": True,
-                        "execution_state": state,
-                        "result": result,
-                        "completion_validated": False,
-                    }
-
-                current_step["result"] = result
-                current_step["status"] = "completed"
-                current_step["next_action"] = None
-                current_step["mutation_ready"] = False
-                current_step["payload_required"] = False
-                current_step["mutation_mode"] = None
-                current_step["error"] = None
-
-                steps[current_index] = current_step
-
-                state["steps"] = steps
-                state["current_step"] = current_step
-
-                return {
-                    "ok": True,
-                    "execution_state": (
-                        self._advance_after_success(
-                            state=state,
-                            steps=steps,
-                            current_index=current_index,
-                            current_step=current_step,
-                        )
-                    ),
-                    "result": result,
-                }
-
-            except Exception as exc:
-
-                current_step["status"] = "failed"
-
-                current_step["error"] = (
-                    f"Test execution failed: {exc}"
-                )
-
-                steps[current_index] = current_step
-
-                state["steps"] = steps
-                state["status"] = "failed"
-                state["waiting"] = False
-                state["complete"] = False
-                state["error"] = current_step["error"]
-                state["current_step"] = current_step
-
-                return {
-                    "ok": False,
-                    "error": current_step["error"],
-                    "execution_state": state,
-                }
-
-        # ---------------------------------------------------------
-        # BUILD EXECUTION MOVE
-        # ---------------------------------------------------------
-
-        move = self._make_move(
-            current_step
-        )
-
-        # ---------------------------------------------------------
-        # LOCAL LOG MOVE
-        # ---------------------------------------------------------
-
-        if move is not None and move.type == "log":
-            current_step["result"] = str(
-                move.payload.get("message")
-                or f"{title} completed."
-            )
-
-            state = self._advance_after_success(
-                state=state,
-                steps=steps,
-                current_index=current_index,
-                current_step=current_step,
-            )
-
-            return {
-                "ok": True,
-                "execution_state": state,
-                "result": current_step["result"],
-            }
-
-        # ---------------------------------------------------------
-        # EXPLICIT PYTHON FILE EXECUTION
-        # ---------------------------------------------------------
-
-        execution_file = str(
-            current_step.get("execution_file")
-            or ""
-        ).strip()
-
-        if execution_file:
-            if self.execution_step_service is None:
-                current_step["status"] = "failed"
-                current_step["error"] = (
-                    "ExecutionStepService is unavailable for "
-                    "explicit Python file execution."
-                )
-
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["status"] = "failed"
-                state["waiting"] = False
-                state["complete"] = False
-                state["error"] = current_step["error"]
-                state["current_step"] = current_step
-
-                return {
-                    "ok": False,
-                    "error": current_step["error"],
-                    "execution_state": state,
-                }
-
-            print(
-                "PROJECT EXECUTION HANDLER EXPLICIT FILE EXECUTION",
-                {
-                    "step_id": current_step.get("id"),
-                    "execution_file": execution_file,
-                    "step_action": step_action,
-                },
-                flush=True,
-            )
-
-            try:
-                generated_step = (
-                    self.execution_step_service.execute_step_logic(
-                        session_id=session_id,
-                        step=current_step,
-                    )
-                )
-
-                if isinstance(generated_step, dict):
-                    current_step = generated_step
-
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["current_step"] = current_step
-                state["waiting"] = False
-
-                step_status = str(
-                    current_step.get("status") or ""
-                ).strip().lower()
-
-                if step_status in {
-                    "failed",
-                    "error",
-                }:
-                    state["status"] = "failed"
-                    state["complete"] = False
-                    state["error"] = str(
-                        current_step.get("error")
-                        or "Explicit Python file execution failed."
-                    )
-
-                    return {
-                        "ok": False,
-                        "error": state["error"],
-                        "execution_state": state,
-                    }
-
-                current_step["status"] = "completed"
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["current_step"] = current_step
-                state["waiting"] = False
-                state["error"] = None
-
-                advanced_state = self._advance_after_success(
-                    state,
-                    steps,
-                    current_index,
-                    current_step,
-                )
-
-                return {
-                    "ok": True,
-                    "execution_state": advanced_state,
-                    "result": current_step.get("result", ""),
-                }
-
-            except Exception as exc:
-                current_step["status"] = "failed"
-                current_step["error"] = str(exc)
-
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["status"] = "failed"
-                state["waiting"] = False
-                state["complete"] = False
-                state["error"] = str(exc)
-                state["current_step"] = current_step
-
-                print(
-                    "PROJECT EXECUTION HANDLER EXPLICIT FILE ERROR",
-                    {
-                        "step_id": current_step.get("id"),
-                        "execution_file": execution_file,
-                        "error": str(exc),
-                    },
-                    flush=True,
-                )
-
-                return {
-                    "ok": False,
-                    "error": str(exc),
-                    "execution_state": state,
-                }
-
-        # ---------------------------------------------------------
-        # MISSING IMPLEMENT TARGET
-        # ---------------------------------------------------------
 
         if move is None and step_action in {
             "build",
@@ -1613,6 +229,62 @@ class ProjectExecutionHandler:
                     }
 
                 try:
+                    execution_meta = (
+                        state.get("meta")
+                        or state.get("execution_metadata")
+                        or {}
+                    )
+
+                    if not isinstance(execution_meta, dict):
+                        execution_meta = {}
+
+                    current_task = (
+                        state.get("context", {}).get("current_task", {})
+                    )
+
+                    if not isinstance(current_task, dict):
+                        current_task = {}
+
+                    if not current_step.get("target_file"):
+                        current_step["target_file"] = (
+                            execution_meta.get("target_file")
+                            or current_task.get("target_file")
+                            or execution_meta.get("file_path")
+                            or ""
+                        )
+
+                    if not current_step.get("content"):
+                        current_step["content"] = (
+                            execution_meta.get("content")
+                            or current_task.get("content")
+                            or current_task.get("file_content")
+                            or current_task.get("code")
+                            or execution_meta.get("file_content")
+                            or execution_meta.get("code")
+                            or ""
+                        )
+
+                    if not current_step.get("mutation_mode"):
+                        current_step["mutation_mode"] = (
+                            execution_meta.get("mutation_mode")
+                            or current_task.get("mutation_mode")
+                            or ""
+                        )
+
+                    if execution_meta.get("mutation_request"):
+                        current_step["mutation_request"] = True
+
+                    if current_task.get("mutation_request"):
+                        current_step["mutation_request"] = True
+
+                    if current_step.get("content"):
+                        current_step["file_content"] = current_step["content"]
+
+                    if current_step.get("target_file"):
+                        current_step["target_files"] = [
+                            current_step["target_file"]
+                        ]
+
                     generated_step = (
                         self.execution_step_service.execute_step_logic(
                             session_id=session_id,
@@ -1621,17 +293,42 @@ class ProjectExecutionHandler:
                     )
 
                     if isinstance(generated_step, dict):
-                        current_step = generated_step
+                        updated_step = dict(current_step)
+                        updated_step.update(generated_step)
+                        current_step = updated_step
 
                     steps[current_index] = current_step
-
                     state["steps"] = steps
                     state["current_step"] = current_step
-                    state["waiting"] = False
 
                     step_status = str(
                         current_step.get("status") or ""
                     ).strip().lower()
+
+                    completion_status = str(
+                        current_step.get("completion_status")
+                        or current_step.get("execution_status")
+                        or ""
+                    ).strip().lower()
+
+                    is_waiting = bool(
+                        current_step.get("waiting")
+                        or current_step.get("needs_input")
+                        or current_step.get("payload_required")
+                        or current_step.get("clarification")
+                        or step_status in {
+                            "waiting",
+                            "waiting_approval",
+                            "needs_input",
+                            "blocked",
+                        }
+                        or completion_status in {
+                            "waiting",
+                            "waiting_approval",
+                            "needs_input",
+                            "incomplete",
+                        }
+                    )
 
                     if step_status in {
                         "failed",
@@ -1639,7 +336,8 @@ class ProjectExecutionHandler:
                     }:
                         state["status"] = "failed"
                         state["complete"] = False
-                        state["error"] = (
+                        state["waiting"] = False
+                        state["error"] = str(
                             current_step.get("error")
                             or "Project execution step failed."
                         )
@@ -1650,10 +348,10 @@ class ProjectExecutionHandler:
                             "execution_state": state,
                         }
 
-                    if step_status in {
-                        "waiting",
-                        "waiting_approval",
-                    }:
+                    if is_waiting:
+                        current_step["status"] = "waiting"
+                        state["steps"] = steps
+                        state["current_step"] = current_step
                         state["status"] = "waiting"
                         state["waiting"] = True
                         state["complete"] = False
@@ -1661,6 +359,9 @@ class ProjectExecutionHandler:
                         return {
                             "ok": True,
                             "execution_state": state,
+                            "result": current_step.get("result")
+                            or current_step.get("clarification")
+                            or "",
                         }
 
                     current_step["status"] = "completed"
@@ -1746,7 +447,9 @@ class ProjectExecutionHandler:
                     )
 
                     if isinstance(generated_step, dict):
-                        current_step = generated_step
+                        updated_step = dict(current_step)
+                        updated_step.update(generated_step)
+                        current_step = updated_step
 
                     steps[current_index] = current_step
 
@@ -1788,15 +491,47 @@ class ProjectExecutionHandler:
                             "execution_state": state,
                         }
 
-                    current_step["status"] = (
-                        "completed"
-                        if step_status not in {
-                            "completed",
-                            "complete",
-                        }
-                        else current_step["status"]
-                    )
+                    step_status = str(
+                        current_step.get("status") or ""
+                    ).strip().lower()
 
+                    if step_status in {
+                        "failed",
+                        "error",
+                    }:
+                        state["status"] = "failed"
+                        state["waiting"] = False
+                        state["complete"] = False
+                        state["error"] = (
+                            current_step.get("error")
+                            or "Project file generation failed."
+                        )
+
+                        return {
+                            "ok": False,
+                            "error": state["error"],
+                            "execution_state": state,
+                        }
+
+                    # File replacement generation only prepares the mutation.
+                    # It must not complete or advance the project step until
+                    # the actual write_file operation succeeds.
+
+
+                    if step_status in {
+                        "waiting",
+                        "waiting_approval",
+                    }:
+                        state["status"] = "waiting"
+                        state["waiting"] = True
+                        state["complete"] = False
+
+                        return {
+                            "ok": True,
+                            "execution_state": state,
+                        }
+
+                    current_step["status"] = "completed"
                     current_step["completion_status"] = "completed"
                     current_step["next_action"] = None
                     current_step["mutation_ready"] = False
@@ -1815,6 +550,12 @@ class ProjectExecutionHandler:
                         current_index=current_index,
                         current_step=current_step,
                     )
+
+                    return {
+                        "ok": True,
+                        "execution_state": state,
+                        "result": current_step.get("result"),
+                    }
 
                     return {
                         "ok": True,
@@ -1885,7 +626,6 @@ class ProjectExecutionHandler:
         }:
             execution_file = str(
                 current_step.get("execution_file")
-                or ""
                 or ""
             ).strip()
 
@@ -2008,6 +748,66 @@ class ProjectExecutionHandler:
 
         if move is not None:
             print(
+                "PROJECT MOVE DISPATCH DIAGNOSTIC",
+                {
+                    "move_type": getattr(
+                        move,
+                        "type",
+                        None,
+                    ),
+                    "move_id": getattr(
+                        move,
+                        "id",
+                        None,
+                    ),
+                    "payload_type": type(
+                        getattr(
+                            move,
+                            "payload",
+                            None,
+                        )
+                    ).__name__,
+                    "payload": getattr(
+                        move,
+                        "payload",
+                        None,
+                    ),
+                    "payload_step_action": (
+                        getattr(
+                            move,
+                            "payload",
+                            {},
+                        ).get(
+                            "step",
+                            {},
+                        ).get(
+                            "action",
+                        )
+                        if isinstance(
+                            getattr(
+                                move,
+                                "payload",
+                                None,
+                            ),
+                            dict,
+                        )
+                        and isinstance(
+                            getattr(
+                                move,
+                                "payload",
+                                {},
+                            ).get(
+                                "step",
+                            ),
+                            dict,
+                        )
+                        else None
+                    ),
+                },
+                flush=True,
+            )
+
+            print(
                 "PROJECT EXECUTION HANDLER CALLING EXECUTOR",
                 {
                     "move_type": move.type,
@@ -2044,10 +844,6 @@ class ProjectExecutionHandler:
                         "run",
                         "run_file",
                         "run_script",
-                        "execute",
-                        "run",
-                        "run_file",
-                        "run_script",
                     }
                 ):
 
@@ -2066,6 +862,47 @@ class ProjectExecutionHandler:
                         )
                     )
 
+                    print(
+                        "[PROJECT EXECUTION SERVICE RESULT]",
+                        {
+                            "type": type(
+                                execution_result
+                            ).__name__,
+                            "result": execution_result,
+                            "status": (
+                                execution_result.get("status")
+                                if isinstance(
+                                    execution_result,
+                                    dict,
+                                )
+                                else None
+                            ),
+                            "completion_status": (
+                                execution_result.get(
+                                    "completion_status"
+                                )
+                                if isinstance(
+                                    execution_result,
+                                    dict,
+                                )
+                                else None
+                            ),
+                            "execution_status": (
+                                execution_result.get(
+                                    "execution_status"
+                                )
+                                if isinstance(
+                                    execution_result,
+                                    dict,
+                                )
+                                else None
+                            ),
+                        },
+                        flush=True,
+                    )
+
+                    current_step = dict(command_step)
+
                     if isinstance(
                         execution_result,
                         dict,
@@ -2074,6 +911,31 @@ class ProjectExecutionHandler:
                             execution_result
                         )
 
+                        print(
+                            "[PROJECT CURRENT STEP AFTER UPDATE]",
+                            {
+                                "status": current_step.get(
+                                    "status"
+                                ),
+                                "completion_status": (
+                                    current_step.get(
+                                        "completion_status"
+                                    )
+                                ),
+                                "execution_status": (
+                                    current_step.get(
+                                        "execution_status"
+                                    )
+                                ),
+                                "result": current_step.get(
+                                    "result"
+                                ),
+                                "error": current_step.get(
+                                    "error"
+                                ),
+                            },
+                            flush=True,
+                        )
                     else:
                         current_step = command_step
 
@@ -2089,13 +951,9 @@ class ProjectExecutionHandler:
                         )
                         or ""
                     ).strip().lower()
-
-                    result_output = (
-                        current_step.get(
-                            "result"
-                        )
+                    result_output = current_step.get(
+                        "result"
                     )
-
                     result_error = str(
                         current_step.get(
                             "error",
@@ -2197,9 +1055,13 @@ class ProjectExecutionHandler:
                             "result": result_output,
                         }
 
-                    current_step["status"] = "completed"
+                    original_step = dict(steps[current_index])
 
-                    steps[current_index] = current_step
+                    original_step.update(current_step)
+                    original_step["status"] = "completed"
+
+                    steps[current_index] = original_step
+                    current_step = original_step
 
                     state = self._advance_after_success(
                         state=state,
@@ -2213,13 +1075,138 @@ class ProjectExecutionHandler:
                         "execution_state": state,
                         "result": result_output,
                     }
-                execution_result = (
-                    self.default_executor(move)
-                )
+                if (
+                    move.type == "fix_file"
+                    and isinstance(move.payload, dict)
+                    and self.execution_step_service is not None
+                ):
+                    payload = move.payload
+
+                    target_file = str(
+                        payload.get("file_path")
+                        or (
+                            payload.get("file_paths") or [""]
+                        )[0]
+                    ).strip()
+
+                    code = str(
+                        payload.get("code")
+                        or payload.get("content")
+                        or ""
+                    )
+
+        
+                    if not target_file:
+                        raise RuntimeError(
+                            "fix_file move is missing file_path."
+                        )
+
+                    if not code.strip():
+                        raise RuntimeError(
+                            "fix_file move is missing code."
+                        )
+
+                    bridge_step = {
+                        "id": current_step.get("id")
+                        or move.id
+                        or "project-fix-file",
+                        "action": "implement",
+                        "target_file": target_file,
+                        "file_path": target_file,
+                        "content": code,
+                        "code": code,
+                        "description": (
+                            current_step.get("description")
+                            or current_step.get("title")
+                            or "Create or update project file."
+                        ),
+                    }
+
+                    # Preserve deterministic file content through the executor
+                    # handoff. The planner/parser may provide content under
+                    # content, code, file_content, or payload.
+                    bridge_payload = bridge_step.get("payload")
+
+                    if not isinstance(bridge_payload, dict):
+                        bridge_payload = {}
+
+                    bridge_content = (
+                        bridge_step.get("content")
+                        if bridge_step.get("content") is not None
+                        else bridge_step.get("code")
+                    )
+
+                    if bridge_content is None:
+                        bridge_content = bridge_step.get("file_content")
+
+                    if bridge_content is None:
+                        bridge_content = bridge_payload.get("content")
+
+                    if bridge_content is None:
+                        bridge_content = bridge_payload.get("file_content")
+
+                    if bridge_content is not None:
+                        bridge_step["content"] = str(bridge_content)
+                        bridge_step["code"] = str(bridge_content)
+                        bridge_step["file_content"] = str(bridge_content)
+
+                        bridge_payload["content"] = str(bridge_content)
+                        bridge_payload["code"] = str(bridge_content)
+                        bridge_payload["file_content"] = str(bridge_content)
+
+                    bridge_step["payload"] = bridge_payload
+
+                    print(
+                        "[PROJECT EXECUTION BRIDGE STEP]",
+                        {
+                            "target_file": bridge_step.get("target_file"),
+                            "has_content": bool(
+                                str(bridge_step.get("content") or "").strip()
+                            ),
+                            "content": bridge_step.get("content"),
+                        },
+                        flush=True,
+                    )
+
+                    execution_result = (
+                        self.execution_step_service.execute_step_logic(
+                            session_id=session_id,
+                            step=bridge_step,
+                        )
+                    )
+                else:
+                    execution_result = (
+                        self.default_executor(move)
+                    )
 
             except Exception as exc:
+                original_error = str(exc)
+
+                print(
+                    "PROJECT EXECUTION HANDLER EXCEPTION",
+                    {
+                        "move_type": getattr(move, "type", None),
+                        "move_id": getattr(move, "id", None),
+                        "current_index": current_index,
+                        "current_step_defined": "current_step" in locals(),
+                        "error": original_error,
+                    },
+                    flush=True,
+                )
+
+                if (
+                    "current_step" not in locals()
+                    or not isinstance(current_step, dict)
+                ):
+                    current_step = {
+                        "id": getattr(move, "id", None)
+                        or f"project-step-{current_index}",
+                        "action": "unknown",
+                        "status": "failed",
+                    }
+
                 current_step["status"] = "failed"
-                current_step["error"] = str(exc)
+                current_step["error"] = original_error
 
                 steps[current_index] = current_step
 
@@ -2227,38 +1214,63 @@ class ProjectExecutionHandler:
                 state["status"] = "failed"
                 state["complete"] = False
                 state["waiting"] = False
-                state["error"] = str(exc)
+                state["error"] = original_error
                 state["current_step"] = current_step
 
                 return {
                     "ok": False,
-                    "error": str(exc),
+                    "error": original_error,
                     "execution_state": state,
                 }
 
-            result_status = str(
-                getattr(
-                    execution_result,
-                    "status",
-                    "",
-                )
-                or ""
-            ).strip().lower()
-
-            result_output = getattr(
+            if isinstance(
                 execution_result,
-                "output",
-                None,
-            )
+                dict,
+            ):
+                result_status = str(
+                    execution_result.get("status")
+                    or execution_result.get("step_status")
+                    or execution_result.get("execution_status")
+                    or execution_result.get("completion_status")
+                    or ""
+                ).strip().lower()
 
-            result_error = str(
-                getattr(
-                    execution_result,
-                    "error",
-                    "",
+                result_output = (
+                    execution_result.get("result")
+                    or execution_result.get("output")
+                    or execution_result.get("stdout")
+                    or execution_result.get("message")
                 )
-                or ""
-            ).strip()
+
+                result_error = str(
+                    execution_result.get("error")
+                    or ""
+                ).strip()
+
+            else:
+                result_status = str(
+                    getattr(
+                        execution_result,
+                        "status",
+                        "",
+                    )
+                    or ""
+                ).strip().lower()
+
+                result_output = getattr(
+                    execution_result,
+                    "output",
+                    None,
+                )
+
+                result_error = str(
+                    getattr(
+                        execution_result,
+                        "error",
+                        "",
+                    )
+                    or ""
+                ).strip()
 
             print(
                 "PROJECT EXECUTION HANDLER RESULT",
@@ -2323,6 +1335,17 @@ class ProjectExecutionHandler:
         # UNSUPPORTED ACTION
         # ---------------------------------------------------------
 
+        if (
+            "current_step" not in locals()
+            or not isinstance(current_step, dict)
+        ):
+            current_step = {
+                "id": getattr(move, "id", None)
+                or f"project-step-{current_index}",
+                "action": step_action,
+                "status": "failed",
+            }
+
         current_step["status"] = "failed"
 
         current_step["error"] = (
@@ -2337,12 +1360,41 @@ class ProjectExecutionHandler:
         state["waiting"] = False
         state["complete"] = False
         state["error"] = current_step["error"]
+        state["current_step"] = current_step
 
         return {
             "ok": False,
             "error": current_step["error"],
             "execution_state": state,
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

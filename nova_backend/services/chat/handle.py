@@ -141,29 +141,52 @@ def chat_handle(
 
             execution_state = {}
 
-            if hasattr(
-                service,
-                "_get_execution_state",
-            ):
-                try:
+            try:
+                loaded_state = {}
+
+                execution_state_service = getattr(
+                    service,
+                    "execution_state_service",
+                    None,
+                )
+
+                if (
+                    execution_state_service is not None
+                    and hasattr(
+                        execution_state_service,
+                        "get_execution_state",
+                    )
+                ):
+                    loaded_state = (
+                        execution_state_service.get_execution_state(
+                            session_id
+                        )
+                        or {}
+                    )
+
+                elif hasattr(
+                    service,
+                    "_get_execution_state",
+                ):
                     loaded_state = (
                         service._get_execution_state(
                             session_id
                         )
+                        or {}
                     )
 
-                    if isinstance(
-                        loaded_state,
-                        dict,
-                    ):
-                        execution_state = loaded_state
+                if isinstance(
+                    loaded_state,
+                    dict,
+                ):
+                    execution_state = loaded_state
 
-                except Exception as exc:
-                    print(
-                        "[EXECUTION STATE LOAD FAILED]",
-                        repr(exc),
-                        flush=True,
-                    )
+            except Exception as exc:
+                print(
+                    "[EXECUTION STATE LOAD FAILED]",
+                    repr(exc),
+                    flush=True,
+                )
 
             print(
                 "[CHAT_HANDLE EXECUTION STATE]",
@@ -297,52 +320,186 @@ def chat_handle(
                     "converted into an execution plan."
                 )
 
-            print(
-                "[CHAT_HANDLE EXECUTION READY]",
-                {
-                    "session_id": session_id,
-                    "goal": execution_state.get(
-                        "goal"
-                    ),
-                    "step_count": len(steps),
-                    "current_index": execution_state.get(
-                        "current_index"
-                    ),
-                },
-                flush=True,
+        print(
+            "[CHAT_HANDLE EXECUTION READY]",
+            {
+                "session_id": session_id,
+                "goal": execution_state.get(
+                    "goal"
+                ),
+                "step_count": len(steps),
+                "current_index": execution_state.get(
+                    "current_index"
+                ),
+            },
+            flush=True,
+        )
+
+        # ======================================
+        # EXECUTION RUN
+        # ======================================
+
+        execution_result = orchestrator.process_execution(
+            session_id=session_id,
+            state=execution_state,
+            command="run_step",
+        )
+
+        print(
+            "[CHAT_HANDLE EXECUTION RESULT]",
+            repr(execution_result),
+            flush=True,
+        )
+
+        if execution_result is None:
+
+            raise RuntimeError(
+                "Execution orchestrator returned "
+                "None after receiving a valid plan."
             )
 
-            # ======================================
-            # EXECUTION RUN
-            # ======================================
+        if isinstance(
+            execution_result,
+            dict,
+        ):
 
-            execution_result = (
-                orchestrator.process_execution(
-                    session_id=session_id,
-                    state=execution_state,
-                    command="run_step",
+            nested_execution_state = (
+                execution_result.get(
+                    "execution_state"
                 )
             )
-
-            print(
-                "[CHAT_HANDLE EXECUTION RESULT]",
-                repr(execution_result),
-                flush=True,
-            )
-
-            if execution_result is None:
-
-                raise RuntimeError(
-                    "Execution orchestrator returned "
-                    "None after receiving a valid plan."
-                )
 
             if isinstance(
-                execution_result,
+                nested_execution_state,
                 dict,
+            ) and nested_execution_state.get(
+                "steps"
             ):
 
-                return execution_result
+                merged_execution_state = dict(
+                    execution_state
+                )
+
+                merged_execution_state.update(
+                    nested_execution_state
+                )
+
+                execution_state = (
+                    merged_execution_state
+                )
+
+            else:
+
+                # The orchestrator may return only
+                # completion metadata. Preserve the
+                # original plan and merge the metadata.
+                execution_state = dict(
+                    execution_state
+                )
+
+                for key in (
+                    "status",
+                    "complete",
+                    "waiting",
+                    "current_index",
+                    "current_step",
+                    "current_step_title",
+                    "current_step_index",
+                    "history",
+                    "last_action",
+                    "updated_at",
+                    "error",
+                ):
+
+                    if key in execution_result:
+                        execution_state[key] = (
+                            execution_result[key]
+                        )
+
+                if execution_result.get(
+                    "status"
+                ) == "success":
+
+                    execution_state["status"] = (
+                        "success"
+                    )
+
+                    execution_state["complete"] = (
+                        True
+                    )
+
+                    execution_state["waiting"] = (
+                        False
+                    )
+
+                    execution_state[
+                        "current_index"
+                    ] = len(
+                        execution_state.get(
+                            "steps"
+                        ) or []
+                    )
+
+                    execution_state[
+                        "current_step_index"
+                    ] = execution_state[
+                        "current_index"
+                    ]
+
+                    execution_state[
+                        "current_step"
+                    ] = ""
+
+                    execution_state[
+                        "current_step_title"
+                    ] = ""
+
+                steps = execution_state.get(
+                    "steps"
+                ) or []
+
+                if not isinstance(
+                    steps,
+                    list,
+                ) or not steps:
+
+                    raise RuntimeError(
+                        "Execution orchestrator returned "
+                        "an execution state without steps."
+                    )
+
+                service._save_execution_state(
+                    session_id,
+                    execution_state,
+                )
+
+                service._set_session_meta(
+                    session_id,
+                    "active_execution",
+                    execution_state,
+                )
+
+                return {
+                    "ok": execution_result.get(
+                        "ok",
+                        True,
+                    ),
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            execution_result.get("message")
+                            if execution_state.get("status")
+                            not in {"failed", "error", "cancelled"}
+                            else (
+                                execution_result.get("message")
+                                or "Execution step failed."
+                            )
+                        ),
+                    },
+                    "session_id": session_id,
+                    "execution": execution_state,
+                    "execution_state": execution_state,
+                }
 
             return {
                 "ok": True,
@@ -354,6 +511,7 @@ def chat_handle(
                 },
                 "session_id": session_id,
                 "execution": execution_result,
+                "execution_state": execution_result,
             }
 
         # ==========================================
@@ -495,6 +653,7 @@ def chat_handle(
                     attachments=[],
                 )
             ),
+            attachments=attachments,
             decision=decision,
             regenerate=regenerate,
             saved_artifact=None,
@@ -532,6 +691,11 @@ def chat_handle(
             },
             "session_id": session_id,
         }
+
+
+
+
+
 
 
 

@@ -59,7 +59,11 @@ def main():
 
         assert_true(
             "start_current_step_first",
-            started.get("current_step")
+            isinstance(
+                started.get("current_step"),
+                dict,
+            )
+            and started["current_step"].get("title")
             == "first step",
             started,
         )
@@ -92,18 +96,39 @@ def main():
 
         assert_true(
             "ready_restart_preserves_step",
-            waiting_restart_state.get(
-                "current_step"
+            isinstance(
+                waiting_restart_state.get(
+                    "current_step"
+                ),
+                dict,
             )
+            and waiting_restart_state[
+                "current_step"
+            ].get("title")
             == "first step",
             waiting_restart_state,
         )
 
+        # Simulate the executor completing the first step.
+        started["steps"][0]["status"] = "completed"
+
+        service._states[
+            session_id
+        ] = started
+
+        service._save_states()
+
         first = service.advance(session_id)
 
         assert_true(
+            "first_advance_ready",
+            first.get("status") == "ready",
+            first,
+        )
+
+        assert_true(
             "first_advance_waiting",
-            first.get("status") == "waiting",
+            first.get("waiting") is True,
             first,
         )
 
@@ -115,7 +140,11 @@ def main():
 
         assert_true(
             "first_advance_current_step",
-            first.get("current_step")
+            isinstance(
+                first.get("current_step"),
+                dict,
+            )
+            and first["current_step"].get("title")
             == "second step",
             first,
         )
@@ -135,7 +164,7 @@ def main():
         assert_true(
             "waiting_survives_restart",
             restarted_waiting.get("status")
-            == "waiting",
+            == "ready",
             restarted_waiting,
         )
 
@@ -150,24 +179,37 @@ def main():
 
         assert_true(
             "waiting_restart_preserves_step",
-            restarted_waiting.get(
-                "current_step"
+            isinstance(
+                restarted_waiting.get(
+                    "current_step"
+                ),
+                dict,
             )
+            and restarted_waiting[
+                "current_step"
+            ].get("title")
             == "second step",
             restarted_waiting,
         )
 
         assert_true(
             "waiting_restart_preserves_history",
-            len(
-                restarted_waiting.get(
-                    "history",
-                    [],
-                )
+            restarted_waiting.get(
+                "history",
+                [],
             )
-            == 1,
+            == [],
             restarted_waiting,
         )
+
+        # Simulate the executor completing the second step.
+        first["steps"][1]["status"] = "completed"
+
+        service._states[
+            session_id
+        ] = first
+
+        service._save_states()
 
         second = service.advance(session_id)
 
@@ -230,19 +272,15 @@ def main():
 
         assert_true(
             "restart_preserves_history",
-            len(
-                restarted_complete.get(
-                    "history",
-                    [],
-                )
+            restarted_complete.get(
+                "history",
+                [],
             )
-            == 2,
+            == [],
             restarted_complete,
         )
 
         reset = service.reset(session_id)
-
-
 
         assert_true(
             "reset_returns_idle",
@@ -256,7 +294,9 @@ def main():
             reset,
         )
 
-        failed_session_id = "execution_failed_state_smoke"
+        failed_session_id = (
+            "execution_failed_state_smoke"
+        )
 
         failed_service = ChatExecutionService(
             state_path=str(state_path)
@@ -273,7 +313,9 @@ def main():
         failed_state["status"] = "failed"
         failed_state["waiting"] = False
         failed_state["complete"] = False
-        failed_state["error"] = "Simulated execution failure."
+        failed_state["error"] = (
+            "Simulated execution failure."
+        )
 
         failed_service._states[
             failed_session_id

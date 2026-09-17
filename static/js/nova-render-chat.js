@@ -711,7 +711,11 @@ async function readStreamResponse(res) {
 
   if (!reader) {
     const text = await res.text().catch(() => "");
-    return { mode: "text", text };
+
+    return {
+      mode: "text",
+      text,
+    };
   }
 
   const decoder = new TextDecoder("utf-8");
@@ -722,26 +726,62 @@ async function readStreamResponse(res) {
   while (true) {
     const { value, done } = await reader.read();
 
-    if (done) break;
+    if (done) {
+      break;
+    }
 
-    buffer += decoder.decode(value, { stream: true });
+    buffer += decoder.decode(value, {
+      stream: true,
+    });
 
     const parts = buffer.split("\n\n");
     buffer = parts.pop() || "";
 
     for (const part of parts) {
-      if (!part.trim()) continue;
+      if (!part.trim()) {
+        continue;
+      }
 
-      const { event, payload } = parseSSEChunk(part);
+      const parsed = parseSSEChunk(part);
+
+      let event = String(
+        parsed.event || ""
+      ).trim().toLowerCase();
+
+      const payload = parsed.payload;
+
+      // The backend sends JSON data events such as:
+      // data: {"type":"token","content":"Hello "}
+      // data: {"type":"message","content":"Hello"}
+      // data: {"type":"done","done":true}
+      if (
+        !event &&
+        payload &&
+        typeof payload === "object"
+      ) {
+        event = String(
+          payload.type ||
+          payload.event ||
+          ""
+        ).trim().toLowerCase();
+      }
 
       // =========================
-      // DELTA STREAM
+      // TOKEN / DELTA STREAM
       // =========================
-      if (event === "delta") {
+      if (
+        event === "delta" ||
+        event === "token"
+      ) {
         let delta = "";
 
         if (typeof payload === "string") {
           delta = payload;
+        } else if (
+          payload &&
+          typeof payload.token === "string"
+        ) {
+          delta = payload.token;
         } else if (
           payload &&
           typeof payload.delta === "string"
@@ -752,11 +792,55 @@ async function readStreamResponse(res) {
           typeof payload.content === "string"
         ) {
           delta = payload.content;
+        } else if (
+          payload &&
+          typeof payload.text === "string"
+        ) {
+          delta = payload.text;
         }
 
         if (delta) {
           assistantText += delta;
           appendStreamToken(delta);
+        }
+
+        continue;
+      }
+
+      // =========================
+      // MESSAGE EVENT
+      // =========================
+      if (event === "message") {
+        let finalText = assistantText;
+
+        if (
+          payload &&
+          typeof payload.content === "string"
+        ) {
+          finalText = payload.content;
+        } else if (
+          payload &&
+          typeof payload.text === "string"
+        ) {
+          finalText = payload.text;
+        } else if (
+          payload &&
+          payload.message &&
+          typeof payload.message.content === "string"
+        ) {
+          finalText =
+            payload.message.content;
+        } else if (
+          payload &&
+          payload.assistant_message &&
+          typeof payload.assistant_message.text === "string"
+        ) {
+          finalText =
+            payload.assistant_message.text;
+        }
+
+        if (finalText) {
+          assistantText = finalText;
         }
 
         continue;
@@ -771,8 +855,10 @@ async function readStreamResponse(res) {
         // =========================
         // OBJECT PAYLOAD
         // =========================
-        if (payload && typeof payload === "object") {
-
+        if (
+          payload &&
+          typeof payload === "object"
+        ) {
           // ---------------------------------
           // IMAGE RESPONSE HARD LOCK
           // ---------------------------------
@@ -786,38 +872,46 @@ async function readStreamResponse(res) {
             imageAssistant.image_url ||
             "";
 
-if (imageUrl) {
-  const finalText =
-    imageAssistant?.text ||
-    payload?.text ||
-    "Generated image";
+          if (imageUrl) {
+            const imageFinalText =
+              imageAssistant?.text ||
+              payload?.text ||
+              "Generated image";
 
-  finalizeStreamingAssistant(finalText);
+            finalizeStreamingAssistant(
+              imageFinalText
+            );
 
-  return {
-    mode: "image",
-    text: finalText,
-    image_url: imageUrl,
-  };
-}
+            return {
+              mode: "image",
+              text: imageFinalText,
+              image_url: imageUrl,
+            };
+          }
 
           // ---------------------------------
           // NORMAL FINALIZATION
           // ---------------------------------
-          if (typeof payload.content === "string") {
+          if (
+            typeof payload.content === "string"
+          ) {
             finalText = payload.content;
-          } else if (typeof payload.message === "string") {
+          } else if (
+            typeof payload.message === "string"
+          ) {
             finalText = payload.message;
           } else if (
             payload.message &&
             typeof payload.message.content === "string"
           ) {
-            finalText = payload.message.content;
+            finalText =
+              payload.message.content;
           } else if (
             payload.assistant_message &&
             typeof payload.assistant_message.text === "string"
           ) {
-            finalText = payload.assistant_message.text;
+            finalText =
+              payload.assistant_message.text;
           }
         }
 
@@ -852,6 +946,11 @@ if (imageUrl) {
           typeof payload.error === "string"
         ) {
           errorText = payload.error;
+        } else if (
+          payload &&
+          typeof payload.message === "string"
+        ) {
+          errorText = payload.message;
         } else if (
           typeof payload === "string" &&
           payload

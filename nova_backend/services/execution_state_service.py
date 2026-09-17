@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -263,14 +263,13 @@ class ExecutionStateService:
         if not session_id:
             return {}
 
-        merged_state = {}
-
+        session = None
         services = []
 
         if self.session_service is not None:
-            services.append(self.session_service)
-
-        session = None
+            services.append(
+                self.session_service
+            )
 
         for svc in services:
             for method_name in (
@@ -298,9 +297,14 @@ class ExecutionStateService:
                 break
 
         if not isinstance(session, dict):
-            sessions_data = self.read_sessions_file()
+            sessions_data, _path = (
+                self.read_sessions_file()
+            )
 
-            if isinstance(sessions_data, dict):
+            if isinstance(
+                sessions_data,
+                (dict, list),
+            ):
                 session = self.find_session(
                     sessions_data,
                     session_id,
@@ -313,167 +317,20 @@ class ExecutionStateService:
             "working_state"
         )
 
-        if isinstance(working_state, dict):
-            merged_state.update(working_state)
+        if not isinstance(working_state, dict):
+            return {}
 
-        def execution_index(item):
-            if not isinstance(item, dict):
-                return -1
-
-            for key in (
-                "current_index",
-                "current_step_index",
-            ):
-                value = item.get(key)
-
-                try:
-                    return int(value)
-                except Exception:
-                    pass
-
-            return -1
-
-        def execution_richness(item):
-            score = 0
-
-            if not isinstance(item, dict):
-                return score
-
-            steps = item.get("steps")
-
-            if isinstance(steps, list):
-                score += len(steps)
-
-                for step in steps:
-                    if not isinstance(step, dict):
-                        continue
-
-                    if step.get("action"):
-                        score += 5
-
-                    if step.get("result"):
-                        score += 5
-
-                    if step.get("text"):
-                        score += 3
-
-                    if step.get("target_file"):
-                        score += 3
-
-                    if step.get("target_function"):
-                        score += 3
-
-                    if step.get("mutation_mode"):
-                        score += 3
-
-                    if step.get("mutation_ready"):
-                        score += 20
-
-                    if step.get("next_action") in {
-                        "generate_file_replacement",
-                        "generate_function_replacement",
-                    }:
-                        score += 20
-
-                    if step.get("payload_required"):
-                        score += 5
-
-            if item.get("history"):
-                score += 2
-
-            if item.get("learning_history"):
-                score += 2
-
-            if item.get("current_index") is not None:
-                score += 5
-
-            if item.get("current_step_index") is not None:
-                score += 5
-
-            if item.get("current_step"):
-                score += 5
-
-            return score
-
-        def merge_execution_value(
-            key,
-            value,
-            source,
-        ):
-            if not isinstance(value, dict) or not value:
-                return
-
-            existing = merged_state.get(key)
-
-            if not isinstance(existing, dict) or not existing:
-                merged_state[key] = value
-                return
-
-            existing_index = execution_index(
-                existing
-            )
-
-            value_index = execution_index(
-                value
-            )
-
-            existing_richness = execution_richness(
-                existing
-            )
-
-            value_richness = execution_richness(
-                value
-            )
-
-            print(
-                "DEBUG EXECUTION FINAL MERGE:",
-                {
-                    "key": key,
-                    "source": source,
-                    "existing_index": existing_index,
-                    "incoming_index": value_index,
-                    "existing_richness": existing_richness,
-                    "incoming_richness": value_richness,
-                },
-            )
-
-            if value_index > existing_index:
-                merged_state[key] = value
-                return
-
-            if (
-                value_index == existing_index
-                and value_richness > existing_richness
-            ):
-                merged_state[key] = value
-
-        for key in (
-            "active_execution",
-            "execution_state",
-            "execution",
-            "last_execution",
-        ):
-            merge_execution_value(
-                key,
-                working_state.get(key)
-                if isinstance(working_state, dict)
-                else None,
-                "session_working_state",
-            )
-
-        for key in (
-            "active_execution",
-            "execution_state",
-            "execution",
-            "last_execution",
-        ):
-            merge_execution_value(
-                key,
-                session.get(key),
-                "session_root",
-            )
-
-        return merged_state
+        # working_state is the canonical source.
+        #
+        # Do not merge root-level execution fields:
+        #   session["active_execution"]
+        #   session["execution_state"]
+        #   session["execution"]
+        #   session["last_execution"]
+        #
+        # Those fields are legacy duplicates and may contain
+        # stale execution data.
+        return dict(working_state)
 
     def persist_working_state(
         self,
@@ -687,7 +544,6 @@ class ExecutionStateService:
         session_id,
         execution_state=None,
     ):
-
         session_id = str(session_id or "").strip()
 
         if not session_id:
@@ -696,84 +552,173 @@ class ExecutionStateService:
         if not isinstance(execution_state, dict):
             return {}
 
-        print(
-            "DEBUG SAVE EXECUTION INCOMING:",
-            {
-                "status": execution_state.get("status"),
-                "current_index": execution_state.get("current_index"),
-                "complete": execution_state.get("complete"),
-                "updated_at": execution_state.get("updated_at"),
-            },
-        )
-
-        # NORMALIZE EXECUTION STATE FORMAT
-        execution_state["current_step_index"] = execution_state.get(
-            "current_index",
-            execution_state.get(
-                "current_step_index",
-                0,
-            ),
-        )
-
-        execution_state["current_index"] = execution_state.get(
-            "current_step_index",
-            0,
-        )
-
         from datetime import datetime, timezone
 
-        execution_state["updated_at"] = datetime.now(
+        incoming = dict(execution_state)
+
+        incoming_steps = incoming.get("steps")
+        if not isinstance(incoming_steps, list):
+            incoming_steps = []
+
+        # Preserve complete step dictionaries and all mutation metadata.
+        incoming["steps"] = [
+            dict(step) if isinstance(step, dict) else step
+            for step in incoming_steps
+        ]
+
+        # Normalize the two index names from one authoritative value.
+        raw_index = incoming.get("current_index")
+
+        if raw_index is None:
+            raw_index = incoming.get("current_step_index", 0)
+
+        try:
+            incoming_index = int(raw_index)
+        except (TypeError, ValueError):
+            incoming_index = 0
+
+        incoming_index = max(0, incoming_index)
+
+        # A completed execution may legitimately point one past
+        # the final step. Do not clamp that value back to the last step.
+        if incoming.get("complete") is True or str(
+            incoming.get("status") or ""
+        ).strip().lower() in {
+            "complete",
+            "completed",
+            "done",
+        }:
+            incoming_index = max(
+                incoming_index,
+                len(incoming["steps"]),
+            )
+        elif incoming["steps"]:
+            incoming_index = min(
+                incoming_index,
+                len(incoming["steps"]) - 1,
+            )
+
+        incoming["current_index"] = incoming_index
+        incoming["current_step_index"] = incoming_index
+
+        existing = self.active_execution_cache.get(session_id)
+
+        # Reject stale saves that move an active execution backward.
+        if isinstance(existing, dict):
+            existing_status = str(
+                existing.get("status") or ""
+            ).strip().lower()
+
+            incoming_status = str(
+                incoming.get("status") or ""
+            ).strip().lower()
+
+            existing_index_value = existing.get(
+                "current_index",
+                existing.get("current_step_index", 0),
+            )
+
+            try:
+                existing_index = int(existing_index_value)
+            except (TypeError, ValueError):
+                existing_index = 0
+
+            existing_complete = (
+                existing.get("complete") is True
+                or existing_status in {
+                    "complete",
+                    "completed",
+                    "done",
+                }
+            )
+
+            incoming_complete = (
+                incoming.get("complete") is True
+                or incoming_status in {
+                    "complete",
+                    "completed",
+                    "done",
+                }
+            )
+
+            if (
+                existing_complete
+                and not incoming_complete
+            ):
+                print(
+                    "DEBUG SAVE REJECTED STALE INCOMING:",
+                    {
+                        "session_id": session_id,
+                        "existing_status": existing_status,
+                        "incoming_status": incoming_status,
+                        "existing_index": existing_index,
+                        "incoming_index": incoming_index,
+                    },
+                )
+                return existing
+
+            if (
+                not existing_complete
+                and not incoming_complete
+                and incoming_index < existing_index
+            ):
+                print(
+                    "DEBUG SAVE REJECTED BACKWARD INDEX:",
+                    {
+                        "session_id": session_id,
+                        "existing_index": existing_index,
+                        "incoming_index": incoming_index,
+                    },
+                )
+                return existing
+
+        incoming["updated_at"] = datetime.now(
             timezone.utc
         ).isoformat()
 
         print(
-            "DEBUG SAVE EXECUTION STATE:",
+            "DEBUG SAVE EXECUTION INCOMING:",
             {
-                "session_id": session_id,
-                "goal": execution_state.get("goal"),
-                "status": execution_state.get("status"),
-                "current_index": execution_state.get("current_index"),
-                "steps": execution_state.get("steps"),
+                "status": incoming.get("status"),
+                "current_index": incoming.get("current_index"),
+                "complete": incoming.get("complete"),
+                "updated_at": incoming.get("updated_at"),
             },
         )
 
-        if not execution_state:
-            return {}
-
         if (
-            not execution_state.get("steps")
-            and not execution_state.get("plan")
-            and not execution_state.get("goal")
+            not incoming.get("steps")
+            and not incoming.get("plan")
+            and not incoming.get("goal")
         ):
             return {}
 
-        execution_state["_execution_processing"] = False
-        execution_state["lock"] = False
+        incoming["_execution_processing"] = False
+        incoming["lock"] = False
 
-        self.active_execution_cache[session_id] = (
-            execution_state
-        )
+        self.active_execution_cache[session_id] = incoming
 
         print(
             "DEBUG BEFORE PERSIST EXECUTION:",
             {
-                "status": execution_state.get("status"),
-                "current_index": execution_state.get("current_index"),
-                "current_step_index": execution_state.get("current_step_index"),
-                "goal": execution_state.get("goal"),
+                "status": incoming.get("status"),
+                "current_index": incoming.get("current_index"),
+                "current_step_index": incoming.get(
+                    "current_step_index"
+                ),
+                "goal": incoming.get("goal"),
             },
         )
 
         self.persist_working_state(
             session_id,
             {
-                "execution_state": execution_state,
-                "active_execution": execution_state,
+                "execution_state": incoming,
+                "active_execution": incoming,
             },
         )
 
-        return execution_state
-
+        return incoming
     def get_active_execution(self, session_id):
         session_id = str(session_id or "").strip()
 
@@ -830,7 +775,7 @@ class ExecutionStateService:
                 execution,
             )
 
-            if isinstance(execution, dict) and execution:
+            if self.execution_is_active(execution):
 
                 print(
                     "DEBUG ACTIVE EXEC RETURN:",
@@ -889,3 +834,5 @@ class ExecutionStateService:
             )
 
         return ""
+
+

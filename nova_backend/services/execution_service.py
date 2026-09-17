@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import uuid
 
+from nova_backend.services.execution_step_service import (
+    ExecutionStepService,
+)
 
 class ExecutionService:
     """
@@ -24,6 +27,28 @@ class ExecutionService:
 
     EXECUTION_STATUSES = {"planned", "running", "blocked", "completed", "failed"}
     STEP_STATUSES = {"pending", "running", "completed", "failed", "blocked"}
+
+    def __init__(
+        self,
+        chat_service=None,
+        execution_step_service=None,
+        python_runner=None,
+        approval_service=None,
+        ai_execution_service=None,
+        tool_executor=None,
+    ):
+        self.chat_service = chat_service
+
+        self.execution_step_service = (
+            execution_step_service
+            or ExecutionStepService(
+                safe_str=self._safe_str,
+                python_runner=python_runner,
+                approval_service=approval_service,
+                ai_execution_service=ai_execution_service,
+                tool_executor=tool_executor,
+            )
+        )
 
     # =========================
     # BASICS
@@ -58,6 +83,84 @@ class ExecutionService:
         if isinstance(raw, dict):
             return self._safe_str(raw.get("text") or raw.get("title") or raw.get("label"))
         return self._safe_str(raw)
+
+    def _extract_terminal_command(
+        self,
+        user_text: str,
+    ) -> str:
+        text = self._safe_str(user_text).strip()
+
+        if not text:
+            return ""
+
+        import re
+
+        # Prefer explicit fenced or backtick-wrapped commands.
+        fenced_match = re.search(
+            r"```(?:powershell|pwsh|cmd|bash|sh|shell)?\s*([\s\S]*?)```",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        if fenced_match:
+            command = fenced_match.group(1).strip()
+
+            if command:
+                return command
+
+        backtick_match = re.search(
+            r"`([^`]+)`",
+            text,
+        )
+
+        if backtick_match:
+            command = backtick_match.group(1).strip()
+
+            if command:
+                return command
+
+        lowered = text.lower()
+
+        markers = (
+            "execute this terminal command now:",
+            "execute this terminal command:",
+            "execute terminal command:",
+            "run exactly this terminal command:",
+            "run this terminal command:",
+            "run the following terminal command:",
+            "run terminal command:",
+            "terminal command:",
+            "command:",
+            "runs:",
+            "run:",
+        )
+
+        for marker in markers:
+            index = lowered.find(marker)
+
+            if index < 0:
+                continue
+
+            command = text[
+                index + len(marker):
+            ].strip()
+
+            if not command:
+                continue
+
+            command = command.strip("`").strip()
+
+            if (
+                len(command) >= 2
+                and command[0] in {'"', "'"}
+                and command[-1] == command[0]
+            ):
+                command = command[1:-1].strip()
+
+            if command:
+                return command
+
+        return ""
 
     # =========================
     # STEP NORMALIZATION
@@ -672,10 +775,10 @@ class ExecutionService:
             for step in execution["steps"]:
                 marker = {
                     "pending": "-",
-                    "running": "â†’",
-                    "completed": "âœ“",
+                    "running": "ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢",
+                    "completed": "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“",
                     "blocked": "!",
-                    "failed": "âœ—",
+                    "failed": "ÃƒÂ¢Ã…â€œÃ¢â‚¬â€",
                 }.get(step["status"], "-")
                 lines.append(f"{marker} {step['text']}")
 
@@ -718,7 +821,7 @@ class ExecutionService:
                 line = f"{marker} {step['text']}"
                 notes = self._safe_str(step.get("notes"))
                 if notes:
-                    line = f"{line} â€” {notes}"
+                    line = f"{line} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {notes}"
                 body_lines.append(line)
 
         counts = self._safe_dict(execution.get("meta", {}).get("step_counts"))
@@ -818,15 +921,296 @@ class ExecutionService:
         title: str = "",
         max_steps: int = 5,
     ) -> Dict[str, Any]:
-        cleaned_user_text = self._safe_str(user_text, "Complete the requested task.")
-        execution_title = self._safe_str(title, "Execution Plan")
+        cleaned_user_text = self._safe_str(
+            user_text,
+            "Complete the requested task.",
+        ).strip()
+
+        execution_title = self._safe_str(
+            title,
+            "Execution Plan",
+        )
+
+        print(
+            "[PLANNER INPUT DEBUG]",
+            {
+                "user_text_repr": repr(user_text),
+                "cleaned_user_text_repr": repr(cleaned_user_text),
+                "length": len(cleaned_user_text),
+            },
+            flush=True,
+        )
+
+        import re
+        file_patterns = [
+            re.compile(
+                r"""
+                ^\s*
+                (?:create|write|overwrite|save)
+                (?:\s+or\s+overwrite)?
+                \s+
+                (?:the\s+)?
+                (?:file\s+)?
+                (?P<target_file>.+?)
+                \s+with\s+
+                (?:exactly\s+)?
+                (?:this\s+)?
+                content\s*:\s*
+                (?P<content>[\s\S]*?)
+                \s*$
+                """,
+                flags=re.IGNORECASE | re.VERBOSE,
+            ),
+
+            re.compile(
+                r"""
+                ^\s*
+                create\s+
+                (?:the\s+)?
+                file\s+
+                (?P<target_file>.+?)
+                \s+
+                with\s+
+                (?:
+                    (?:the\s+)?exact\s+
+                    |
+                    exactly\s+
+                )?
+                (?:this\s+)?
+                content\s*:\s*
+                (?P<content>[\s\S]*?)
+                \s*$
+                """,
+                flags=re.IGNORECASE | re.VERBOSE,
+            ),
+
+            re.compile(
+                r"""
+                ^\s*
+                create\s+
+                (?:a\s+)?
+                file
+                (?:\s+named|\s+called)?
+                \s+
+                (?P<target_file>.+?)
+                \s+
+                containing\s+
+                (?:exactly\s+)?
+                (?P<content>[\s\S]*?)
+                \s*$
+                """,
+                flags=re.IGNORECASE | re.VERBOSE,
+            ),
+        ]
+        file_match = None
+
+        print(
+            "[PLANNER FILE PARSER DEBUG]",
+            {
+                "pattern_count": len(file_patterns),
+                "input": cleaned_user_text,
+            },
+            flush=True,
+        )
+
+        for pattern in file_patterns:
+            file_match = pattern.match(cleaned_user_text)
+            if file_match:
+                break
+
+        print(
+            "[PLANNER FILE PARSER RESULT]",
+            {
+                "matched": bool(file_match),
+                "target_file": (
+                    file_match.group("target_file")
+                    if file_match
+                    else None
+                ),
+                "content": (
+                    file_match.group("content")
+                    if file_match
+                    else None
+                ),
+            },
+            flush=True,
+        )
+
+        if file_match:
+            target_file = (
+                file_match.group("target_file")
+                .strip()
+                .rstrip(":")
+                .strip()
+                .strip("\"'")
+            )
+
+            content = (
+                file_match.group("content")
+                .strip()
+            )
+
+            # Remove a trailing verification clause from the requested
+            # file content. The verification instruction belongs to the
+            # second execution step, not inside the file itself.
+            content = re.split(
+                r"\s*,\s*(?:then\s+)?verify\b"
+                r"|\s+(?:then\s+)?verify\b",
+                content,
+                maxsplit=1,
+                flags=re.IGNORECASE,
+            )[0].strip()
+
+            # Remove one prose-period suffix only.
+            if content.endswith(".") and not content.endswith(".."):
+                content = content[:-1]
+
+            content = content.strip("\"'")
+
+            print(
+                "[PLANNER CONCRETE FILE MATCH]",
+                {
+                    "target_file": target_file,
+                    "content": content,
+                },
+                flush=True,
+            )
+
+            seed_steps = [
+                {
+                    "id": "create-requested-file",
+                    "title": "Create requested file",
+                    "text": cleaned_user_text,
+                    "description": (
+                        "Create the requested file with the requested content."
+                    ),
+                    "action": "implement",
+                    "status": "pending",
+                    "target_file": target_file,
+                    "target_files": [target_file],
+                    "target_function": "",
+                    "content": content,
+                    "mutation_mode": "create",
+                    "next_action": "execute",
+                    "mutation_ready": True,
+                    "payload_required": False,
+                },
+                {
+                    "id": "verify-result",
+                    "title": "Verify the result",
+                    "text": (
+                        "Verify that the requested file was created "
+                        "with the requested content."
+                    ),
+                    "description": (
+                        "Verify that the requested file was created "
+                        "with the requested content."
+                    ),
+                    "action": "verify",
+                    "status": "pending",
+                },
+            ][: max(1, min(max_steps, 8))]
+
+            return self.new_execution(
+                title=execution_title,
+                goal=cleaned_user_text,
+                steps=seed_steps,
+                status="planned",
+                meta={
+                    "source": "planning_v6",
+                    "step_action": "implement",
+                    "mutation_request": True,
+                    "terminal_request": False,
+                    "target_file": target_file,
+                    "content": content,
+                    "mutation_mode": "create",
+                },
+                auto_start=True,
+            )
+
+        # ----------------------------------------------------------
+        # GENERAL REQUEST CLASSIFICATION
+        # ----------------------------------------------------------
+
+        lowered_text = cleaned_user_text.lower()
+
+        target_file = ""
+        content = ""
+
+
+        mutation_match = re.match(
+            r"^\s*(fix|create|write|edit|modify|update|patch|replace|"
+            r"change|delete|remove|append|prepend|save)\b",
+            lowered_text,
+        )
+
+        terminal_match = re.match(
+            r"^\s*(run|execute|shell|powershell|pwsh|cmd|bash|sh|"
+            r"python|python3|pip|npm|node|git|curl|invoke-restmethod|"
+            r"invoke-webrequest)\b",
+            lowered_text,
+        )
+
+        extracted_command = ""
+
+        if terminal_match and not mutation_match:
+            extracted_command = self._extract_terminal_command(
+                cleaned_user_text
+            )
+
+        if mutation_match:
+            step_action = "implement"
+            step_title = "Implement the requested change"
+            step_description = (
+                "Apply the requested file or project change directly. "
+                "Do not execute the natural-language request as a shell command."
+            )
+        elif extracted_command:
+            step_action = "command"
+            step_title = "Execute the terminal command"
+            step_description = cleaned_user_text
+        else:
+            step_action = "implement"
+            step_title = "Execute the requested task"
+            step_description = cleaned_user_text
+
+        execute_step = {
+            "id": "execute-request",
+            "title": step_title,
+            "text": cleaned_user_text,
+            "description": step_description,
+            "action": step_action,
+            "status": "pending",
+        }
+
+        if mutation_match and target_file:
+            execute_step["target_file"] = target_file
+            execute_step["target_files"] = [target_file]
+            execute_step["content"] = content
+            execute_step["file_content"] = content
+            execute_step["mutation_mode"] = "create"
+            execute_step["mutation_ready"] = True
+            execute_step["next_action"] = "execute"
+            execute_step["payload_required"] = False
+
+        if extracted_command:
+            execute_step["command"] = extracted_command
+            execute_step["shell_command"] = extracted_command
 
         seed_steps = [
-            "Inspect the current state and constraints",
-            "Choose the safest implementation path",
-            "Apply the required change",
-            "Verify the result",
-            "Summarize outcome and next move",
+            execute_step,
+            {
+                "id": "verify-result",
+                "title": "Verify the result",
+                "text": (
+                    "Verify that the requested change was completed successfully."
+                ),
+                "description": (
+                    "Verify that the requested change was completed successfully."
+                ),
+                "action": "verify",
+                "status": "pending",
+            },
         ][: max(1, min(max_steps, 8))]
 
         return self.new_execution(
@@ -834,15 +1218,25 @@ class ExecutionService:
             goal=cleaned_user_text,
             steps=seed_steps,
             status="planned",
-            meta={"source": "planning_v2"},
+            meta={
+                "source": "planning_v6",
+                "step_action": step_action,
+                "mutation_request": bool(mutation_match),
+                "terminal_request": bool(extracted_command),
+            },
             auto_start=True,
         )
 
     def execute_current_step(self, execution: Dict[str, Any]) -> str:
         execution = self.normalize_execution(execution)
 
-        goal = self._safe_str(execution.get("goal")).lower()
-        current_step = self._safe_str(execution.get("current_step")).lower()
+        goal = self._safe_str(
+            execution.get("goal")
+        ).lower()
+
+        current_step = self._safe_str(
+            execution.get("current_step")
+        ).lower()
 
         # ===== PLAN HANDLER =====
         if "plan" in goal:
@@ -867,19 +1261,183 @@ Write the exact goal in one sentence.
 """
 
             if "inspect" in current_step:
-                return "State inspected. Missing inputs identified. Ready to proceed."
+                return (
+                    "State inspected. Missing inputs identified. "
+                    "Ready to proceed."
+                )
 
             if "safest" in current_step:
-                return "Proceeding with a general-purpose plan structure using assumptions."
+                return (
+                    "Proceeding with a general-purpose plan structure "
+                    "using assumptions."
+                )
 
             if "verify" in current_step:
-                return "Plan structure verified for completeness and usability."
+                return (
+                    "Plan structure verified for completeness and usability."
+                )
 
             if "summarize" in current_step:
-                return "Plan created. Next step: refine based on real inputs."
+                return (
+                    "Plan created. Next step: refine based on real inputs."
+                )
 
-        # ===== DEFAULT FALLBACK =====
-        return "Step executed."
+        # ===== REAL EXECUTION DELEGATION =====
+        execution_steps = execution.get("steps") or []
+        current_index = execution.get("current_index", 0)
+
+        try:
+            current_index = int(current_index)
+        except (TypeError, ValueError):
+            current_index = 0
+
+        if not isinstance(execution_steps, list):
+            execution_steps = []
+
+        if not execution_steps:
+            return "No executable steps were found."
+
+        if current_index < 0 or current_index >= len(execution_steps):
+            current_index = 0
+
+        raw_step = execution_steps[current_index]
+
+        if isinstance(raw_step, dict):
+            step = dict(raw_step)
+        else:
+            step = {
+                "text": self._safe_str(raw_step),
+                "title": self._safe_str(raw_step),
+            }
+
+        execution_goal = self._safe_str(
+            execution.get("goal")
+        ).strip()
+
+        # The planner currently creates a generic placeholder step.
+        # Preserve the actual user request so the real executor can
+        # extract target_file/content/command from it.
+        if execution_goal:
+            existing_goal = self._safe_str(
+                step.get("goal")
+            ).strip()
+
+            existing_description = self._safe_str(
+                step.get("description")
+            ).strip()
+
+            existing_text = self._safe_str(
+                step.get("text")
+            ).strip()
+
+            if not existing_goal:
+                step["goal"] = execution_goal
+
+            if not existing_description:
+                step["description"] = (
+                    existing_text or execution_goal
+                )
+
+            if not existing_text:
+                step["text"] = step["description"]
+
+            generic_titles = {
+                "implement the requested change",
+                "implement the requested change.",
+                "execute requested change",
+                "implementation",
+                "implement",
+            }
+
+            step_title = self._safe_str(
+                step.get("title")
+            ).strip().lower()
+
+            if step_title in generic_titles:
+                step["title"] = execution_goal
+
+        if not self._safe_str(
+            step.get("title")
+        ).strip():
+            step["title"] = self._safe_str(
+                execution.get("current_step"),
+                "Execute requested change",
+            )
+
+        if not self._safe_str(
+            step.get("action")
+        ).strip():
+            execution_meta = execution.get("meta") or {}
+
+            step["action"] = self._safe_str(
+                execution_meta.get("step_action"),
+                "implement",
+            ).lower()
+
+        step["status"] = "running"
+
+        try:
+            result = self.execution_step_service.execute_step_logic(
+                session_id=self._safe_str(
+                    execution.get("session_id")
+                    or execution.get("id")
+                ),
+                step=step,
+            )
+        except TypeError:
+            # Compatibility fallback for alternate method signatures.
+            result = self.execution_step_service.execute_step_logic(
+                self._safe_str(
+                    execution.get("session_id")
+                    or execution.get("id")
+                ),
+                step,
+            )
+
+        if isinstance(result, dict):
+            execution_steps[current_index] = result
+            execution["steps"] = execution_steps
+
+            result_status = self._safe_str(
+                result.get("status")
+            ).lower()
+
+            if result_status in {
+                "completed",
+                "failed",
+                "blocked",
+                "waiting",
+            }:
+                execution["status"] = result_status
+
+            result_output = (
+                result.get("output")
+                or result.get("result")
+                or result.get("message")
+                or ""
+            )
+
+            if result_output:
+                execution["last_output"] = self._safe_str(
+                    result_output
+                )
+
+            return self._safe_str(
+                result_output,
+                "Execution step processed.",
+            )
+
+        execution_steps[current_index]["status"] = "completed"
+        execution_steps[current_index]["output"] = self._safe_str(
+            result
+        )
+        execution["steps"] = execution_steps
+        execution["status"] = "completed"
+
+        return self._safe_str(
+            result,
+            "Execution step completed.",
+        )
 
     def serialize_move(self, move):
         if isinstance(move, dict):
@@ -1023,4 +1581,18 @@ Write the exact goal in one sentence.
             execution["current_step"] = "Unknown action"
 
         return self.normalize_execution(execution)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

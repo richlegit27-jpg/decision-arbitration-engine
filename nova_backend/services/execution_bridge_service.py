@@ -1,129 +1,160 @@
-﻿
+﻿from __future__ import annotations
 
-from typing import Any
+import logging
+import re
+import uuid
+from typing import Any, Dict, Optional
 
 from nova_backend.services.project_brain_context_builder import (
     build_project_brain_context,
 )
-from nova_backend.services.project_planning_ai_service import (
-    ProjectPlanningAIService,
-)
+
 
 class ExecutionBridgeService:
-
     def __init__(
         self,
-        chat_execution_service,
-        logger,
+        chat_execution_service=None,
         chat_service=None,
         project_planning_ai_service=None,
+        logger=None,
     ):
         self.chat_execution_service = chat_execution_service
-        self.logger = logger
         self.chat_service = chat_service
-
         self.project_planning_ai_service = (
             project_planning_ai_service
-            or ProjectPlanningAIService()
         )
+        self.logger = logger or logging.getLogger(
+            __name__
+        )
+
+    def _get_user_text(
+        self,
+        payload,
+    ) -> str:
+        if not isinstance(payload, dict):
+            return ""
+
+        return str(
+            payload.get("user_text")
+            or payload.get("text")
+            or payload.get("message")
+            or ""
+        ).strip()
+
+    def _extract_deterministic_file_request(
+        self,
+        goal: str,
+    ) -> Optional[Dict[str, str]]:
+        """
+        Detect direct file-write requests before the AI planner
+        can replace the exact requested operation with a generic
+        implementation step.
+        """
+
+        clean = str(goal or "").strip()
+
+        if not clean:
+            return None
+
+        file_match = re.search(
+            r"(?is)"
+            r"\b(?:create|write|overwrite|replace|save|update|modify)"
+            r"\b"
+            r".*?"
+            r"([A-Za-z]:\\[^:\r\n]+?\.[A-Za-z0-9]+)"
+            r"(?:\s+with\s+exactly\s+this\s+content\s*:?\s*)"
+            r"(.*)$",
+            clean,
+        )
+
+        if not file_match:
+            return None
+
+        target_file = (
+            file_match.group(1)
+            .strip()
+            .rstrip(".,;:")
+        )
+
+        content = file_match.group(2)
+
+        if content is None:
+            return None
+
+        content = content.strip()
+
+        if not target_file or not content:
+            return None
+
+        return {
+            "target_file": target_file,
+            "content": content,
+        }
+
+    def _build_direct_file_step(
+        self,
+        goal: str,
+        target_file: str,
+        content: str,
+    ) -> Dict[str, Any]:
+        return {
+            "title": (
+                "Create or overwrite requested file"
+            ),
+            "description": goal,
+            "text": goal,
+            "action": "create_file",
+            "execution_mode": "direct",
+            "target_file": target_file,
+            "target_function": "",
+            "content": content,
+            "file_content": content,
+            "mutation_mode": "file",
+            "next_action": "write_file",
+            "mutation_ready": True,
+            "payload_required": False,
+            "status": "ready",
+        }
 
     def try_execution_trigger(
         self,
         session_id,
         user_text,
     ):
-        try:
-            target_result = self.try_execution_target_capture(
-                session_id,
-                user_text,
-            )
+        return None
 
-            if target_result is not None:
-                return target_result
+    def try_execution_status(
+        self,
+        session_id=None,
+        user_text=None,
+        **kwargs,
+    ):
+        """
+        Compatibility method used by chat_guard_service.
 
-            if not self.chat_execution_service.is_execution_trigger(
-                user_text
-            ):
-                return None
+        Returns a neutral result when there is no active execution state.
+        """
+        return {
+            "handled": False,
+            "active": False,
+            "execution_active": False,
+            "session_id": session_id or "",
+        }
 
-            if hasattr(
-                self.chat_execution_service,
-                "execution_orchestrator_service",
-            ):
-                return None
+    def try_execution_target_capture(
+        self,
+        session_id=None,
+        user_text=None,
+        **kwargs,
+    ):
+        """
+        Compatibility method used by chat_service.
 
-            state = self.chat_execution_service.get_state(
-                session_id
-            )
-
-            status = str(
-                state.get("status")
-                or ""
-            ).lower().strip()
-
-            has_active_execution = (
-                status in {
-                    "ready",
-                    "running",
-                    "paused",
-                    "waiting_approval",
-                }
-                or bool(state.get("steps"))
-                or bool(state.get("current_step"))
-            )
-
-            if not has_active_execution:
-                return None
-
-            state = self.chat_execution_service.advance(
-                session_id,
-                user_text,
-            )
-
-            reply_text = (
-                self._format_execution_response(state)
-                if hasattr(
-                    self,
-                    "_format_execution_response",
-                )
-                else self.chat_execution_service.format_reply(
-                    state
-                )
-            )
-
-            return {
-                "ok": True,
-                "skip_cleanup": True,
-                "skip_post_processing": True,
-                "skip_rewrite": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": reply_text,
-                    "content": reply_text,
-                    "execution_state": state,
-                },
-                "execution_state": state,
-            }
-
-        except Exception as exc:
-            if self.logger:
-                self.logger.exception(
-                    "[NovaExecutionBridge] failed"
-                )
-
-            reply_text = (
-                "Execution bridge failed: "
-                + str(exc)
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": reply_text,
-                    "content": reply_text,
-                },
-            }
+        Returning None allows the normal chat execution pipeline to continue.
+        Actual execution triggering remains handled by the execution bridge's
+        existing execution methods.
+        """
+        return None
 
     def try_execution_autoplan_start(
         self,
@@ -136,7 +167,10 @@ class ExecutionBridgeService:
         )
 
         try:
-            clean = str(user_text or "").strip()
+            clean = str(
+                user_text or ""
+            ).strip()
+
             lower = clean.lower()
 
             continuation_commands = {
@@ -155,36 +189,6 @@ class ExecutionBridgeService:
                     flush=True,
                 )
                 return None
-
-            prefixes = [
-                "auto-plan ",
-                "autoplan ",
-                "auto plan ",
-            ]
-
-
-            if lower in continuation_commands:
-                return {
-                    "ok": True,
-                    "skip_cleanup": True,
-                    "skip_post_processing": True,
-                    "skip_rewrite": True,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": (
-                            "No active execution mission. "
-                            "Start one with: auto-plan <goal>"
-                        ),
-                        "content": (
-                            "No active execution mission. "
-                            "Start one with: auto-plan <goal>"
-                        ),
-                    },
-                    "execution_state": {},
-                    "debug": {
-                        "route_taken": "no_active_execution_guard",
-                    },
-                }
 
             prefixes = [
                 "auto-plan ",
@@ -229,11 +233,15 @@ class ExecutionBridgeService:
 
                 for phrase in execution_phrases:
                     if phrase in goal_lower_clean:
-                        position = goal_lower_clean.find(
-                            phrase
+                        position = (
+                            goal_lower_clean.find(
+                                phrase
+                            )
                         )
 
-                        goal = goal[:position].strip(
+                        goal = goal[
+                            :position
+                        ].strip(
                             " .,:;-"
                         )
 
@@ -249,111 +257,305 @@ class ExecutionBridgeService:
 
             if not goal:
                 goal = "Untitled mission"
+
             goal_lower = goal.lower()
 
             steps = []
 
-            project_context = build_project_brain_context()
+            project_context = (
+                build_project_brain_context()
+            )
 
             brain_context = {
-                "project_name": project_context.project_name,
-                "active_checkpoint": project_context.active_checkpoint,
-                "blocker": project_context.blocker,
-                "next_move": project_context.next_move,
+                "project_name": (
+                    project_context.project_name
+                ),
+                "active_checkpoint": (
+                    project_context.active_checkpoint
+                ),
+                "blocker": (
+                    project_context.blocker
+                ),
+                "next_move": (
+                    project_context.next_move
+                ),
             }
 
-            try:
-                plan = self.project_planning_ai_service.build_plan(
-                    request=goal,
-                    project_context={
-                        "project_name": project_context.project_name,
-                        "active_checkpoint": (
-                            project_context.active_checkpoint
-                        ),
-                        "blocker": project_context.blocker,
-                        "next_move": project_context.next_move,
-                    },
+            # -------------------------------------------------
+            # Deterministic file handling MUST happen before
+            # the AI planner.
+            # -------------------------------------------------
+
+            deterministic_file = (
+                self._extract_deterministic_file_request(
+                    goal
+                )
+            )
+
+            if deterministic_file:
+                target_file = (
+                    deterministic_file[
+                        "target_file"
+                    ]
                 )
 
-                steps = plan.get("tasks", [])
-
-                if not isinstance(steps, list):
-                    steps = []
+                content = (
+                    deterministic_file[
+                        "content"
+                    ]
+                )
 
                 steps = [
-                    step
-                    for step in steps
-                    if isinstance(step, dict)
-                    and str(
-                        step.get("title") or ""
-                    ).strip()
+                    self._build_direct_file_step(
+                        goal=goal,
+                        target_file=target_file,
+                        content=content,
+                    )
                 ]
 
                 print(
-                    "[AI AUTOPLAN RESULT]",
+                    "[DETERMINISTIC FILE REQUEST]",
                     {
                         "goal": goal,
-                        "plan_name": plan.get("name"),
-                        "task_count": len(steps),
+                        "target_file": target_file,
+                        "content_length": len(
+                            content
+                        ),
+                        "action": "create_file",
                     },
                     flush=True,
                 )
 
-            except Exception as exc:
+            deterministic_file_match = re.search(
+                r"(?is)"
+                r"\b(?:create|write|overwrite|replace|save|update|modify)"
+                r"\b.*?"
+                r"([A-Za-z]:\\[^:\r\n]+?\.[A-Za-z0-9]+)"
+                r"(?:\s+with\s+exactly\s+this\s+content\s*:?\s*)"
+                r"(.*)$",
+                goal,
+            )
 
-                self.logger.exception(
-                    "[AI AUTOPLAN FAILED]"
+            if deterministic_file_match:
+                target_file = (
+                    deterministic_file_match.group(1)
+                    .strip()
+                    .rstrip(".,;:")
                 )
 
-                print(
-                    "[AI AUTOPLAN FALLBACK]",
-                    repr(exc),
-                    flush=True,
+                exact_content = (
+                    deterministic_file_match.group(2)
+                    .strip()
                 )
-
-                steps = []
-
-            if not steps:
 
                 steps = [
                     {
-                        "title": f"Analyze the goal: {goal}",
-                        "action": "analyze",
-                        "execution_mode": "ai",
-                    },
-                    {
                         "title": (
-                            "Determine the required work "
-                            "and implementation approach"
+                            "Create or overwrite requested file"
                         ),
-                        "action": "plan",
-                        "execution_mode": "ai",
-                    },
-                    {
-                        "title": (
-                            "Review the result and "
-                            "determine next actions"
-                        ),
-                        "action": "review",
-                        "execution_mode": "ai",
-                    },
+                        "description": goal,
+                        "text": goal,
+                        "action": "create_file",
+                        "execution_mode": "direct",
+                        "target_file": target_file,
+                        "target_function": "",
+                        "content": exact_content,
+                        "file_content": exact_content,
+                        "mutation_mode": "file",
+                        "next_action": "write_file",
+                        "mutation_ready": True,
+                        "payload_required": False,
+                        "status": "ready",
+                    }
                 ]
+
+                print(
+                    "[DETERMINISTIC FILE REQUEST]",
+
+                    {
+                        "target_file": target_file,
+                        "content_length": len(
+                            exact_content
+                        ),
+                    },
+                    flush=True,
+                )
+
+
+            else:
+                try:
+                    plan = (
+                        self.project_planning_ai_service.build_plan(
+                            request=goal,
+                            project_context={
+                                "project_name": (
+                                    project_context.project_name
+                                ),
+                                "active_checkpoint": (
+                                    project_context.active_checkpoint
+                                ),
+                                "blocker": (
+                                    project_context.blocker
+                                ),
+                                "next_move": (
+                                    project_context.next_move
+                                ),
+                            },
+                        )
+                    )
+
+                    steps = plan.get(
+                        "tasks",
+                        [],
+                    )
+
+                    if not isinstance(
+                        steps,
+                        list,
+                    ):
+                        steps = []
+
+                    steps = [
+                        step
+                        for step in steps
+                        if isinstance(
+                            step,
+                            dict,
+                        )
+                        and str(
+                            step.get("title")
+                            or ""
+                        ).strip()
+                    ]
+
+                    print(
+                        "[AI AUTOPLAN RESULT]",
+                        {
+                            "goal": goal,
+                            "plan_name": plan.get(
+                                "name"
+                            ),
+                            "task_count": len(
+                                steps
+                            ),
+                        },
+                        flush=True,
+                    )
+
+                except Exception as exc:
+                    self.logger.exception(
+                        "[AI AUTOPLAN FAILED]"
+                    )
+
+                    print(
+                        "[AI AUTOPLAN FALLBACK]",
+                        repr(exc),
+                        flush=True,
+                    )
+
+                    steps = []
+
+            if not steps:
+                file_operation_match = re.search(
+                    r"(?is)"
+                    r"\b(create|write|overwrite|replace|save|update|modify)"
+                    r"\b.*?"
+                    r"([A-Za-z]:\\[^:\r\n]+?\.[A-Za-z0-9]+)"
+                    r"\b",
+                    goal,
+                )
+
+                if file_operation_match:
+                    target_file = (
+                        file_operation_match.group(
+                            2
+                        )
+                        .strip()
+                        .rstrip(".,;:")
+                    )
+
+                    steps = [
+                        {
+                            "title": goal,
+                            "description": goal,
+                            "text": goal,
+                            "action": "create_file",
+                            "execution_mode": "direct",
+                            "target_file": target_file,
+                            "target_function": "",
+                            "mutation_mode": "file",
+                            "next_action": (
+                                "generate_file_replacement"
+                            ),
+                            "mutation_ready": True,
+                            "payload_required": True,
+                            "status": "ready",
+                        }
+                    ]
+
+                    print(
+                        "[NATURAL FILE FALLBACK]",
+                        {
+                            "goal": goal,
+                            "target_file": target_file,
+                        },
+                        flush=True,
+                    )
+
+                else:
+                    steps = [
+                        {
+                            "title": (
+                                f"Analyze the goal: {goal}"
+                            ),
+                            "action": "analyze",
+                            "execution_mode": "ai",
+                        },
+                        {
+                            "title": (
+                                "Determine the required work "
+                                "and implementation approach"
+                            ),
+                            "action": "plan",
+                            "execution_mode": "ai",
+                        },
+                        {
+                            "title": (
+                                "Review the result and "
+                                "determine next actions"
+                            ),
+                            "action": "review",
+                            "execution_mode": "ai",
+                        },
+                    ]
 
             print(
                 "DEBUG AUTOPLAN STEPS BEFORE START:",
                 steps,
+                flush=True,
             )
 
             for step in steps:
-                if step.get("action") != "implement":
+                if not isinstance(
+                    step,
+                    dict,
+                ):
+                    continue
+
+                if step.get("action") not in {
+                    "implement",
+                    "create_file",
+                }:
                     continue
 
                 target_file = str(
-                    step.get("target_file") or ""
+                    step.get("target_file")
+                    or ""
                 ).strip()
 
                 target_files = (
-                    step.get("target_files") or []
+                    step.get("target_files")
+                    or []
                 )
 
                 has_real_target = bool(
@@ -367,32 +569,58 @@ class ExecutionBridgeService:
                         "",
                     )
 
-                    step["mutation_mode"] = "file"
-                    step["next_action"] = (
-                        "generate_file_replacement"
+                    step["mutation_mode"] = (
+                        "file"
                     )
-                    step["mutation_ready"] = True
-                    step["payload_required"] = True
+
+                    step["next_action"] = (
+                        "write_file"
+                        if step.get(
+                            "action"
+                        )
+                        == "create_file"
+                        else "generate_file_replacement"
+                    )
+
+                    step["mutation_ready"] = (
+                        True
+                    )
+
+                    step["payload_required"] = (
+                        False
+                        if step.get(
+                            "action"
+                        )
+                        == "create_file"
+                        else True
+                    )
 
                 else:
-                    # Generic implementation/research step.
-                    # Do not pretend the user's natural-language
-                    # request is a file path.
-                    step["mutation_mode"] = "general"
+                    step["mutation_mode"] = (
+                        "general"
+                    )
+
                     step["next_action"] = (
                         "execute_task"
                     )
-                    step["mutation_ready"] = True
-                    step["payload_required"] = False
-                    step["status"] = "ready"
+
+                    step["mutation_ready"] = (
+                        True
+                    )
+
+                    step["payload_required"] = (
+                        False
+                    )
+
+                    step["status"] = (
+                        "ready"
+                    )
 
             session_id = str(
                 session_id or ""
             ).strip()
 
             if not session_id:
-                import uuid
-
                 session_id = (
                     "execution_"
                     + uuid.uuid4().hex
@@ -400,15 +628,18 @@ class ExecutionBridgeService:
 
             print(
                 "AUTOPLAN BEFORE START",
-
                 {
-                    "has_chat_execution_service": hasattr(
-                        self,
-                        "chat_execution_service",
+                    "has_chat_execution_service": (
+                        hasattr(
+                            self,
+                            "chat_execution_service",
+                        )
                     ),
-                    "has_chat_service": hasattr(
-                        self,
-                        "chat_service",
+                    "has_chat_service": (
+                        hasattr(
+                            self,
+                            "chat_service",
+                        )
                     ),
                     "session_id": session_id,
                     "goal": goal,
@@ -423,22 +654,28 @@ class ExecutionBridgeService:
                 flush=True,
             )
 
-            state = self.chat_execution_service.start(
-                session_id=session_id,
-                goal=goal,
-                steps=steps,
-                context={
-                    "source": "auto_plan",
-                    "task_goal": goal,
-                    "step_count": len(steps),
-                    "steps": steps,
-                    "project": "Nova",
-                    "execution_reason": (
-                        "Complete the user's requested task "
-                        "through a guided execution workflow."
-                    ),
-                    "project_brain": brain_context,
-                },
+            state = (
+                self.chat_execution_service.start(
+                    session_id=session_id,
+                    goal=goal,
+                    steps=steps,
+                    context={
+                        "source": "auto_plan",
+                        "task_goal": goal,
+                        "step_count": len(
+                            steps
+                        ),
+                        "steps": steps,
+                        "project": "Nova",
+                        "execution_reason": (
+                            "Complete the user's requested task "
+                            "through a guided execution workflow."
+                        ),
+                        "project_brain": (
+                            brain_context
+                        ),
+                    },
+                )
             )
 
             print(
@@ -448,20 +685,30 @@ class ExecutionBridgeService:
             )
 
             if state:
-                if self.chat_service and hasattr(
-                    self.chat_service,
-                    "_save_execution_state",
+                if (
+                    self.chat_service
+                    and hasattr(
+                        self.chat_service,
+                        "_save_execution_state",
+                    )
                 ):
                     self.chat_service._save_execution_state(
                         session_id,
                         state,
                     )
+
             step_lines = []
 
-            for index, step in enumerate(steps):
-                if isinstance(step, dict):
+            for index, step in enumerate(
+                steps
+            ):
+                if isinstance(
+                    step,
+                    dict,
+                ):
                     step_lines.append(
-                        f"{index + 1}. {step.get('title', 'Execution step')}"
+                        f"{index + 1}. "
+                        f"{step.get('title', 'Execution step')}"
                     )
                 else:
                     step_lines.append(
@@ -474,29 +721,51 @@ class ExecutionBridgeService:
                 "target_function": "",
             }
 
-
-
-
             for step in steps:
-                if not isinstance(step, dict):
+                if not isinstance(
+                    step,
+                    dict,
+                ):
                     continue
 
-                if step.get("target_file"):
-                    target["target_file"] = step.get("target_file")
+                if step.get(
+                    "target_file"
+                ):
+                    target[
+                        "target_file"
+                    ] = step.get(
+                        "target_file"
+                    )
 
-                if step.get("target_files"):
-                    target["target_files"] = step.get("target_files")
+                if step.get(
+                    "target_files"
+                ):
+                    target[
+                        "target_files"
+                    ] = step.get(
+                        "target_files"
+                    )
 
-                if step.get("target_function"):
-                    target["target_function"] = step.get("target_function")
+                if step.get(
+                    "target_function"
+                ):
+                    target[
+                        "target_function"
+                    ] = step.get(
+                        "target_function"
+                    )
 
             print(
                 "[EXECUTION TARGET HANDOFF]",
                 {
                     "session_id": session_id,
                     "target": target,
-                    "status": state.get("status"),
-                    "current_index": state.get("current_index"),
+                    "status": state.get(
+                        "status"
+                    ),
+                    "current_index": state.get(
+                        "current_index"
+                    ),
                 },
                 flush=True,
             )
@@ -508,7 +777,9 @@ class ExecutionBridgeService:
                     "current_index": state.get(
                         "current_index"
                     ),
-                    "status": state.get("status"),
+                    "status": state.get(
+                        "status"
+                    ),
                     "handler": type(
                         self.chat_execution_service.execution_handler
                     ).__name__
@@ -516,7 +787,8 @@ class ExecutionBridgeService:
                         self.chat_execution_service,
                         "execution_handler",
                         None,
-                    ) is not None
+                    )
+                    is not None
                     else None,
                 },
                 flush=True,
@@ -550,8 +822,12 @@ class ExecutionBridgeService:
                 "ok": True,
                 "assistant_message": {
                     "role": "assistant",
-                    "text": str(execution_result),
-                    "content": str(execution_result),
+                    "text": str(
+                        execution_result
+                    ),
+                    "content": str(
+                        execution_result
+                    ),
                 },
                 "session_id": session_id,
                 "execution": execution_result,
@@ -574,263 +850,10 @@ class ExecutionBridgeService:
                     "text": reply_text,
                     "content": reply_text,
                 },
+                "session_id": session_id,
+                "execution_state": {},
+                "error": str(exc),
             }
 
-    def try_execution_status(
-        self,
-        session_id,
-        user_text,
-    ):
-        try:
-            clean = (
-                " ".join(
-                    str(user_text or "")
-                    .strip()
-                    .lower()
-                    .split()
-                )
-                .rstrip("?!.")
-            )
 
-            status_questions = {
-                "status",
-                "execution status",
-                "mission status",
-                "what comes next",
-            }
-
-            if clean not in status_questions:
-                return None
-
-            state = self.chat_execution_service.get_state(
-                session_id
-            )
-            print(
-                "DEBUG TARGET CAPTURE CHECK",
-                {
-                    "session_id": session_id,
-                    "current_index": state.get("current_index")
-                    if isinstance(state, dict)
-                    else None,
-                    "steps": state.get("steps")
-                    if isinstance(state, dict)
-                    else None,
-                },
-                flush=True,
-            )
-
-            if (
-                not isinstance(state, dict)
-                or state.get("status") == "idle"
-            ):
-                return None
-
-            goal = str(
-                state.get("goal")
-                or "Untitled mission"
-            )
-
-            status = str(
-                state.get("status")
-                or "ready"
-            )
-
-            task_type = str(
-                state.get("task_type")
-                or "general"
-            )
-
-            project_brain = (
-                state.get("context", {})
-                .get("project_brain", {})
-                if isinstance(state, dict)
-                else {}
-            )
-
-            next_action = state.get(
-                "next_action",
-                {},
-            )
-
-            reply_text = (
-                f"Active mission: {goal}\n"
-                f"Type: {task_type}\n"
-                f"Status: {status}\n"
-                f"Checkpoint: {project_brain.get('active_checkpoint', 'Not available')}\n"
-                f"Blocker: {project_brain.get('blocker', 'None')}\n"
-                f"Next move: {project_brain.get('next_move') or 'No next move available'}\n"
-                f"Next action: {next_action.get('step') or 'Waiting for instruction'}\n"
-            )
-
-            return {
-                "ok": True,
-                "text": reply_text,
-                "content": reply_text,
-                "skip_cleanup": True,
-                "skip_post_processing": True,
-                "skip_rewrite": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": reply_text,
-                    "content": reply_text,
-                    "execution_state": state,
-                },
-                "execution_state": state,
-            }
-
-        except Exception:
-            return None
-
-    def try_execution_target_capture(
-        self,
-        session_id,
-        user_text,
-    ):
-        try:
-            state = self.chat_execution_service.get_state(
-                session_id
-            )
-
-            if not isinstance(state, dict):
-                return None
-
-            steps = state.get("steps") or []
-
-            current_index = int(
-                state.get("current_index") or 0
-            )
-
-            if current_index >= len(steps):
-                return None
-
-            step = steps[current_index]
-
-            if not isinstance(step, dict):
-                return None
-
-            if step.get("next_action") != "request_target":
-                return None
-
-            target = str(
-                user_text or ""
-            ).strip()
-
-            ignored_commands = {
-                "next",
-                "continue",
-                "go",
-                "run",
-                "advance",
-            }
-
-            if (
-                not target
-                or target.lower() in ignored_commands
-                or target.lower().startswith("auto-plan")
-                or target.lower().startswith("autoplan")
-                or target.lower().startswith("auto plan")
-            ):
-                return None
-
-            print(
-                "[EXECUTION TARGET CAPTURED]",
-                {
-                    "session_id": session_id,
-                    "current_index": current_index,
-                    "target": target,
-                },
-                flush=True,
-            )
-
-            step["target_file"] = target
-            step["target_files"] = [target]
-
-            step["next_action"] = (
-                "generate_file_replacement"
-            )
-
-            step["mutation_ready"] = True
-            step["payload_required"] = True
-            step["status"] = "ready"
-            step["waiting_for_target"] = False
-
-            state["steps"][current_index] = step
-            state["current_step"] = step
-
-            # Target capture is complete.
-            # The mission must now be executable.
-            state["status"] = "ready"
-            state["waiting"] = False
-            state["complete"] = False
-
-            self.chat_execution_service._states[
-                session_id
-            ] = state
-
-            self.chat_execution_service._sync_state_to_session(
-                session_id,
-                state,
-            )
-
-            self.chat_execution_service._save_states()
-
-            reply_text = (
-                "Target captured:\n"
-                f"{target}\n\n"
-                "Proceeding with implementation."
-            )
-
-            print(
-                "[EXECUTION TARGET HANDOFF]",
-                {
-                    "session_id": session_id,
-                    "target": target,
-                    "current_index": current_index,
-                    "next_action": step.get(
-                        "next_action"
-                    ),
-                    "status": state.get("status"),
-                },
-                flush=True,
-            )
-
-            if (
-                self.chat_service is not None
-                and getattr(
-                    self.chat_service,
-                    "execution_orchestrator_service",
-                    None,
-                ) is not None
-            ):
-                return (
-                    self.chat_service
-                    .execution_orchestrator_service
-                    .process_execution(
-                        session_id=session_id,
-                        state=state,
-                        command="run_step",
-                    )
-                )
-
-            return {
-                "ok": True,
-                "skip_cleanup": True,
-                "skip_post_processing": True,
-                "skip_rewrite": True,
-                "target_captured": True,
-                "continue_execution": False,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": reply_text,
-                    "content": reply_text,
-                    "execution_state": state,
-                },
-                "execution_state": state,
-            }
-
-        except Exception:
-            self.logger.exception(
-                "[ExecutionTargetCapture] failed"
-            )
-            return None
 

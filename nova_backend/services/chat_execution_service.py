@@ -347,6 +347,25 @@ class ChatExecutionService:
         # Normalize legacy step status values only.
         # ExecutionHandler remains the authoritative owner of
         # current_index, current_step, and execution status.
+        if state.get("status") == "failed":
+            state["waiting"] = False
+            state["complete"] = False
+
+            self._states[
+                safe_session_id
+            ] = state
+
+            self._sync_state_to_session(
+                safe_session_id,
+                state,
+            )
+
+            self._save_states()
+
+            return self._copy_state(
+                state
+            )
+
         normalized_steps = []
 
         for raw_step in steps:
@@ -479,6 +498,34 @@ class ChatExecutionService:
                 return self._copy_state(
                     state
                 )
+
+
+
+
+
+        execution_result = (
+            self.execution_handler.run_next_move(
+                action="run_step",
+                session_id=safe_session_id,
+                execution_state=state,
+            )
+        )
+
+        returned_state = None
+
+        if isinstance(
+            execution_result,
+            dict,
+        ):
+            returned_state = execution_result.get(
+                "execution_state"
+            )
+
+        if isinstance(
+            returned_state,
+            dict,
+        ):
+            state = returned_state
 
         self._states[
             safe_session_id
@@ -1683,4 +1730,7 @@ except Exception as _nova_chat_execution_handler_wire_error:
         "[NOVA_CHAT_EXECUTION_HANDLER_WIRE_FAILED]",
         _nova_chat_execution_handler_wire_error,
     )
+
+
+
 

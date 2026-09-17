@@ -432,6 +432,11 @@ try:
             "api_attachment_summarize",
             "api_attachment_keypoints",
             "api_debug_attachment_readiness",
+"api_debug_chat_turn_shadow",
+"api_debug_chat_turn_dry_run",
+"api_debug_attachment_context_dry_run",
+"api_debug_attachment_web_guard_dry_run",
+"api_debug_chat_attachment_intent_dry_run",
         }:
             return False
         view = app.view_functions.get(endpoint_name)
@@ -979,6 +984,11 @@ try:
             "api_attachment_summarize",
             "api_attachment_keypoints",
             "api_debug_attachment_readiness",
+"api_debug_chat_turn_shadow",
+"api_debug_chat_turn_dry_run",
+"api_debug_attachment_context_dry_run",
+"api_debug_attachment_web_guard_dry_run",
+"api_debug_chat_attachment_intent_dry_run",
         }:
             return False
 
@@ -1236,6 +1246,12 @@ def install_project_chat_response_router(app):
             "api_attachment_extract",
             "api_attachment_summarize",
             "api_attachment_keypoints",
+            "api_debug_attachment_readiness",
+            "api_debug_chat_turn_shadow",
+            "api_debug_chat_turn_dry_run",
+            "api_debug_attachment_context_dry_run",
+            "api_debug_attachment_web_guard_dry_run",
+            "api_debug_chat_attachment_intent_dry_run",
 
             "nova_login_page_20260610",
             "nova_register_page_20260610",
@@ -1409,3 +1425,8 @@ def patch_payload(payload, reply):
 
 def route_project_chat_response(user_text):
     return build_project_answer(user_text)
+
+
+
+
+

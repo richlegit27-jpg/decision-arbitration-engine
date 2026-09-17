@@ -11,8 +11,12 @@ def register_chat_routes(app, agent_service):
         data = request.get_json(silent=True) or {}
 
         user_text = str(
-            data.get("user_text") or ""
-        )
+            data.get("user_text")
+            or data.get("message")
+            or data.get("text")
+            or data.get("content")
+            or ""
+        ).strip()
 
         attachments = (
             data.get("attachments")

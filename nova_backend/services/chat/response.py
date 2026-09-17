@@ -1,4 +1,6 @@
-import uuid
+﻿import uuid
+
+from nova_backend.services import attachment_memory_service
 
 class ChatResponseHandler:
 
@@ -172,18 +174,18 @@ class ChatResponseHandler:
         if smff_active and code_intent and not asks_alternatives:
             return (
                 "Send full file path + full broken code.\n"
-                "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement, cleanly indented.\n\n"
+                "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement, cleanly indented.\n\n"
                 "PowerShell test:\n"
                 "python -m py_compile <file_path>"
             )
 
         if smff_active and code_intent and asks_alternatives:
             return (
-                "Option A ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â safest:\n"
-                "Send the full file path + full broken file. IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full-file replacement.\n\n"
-                "Option B ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â faster:\n"
-                "Send the full function only. IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full function replacement.\n\n"
-                "Option C ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â debug-only:\n"
+                "Option A ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â safest:\n"
+                "Send the full file path + full broken file. IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full-file replacement.\n\n"
+                "Option B ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â faster:\n"
+                "Send the full function only. IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full function replacement.\n\n"
+                "Option C ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â debug-only:\n"
                 "Run this and send the exact error:\n"
                 "python -m py_compile <file_path>"
             )
@@ -225,7 +227,7 @@ class ChatResponseHandler:
         ):
             return (
                 "Send the full function and file path.\n"
-                "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement block, cleanly indented."
+                "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement block, cleanly indented."
             )
 
         kill_phrases = [
@@ -256,7 +258,7 @@ class ChatResponseHandler:
 
         bad_endings = [
             "Example:",
-            "HereÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s how:",
+            "HereÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s how:",
             "Here's how:",
             "This prints:",
             "That prints:",
@@ -278,7 +280,7 @@ class ChatResponseHandler:
                 last.endswith(":")
                 or last.endswith("-")
                 or last_lc
-                in {"example", "output", "result", "hereÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s how", "here's how"}
+                in {"example", "output", "result", "hereÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s how", "here's how"}
             ):
                 lines.pop()
                 continue
@@ -390,13 +392,65 @@ class ChatResponseHandler:
         )
 
         decision = decision if isinstance(decision, dict) else {}
+
+        decision_execution_state = decision.get("execution_state")
+
+        if isinstance(decision_execution_state, dict) and decision_execution_state:
+            execution_state = decision_execution_state
+
         print(
             "[FINALIZE DECISION EXECUTION DEBUG]",
-            decision.get("execution_state"),
+            decision_execution_state,
+        )
+
+        print(
+            "[FINALIZE EFFECTIVE EXECUTION DEBUG]",
+            execution_state,
+            flush=True,
         )
 
         session_id = self.chat_service._ensure_session_id(session_id)
-        attachments = extra.get("attachments") or []
+
+        # NOVA_ATTACHMENT_PERSISTENCE_LOCK_20260913
+        # Normalize attachments before user and assistant messages are persisted.
+        attachments = extra.get("attachments")
+
+        if not isinstance(attachments, list):
+            attachments = []
+
+        if not attachments and isinstance(user_msg, dict):
+            existing_user_attachments = user_msg.get("attachments")
+            if isinstance(existing_user_attachments, list):
+                attachments = existing_user_attachments
+
+        if isinstance(user_msg, dict):
+            user_msg["attachments"] = attachments
+
+        if isinstance(assistant_msg, dict):
+            assistant_attachments = assistant_msg.get("attachments")
+            if not isinstance(assistant_attachments, list) or not assistant_attachments:
+                assistant_msg["attachments"] = attachments
+
+        # NOVA_SESSION_ATTACHMENT_REGISTRY_LOCK_20260913
+        # Persist the session-level attachment registry through the
+        # existing attachment-memory service.
+        session_attachments = []
+
+        try:
+            session_attachments = (
+                attachment_memory_service
+                .get_or_create_session_attachments(
+                    session_id,
+                    attachments,
+                )
+                or []
+            )
+        except Exception as e:
+            print(
+                "[SESSION ATTACHMENT REGISTRY FAILED]",
+                repr(e),
+                flush=True,
+            )
 
         memory_written = False
 
@@ -701,11 +755,22 @@ class ChatResponseHandler:
             )
 
 
-
         return {
             "ok": True,
             "assistant_message": assistant_msg,
             "session_id": session_id,
+            "attachments": attachments,
+            "session_attachments": session_attachments,
+            "session": {
+                "id": session_id,
+                "session_id": session_id,
+                "attachments": session_attachments,
+            },
+            "attachment_debug": {
+                "active_session_id": session_id,
+                "request_attachments_count": len(attachments),
+                "session_attachments_count": len(session_attachments),
+            },
             "execution_state": execution_state or {},
             "execution": execution_state or {},
         }
@@ -724,9 +789,8 @@ class ChatResponseHandler:
             assistant_msg = self.chat_service._build_assistant_message(
                 text=fallback_text or "Execution complete."
             )
-
         if isinstance(assistant_msg, str):
-            assistant_msg = self._build_assistant_message(
+            assistant_msg = self.chat_service._build_assistant_message(
                 text=assistant_msg
             )
 
@@ -753,3 +817,7 @@ class ChatResponseHandler:
 
     def safe_str(self, value):
         return self.chat_service.safe_str(value)
+
+
+
+

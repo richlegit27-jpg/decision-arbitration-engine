@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import traceback
 
@@ -74,7 +74,10 @@ class ChatGuardService:
                 flush=True,
             )
 
-            if execution_status_result is not None:
+            if (
+                isinstance(execution_status_result, dict)
+                and execution_status_result.get("handled") is True
+            ):
                 return execution_status_result
 
             target_capture_result = (
@@ -140,3 +143,4 @@ class ChatGuardService:
             traceback.print_exc()
 
             return None
+

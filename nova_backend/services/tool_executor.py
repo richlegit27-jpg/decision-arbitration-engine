@@ -207,6 +207,16 @@ class ToolExecutor:
                         "payload": safe_payload,
                     }
 
+                print(
+                    "DEBUG TOOL EXECUTOR DISPATCH =",
+                    {
+                        "tool_name": normalized_name,
+                        "tool_class": type(tool).__name__,
+                        "payload": safe_payload,
+                    },
+                    flush=True,
+                )
+
                 try:
                     result = tool.run(
                         **safe_payload

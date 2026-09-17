@@ -43,6 +43,36 @@ def apply_api_chat_final_response(
         requested_session_id,
     ) or result
 
+    # NOVA_SESSION_ATTACHMENT_TOP_LEVEL_SYNC_20260913
+    # Ensure the final nested session payload exposes the same
+    # attachment registry as the top-level response.
+    if isinstance(result, dict):
+        session_attachments = result.get(
+            "session_attachments"
+        )
+
+        if not isinstance(session_attachments, list):
+            session_attachments = []
+
+        session_payload = result.get("session")
+
+        if not isinstance(session_payload, dict):
+            session_payload = {}
+
+        session_payload["id"] = (
+            session_payload.get("id")
+            or result.get("session_id")
+            or session_id
+        )
+        session_payload["session_id"] = (
+            session_payload.get("session_id")
+            or result.get("session_id")
+            or session_id
+        )
+        session_payload["attachments"] = session_attachments
+
+        result["session"] = session_payload
+
     result = apply_real_response_attachment_lock(
         result,
         attachments,

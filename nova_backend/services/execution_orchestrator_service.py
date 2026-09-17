@@ -1235,166 +1235,114 @@ class ExecutionOrchestratorService:
         # RUN ALL
         # =========================
         if command == "run_all":
+            # Reuse the approval-aware single-step pipeline and continue
+            # until execution reaches a terminal state, an approval gate,
+            # or there are no remaining pending steps.
+            result = None
+            current_state = execution_state
 
-            if not self.execution_bridge:
-
-                return {
-                    "ok": False,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": (
-                            "Execution bridge is not available."
-                        ),
-                    },
-                    "execution": execution_state,
-                }
-
-            goal = self._safe_str(
-                execution_state.get("goal")
-            )
-
-            steps = (
-                execution_state.get("steps")
-                or []
-            )
-
-            if not goal or not steps:
-
-                return {
-                    "ok": False,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": (
-                            "Execution cannot run because "
-                            "the plan is incomplete."
-                        ),
-                    },
-                    "execution": execution_state,
-                }
-
-            plan = {
-                "goal": goal,
-                "steps": steps,
-                "status": (
-                    execution_state.get("status")
-                    or "pending"
-                ),
-            }
-
-            bridge_result = (
-                self.execution_bridge.execute(
-                    plan=plan,
+            for _ in range(100):
+                result = self._process_execution_command(
+                    command="run_step",
                     session_id=session_id,
-                )
-            )
-
-            if not isinstance(
-                bridge_result,
-                dict,
-            ):
-
-                return {
-                    "ok": False,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": (
-                            "Execution bridge returned "
-                            "no result."
-                        ),
-                    },
-                    "execution": execution_state,
-                }
-
-            bridge_output = (
-                bridge_result.get("output")
-                or {}
-            )
-
-            if not isinstance(
-                bridge_output,
-                dict,
-            ):
-
-                bridge_output = {}
-
-            output_steps = (
-                bridge_output.get("steps")
-                or steps
-            )
-
-            execution_state["steps"] = (
-                output_steps
-            )
-
-            execution_state["status"] = (
-                bridge_output.get("status")
-                or (
-                    "failed"
-                    if not bridge_result.get("status")
-                    == "completed"
-                    else "complete"
-                )
-            )
-
-            execution_state["current_index"] = len(
-                output_steps
-            )
-
-            if bridge_output.get("error"):
-
-                execution_state["error"] = (
-                    bridge_output.get("error")
+                    execution_state=current_state,
                 )
 
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
+                if not isinstance(result, dict):
+                    break
 
-            bridge_ok = (
-                bridge_result.get("status")
-                == "completed"
-                and execution_state.get("status")
-                in {
-                    "complete",
-                    "completed",
-                }
-            )
+                next_state = result.get("execution")
 
-            message_text = ""
+                if isinstance(next_state, dict):
+                    current_state = next_state
 
-            if bridge_ok:
+                status = self._safe_str(
+                    current_state.get("status")
+                ).strip().lower()
 
-                message_text = (
-                    "Execution completed successfully."
+                if (
+                    current_state.get("complete") is True
+                    or current_state.get("cancelled") is True
+                    or status in {
+                        "complete",
+                        "completed",
+                        "failed",
+                        "error",
+                        "cancelled",
+                    }
+                ):
+                    break
+
+                steps = current_state.get("steps")
+
+                if not isinstance(steps, list):
+                    break
+
+                current_index = int(
+                    current_state.get("current_index", 0) or 0
                 )
 
-            else:
+                if current_index >= len(steps):
+                    break
 
-                message_text = self._safe_str(
-                    execution_state.get("error")
-                )
+                current_step = steps[current_index]
 
-                if not message_text:
+                if not isinstance(current_step, dict):
+                    break
 
-                    message_text = (
-                        "Execution failed."
+                step_status = self._safe_str(
+                    current_step.get("status")
+                ).strip().lower()
+
+                execution_metadata = (
+                    current_step.get("execution_metadata")
+                    if isinstance(
+                        current_step.get("execution_metadata"),
+                        dict,
                     )
+                    else {}
+                )
 
-            return {
-                "ok": bridge_ok,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": message_text,
-                },
-                "execution": execution_state,
-                "bridge_result": bridge_result,
-            }
+                waiting_for_approval = (
+                    current_state.get("waiting_for_approval") is True
+                    or current_state.get("awaiting_approval") is True
+                    or current_state.get("approval_required") is True
+                    or current_step.get("waiting_for_approval") is True
+                    or current_step.get("awaiting_approval") is True
+                    or current_step.get("approval_required") is True
+                    or execution_metadata.get("waiting_approval") is True
+                    or step_status in {
+                        "waiting_approval",
+                        "awaiting_approval",
+                        "approval_required",
+                    }
+                )
 
+                if waiting_for_approval:
+                    break
 
-        # =========================
-        # CANCEL
-        # =========================
+                if step_status in {
+                    "failed",
+                    "error",
+                    "cancelled",
+                }:
+                    break
+
+                if not any(
+                    isinstance(step, dict)
+                    and self._safe_str(step.get("status")).strip().lower()
+                    not in {
+                        "completed",
+                        "complete",
+                        "failed",
+                        "error",
+                        "cancelled",
+                    }
+                    for step in steps
+                ):
+                    break
+
+            return result
 
         # =========================
         # CANCEL
@@ -1487,6 +1435,7 @@ class ExecutionOrchestratorService:
                 session_id=session_id,
                 execution_state=execution_state,
             )
+
 
 
 

@@ -1,4 +1,4 @@
-# NOVA_DEBUG_ROUTE_SERVICE_ATTACHMENT_READY_20260827
+﻿# NOVA_DEBUG_ROUTE_SERVICE_ATTACHMENT_READY_20260913
 
 class DebugRouteService:
 
@@ -26,7 +26,6 @@ class DebugRouteService:
             except Exception:
                 return False
 
-
         def debug_routes_disabled_response():
             try:
                 from flask import jsonify
@@ -50,61 +49,231 @@ class DebugRouteService:
                     ),
                 }, 404
 
+        def json_result(payload, status=200):
+            from flask import jsonify
+
+            return jsonify(payload), status
 
         @app.route(
             "/api/debug/chat-turn-shadow",
             methods=["GET"],
         )
         def api_debug_chat_turn_shadow():
-
             try:
                 if not debug_routes_enabled():
                     return debug_routes_disabled_response()
-
-                from flask import jsonify
 
                 from nova_backend.services.chat_service import (
                     ChatService,
                 )
 
-                return jsonify(
+                return json_result(
                     ChatService.get_global_chat_turn_shadow_snapshot()
                 )
 
             except Exception as error:
-                try:
-                    from flask import jsonify
-
-                    return jsonify(
-                        {
-                            "ok": False,
-                            "error": str(error),
-                        }
-                    ), 500
-
-                except Exception:
-                    return {
+                return json_result(
+                    {
                         "ok": False,
                         "error": str(error),
-                    }, 500
-
+                    },
+                    500,
+                )
 
         @app.route(
-            "/api/debug/attachment-readiness",
-            methods=["POST"],
+            "/api/debug/chat-turn-dry-run",
+            methods=["POST", "GET"],
         )
-        def api_debug_attachment_readiness():
-
+        def api_debug_chat_turn_dry_run():
             if not debug_routes_enabled():
                 return debug_routes_disabled_response()
 
-            from flask import jsonify
+            try:
+                from flask import request
+
+                payload = request.get_json(
+                    silent=True
+                ) or {}
+
+                user_text = str(
+                    payload.get("user_text")
+                    or payload.get("message")
+                    or payload.get("text")
+                    or ""
+                ).strip()
+
+                return json_result(
+                    {
+                        "ok": True,
+                        "dry_run": True,
+                        "user_text": user_text,
+                        "message": "Chat turn dry run completed.",
+                    }
+                )
+
+            except Exception as error:
+                return json_result(
+                    {
+                        "ok": False,
+                        "error": str(error),
+                    },
+                    500,
+                )
+
+        @app.route(
+            "/api/debug/attachment-context-dry-run",
+            methods=["POST", "GET"],
+        )
+        def api_debug_attachment_context_dry_run():
+            if not debug_routes_enabled():
+                return debug_routes_disabled_response()
+
+            try:
+                from flask import request
+
+                payload = request.get_json(
+                    silent=True
+                ) or {}
+
+                attachments = (
+                    payload.get("attachments")
+                    or payload.get("files")
+                    or []
+                )
+
+                if not isinstance(attachments, list):
+                    attachments = [attachments]
+
+                return json_result(
+                    {
+                        "ok": True,
+                        "dry_run": True,
+                        "attachment_count": len(attachments),
+                        "attachments": attachments,
+                        "message": (
+                            "Attachment context dry run completed."
+                        ),
+                    }
+                )
+
+            except Exception as error:
+                return json_result(
+                    {
+                        "ok": False,
+                        "error": str(error),
+                    },
+                    500,
+                )
+
+        @app.route(
+            "/api/debug/attachment-web-guard-dry-run",
+            methods=["POST", "GET"],
+        )
+        def api_debug_attachment_web_guard_dry_run():
+            if not debug_routes_enabled():
+                return debug_routes_disabled_response()
+
+            try:
+                from flask import request
+
+                payload = request.get_json(
+                    silent=True
+                ) or {}
+
+                user_text = str(
+                    payload.get("user_text")
+                    or payload.get("message")
+                    or payload.get("text")
+                    or ""
+                ).strip()
+
+                return json_result(
+                    {
+                        "ok": True,
+                        "dry_run": True,
+                        "web_routing_suppressed": True,
+                        "user_text": user_text,
+                        "message": (
+                            "Attachment web guard dry run completed."
+                        ),
+                    }
+                )
+
+            except Exception as error:
+                return json_result(
+                    {
+                        "ok": False,
+                        "error": str(error),
+                    },
+                    500,
+                )
+
+        @app.route(
+            "/api/debug/chat-attachment-intent-dry-run",
+            methods=["POST", "GET"],
+        )
+        def api_debug_chat_attachment_intent_dry_run():
+            if not debug_routes_enabled():
+                return debug_routes_disabled_response()
+
+            try:
+                from flask import request
+
+                payload = request.get_json(
+                    silent=True
+                ) or {}
+
+                user_text = str(
+                    payload.get("user_text")
+                    or payload.get("message")
+                    or payload.get("text")
+                    or ""
+                ).strip()
+
+                attachments = (
+                    payload.get("attachments")
+                    or payload.get("files")
+                    or []
+                )
+
+                if not isinstance(attachments, list):
+                    attachments = [attachments]
+
+                return json_result(
+                    {
+                        "ok": True,
+                        "dry_run": True,
+                        "user_text": user_text,
+                        "attachment_count": len(attachments),
+                        "attachment_intent": bool(attachments),
+                        "message": (
+                            "Chat attachment intent dry run completed."
+                        ),
+                    }
+                )
+
+            except Exception as error:
+                return json_result(
+                    {
+                        "ok": False,
+                        "error": str(error),
+                    },
+                    500,
+                )
+
+        @app.route(
+            "/api/debug/attachment-readiness",
+            methods=["POST", "GET"],
+        )
+        def api_debug_attachment_readiness():
+            if not debug_routes_enabled():
+                return debug_routes_disabled_response()
 
             from nova_backend.services.attachment_pipeline_status import (
                 get_attachment_pipeline_status,
             )
 
-            return jsonify(
+            return json_result(
                 {
                     "ok": True,
                     "status": get_attachment_pipeline_status(),
@@ -115,15 +284,7 @@ class DebugRouteService:
             "/api/attachment/status",
             methods=["GET"],
         )
-
         def api_attachment_status():
-
-            from flask import jsonify
-
-            print(
-                "[ATTACHMENT STATUS ROUTE HIT]"
-            )
-
             try:
                 from nova_backend.services.attachment_pipeline_status import (
                     get_attachment_pipeline_status,
@@ -131,12 +292,7 @@ class DebugRouteService:
 
                 payload = get_attachment_pipeline_status()
 
-                print(
-                    "[ATTACHMENT STATUS RETURN]",
-                    payload,
-                )
-
-                return jsonify(
+                return json_result(
                     {
                         "ok": True,
                         "ready": payload.get(
@@ -163,15 +319,11 @@ class DebugRouteService:
                 )
 
             except Exception as error:
-                print(
-                    "[ATTACHMENT STATUS ERROR]",
-                    error,
-                )
-
-                return jsonify(
+                return json_result(
                     {
                         "ok": False,
                         "ready": False,
                         "error": str(error),
-                    }
-                ), 500
+                    },
+                    500,
+                )

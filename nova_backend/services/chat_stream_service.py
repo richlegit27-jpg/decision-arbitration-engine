@@ -1,7 +1,7 @@
-import json
+﻿import json
 import traceback
 
-from flask import Response, stream_with_context
+from flask import Response, request, stream_with_context
 
 
 class ChatStreamService:
@@ -59,12 +59,14 @@ class ChatStreamService:
         assistant = payload.get("assistant_message")
 
         if isinstance(assistant, dict):
+
             for key in (
                 "text",
                 "content",
                 "message",
                 "response",
             ):
+
                 value = assistant.get(key)
 
                 if isinstance(value, str) and value.strip():
@@ -77,6 +79,7 @@ class ChatStreamService:
             "message",
             "answer",
         ):
+
             value = payload.get(key)
 
             if isinstance(value, str) and value.strip():
@@ -107,6 +110,29 @@ class ChatStreamService:
                     "stream": True,
                     "status": "started",
                 })
+
+                raw_before_api_chat = request.get_data(
+                    cache=True,
+                    as_text=True,
+                )
+
+                print(
+                    "[CHAT STREAM REQUEST BODY BEFORE API CHAT]",
+                    raw_before_api_chat,
+                    flush=True,
+                )
+
+                json_before_api_chat = request.get_json(
+                    silent=True,
+                    cache=True,
+                )
+
+                print(
+                    "[CHAT STREAM JSON BEFORE API CHAT]",
+                    json_before_api_chat,
+                    flush=True,
+                )
+
                 result = api_chat()
 
                 print(
@@ -136,12 +162,6 @@ class ChatStreamService:
                     "type": "debug",
                     "payload": payload,
                 })
-
-                print(
-                    "[CHAT STREAM PAYLOAD]",
-                    repr(payload)[:3000],
-                    flush=True,
-                )
 
                 text = self._extract_text(
                     payload

@@ -251,9 +251,19 @@ with TemporaryDirectory() as temporary_directory:
     )
 
     assert_true(
-        "missing_content_step_blocked",
-        missing_content_step.get("status")
-        == "failed",
+        "missing_content_step_waits",
+        (
+            missing_content_step.get("status") == "waiting"
+            and missing_content_step.get("waiting") is True
+            and missing_content_step.get("error") is None
+            and missing_content_step.get("needs_clarification") is True
+            and missing_content_step.get("next_action")
+            == "request_content"
+            and missing_content_step.get("payload_required") is True
+            and bool(
+                missing_content_step.get("result")
+            )
+        ),
         missing_content_step,
     )
 
@@ -272,18 +282,34 @@ with TemporaryDirectory() as temporary_directory:
     )
 
     assert_true(
-        "unsupported_action_blocked",
-        unsupported_step.get("status")
-        == "failed",
+        "unsupported_action_waits",
+        (
+            unsupported_step.get("status") == "waiting"
+            and unsupported_step.get("waiting") is True
+            and unsupported_step.get("error") is None
+            and bool(
+                unsupported_step.get("clarification")
+            )
+        ),
         unsupported_step,
     )
 
+    unsupported_clarification = str(
+        unsupported_step.get("clarification")
+        or unsupported_step.get("result")
+        or ""
+    ).lower()
+
     assert_true(
         "unsupported_action_explained",
-        "Unsupported execution action"
-        in str(
-            unsupported_step.get("error")
-            or ""
+        (
+            len(unsupported_clarification.strip()) > 0
+            and (
+                "teleport" in unsupported_clarification
+                or "destination" in unsupported_clarification
+                or "location" in unsupported_clarification
+                or "coordinates" in unsupported_clarification
+            )
         ),
         unsupported_step,
     )

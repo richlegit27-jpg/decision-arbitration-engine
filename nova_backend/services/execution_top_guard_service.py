@@ -46,11 +46,50 @@ class ExecutionTopGuardService:
             "complete the steps",
             "continue execution",
             "start execution",
+            "create or overwrite",
+            "create file",
+            "overwrite",
+            "write to",
+            "save to",
+            "modify file",
+            "update file",
+            "delete file",
+            "remove file",
+            "rename file",
+            "move file",
+            "make a file",
+            "generate a file",
         )
 
         return any(
             marker in text
             for marker in execution_markers
+        )
+
+    def _is_continuation_request(
+        self,
+        user_text,
+    ):
+        text = str(
+            user_text or ""
+        ).lower().strip()
+
+        continuation_markers = (
+            "continue execution",
+            "resume execution",
+            "continue",
+            "resume",
+            "run all",
+            "run all steps",
+            "run the steps",
+            "execute all",
+            "execute all steps",
+            "complete the steps",
+        )
+
+        return any(
+            marker in text
+            for marker in continuation_markers
         )
 
     def handle(
@@ -109,6 +148,7 @@ class ExecutionTopGuardService:
                 status in (
                     "running",
                     "paused",
+                    "waiting",
                     "waiting_approval",
                     "ready",
                 )
@@ -116,7 +156,35 @@ class ExecutionTopGuardService:
                 or bool(state.get("current_step"))
             )
 
-            if has_active_execution:
+            is_continuation_request = (
+                self._is_continuation_request(
+                    user_text
+                )
+            )
+
+            print(
+                "[TOP EXECUTION GUARD ROUTING]",
+                {
+                    "session_id": safe_session_id,
+                    "status": status,
+                    "has_active_execution": (
+                        has_active_execution
+                    ),
+                    "is_continuation_request": (
+                        is_continuation_request
+                    ),
+                    "user_text": user_text,
+                },
+                flush=True,
+            )
+
+            # Resume an existing mission only when the user explicitly
+            # requests continuation. A new concrete request must never
+            # be swallowed by an older running or waiting state.
+            if (
+                has_active_execution
+                and is_continuation_request
+            ):
                 result = chat_execution_service.run_all(
                     safe_session_id
                 )
@@ -151,9 +219,14 @@ class ExecutionTopGuardService:
 
             if execution_bridge_service is not None:
 
-                # No active mission exists.
-                # Try to create one before attempting
-                # to advance an existing mission.
+                # This is either a new explicit execution request or
+                # there is no active mission. The bridge must receive
+                # the current user text and build a fresh concrete plan.
+                print(
+                    "[TOP EXECUTION GUARD] Starting fresh execution plan",
+                    flush=True,
+                )
+
                 bridge_result = (
                     execution_bridge_service
                     .try_execution_autoplan_start(

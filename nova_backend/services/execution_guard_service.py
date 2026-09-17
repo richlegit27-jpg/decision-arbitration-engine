@@ -1,3 +1,6 @@
+﻿from nova_backend.services.project_brain_context_builder import (
+    build_project_brain_context,
+)
 
 class ExecutionGuardService:
 

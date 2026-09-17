@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
@@ -47,14 +47,37 @@ def _new_working_state() -> Dict[str, Any]:
         "last_execution": None,
     }
 
-def _normalize_working_state(value: Any) -> Dict[str, str]:
+def _normalize_working_state(value: Any) -> Dict[str, Any]:
     state = _new_working_state()
-    if isinstance(value, dict):
-        for key in WORKING_STATE_KEYS:
-            if key in value:
-                state[key] = str(value.get(key) or "")
-    return state
 
+    if not isinstance(value, dict):
+        return state
+
+    structured_keys = {
+        "active_execution",
+        "execution_state",
+        "execution",
+        "last_execution",
+    }
+
+    for key in WORKING_STATE_KEYS:
+        if key not in value:
+            continue
+
+        raw_value = value.get(key)
+
+        if key in structured_keys:
+            if isinstance(raw_value, dict):
+                state[key] = raw_value
+            elif raw_value in (None, "", {}):
+                state[key] = None
+            else:
+                # Do not convert structured execution state to text.
+                state[key] = None
+        else:
+            state[key] = str(raw_value or "")
+
+    return state
 
 def _session_sort_key(session: Dict[str, Any]) -> tuple:
     pinned = bool(session.get("pinned", False))
@@ -205,7 +228,7 @@ class SessionService:
         text = self._safe_str(value)
         if len(text) <= limit:
             return text
-        return text[:limit] + " Ã¢â‚¬Â¦[truncated]"
+        return text[:limit] + " ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦[truncated]"
 
     def _sanitize_meta_for_storage(self, meta) -> dict:
         if not isinstance(meta, dict):
@@ -344,23 +367,39 @@ class SessionService:
         if not isinstance(active_execution, dict):
             return None
 
-        return {
+        safe_execution = {
             "id": self._truncate_text(active_execution.get("id", ""), 128),
             "goal": self._truncate_text(active_execution.get("goal", ""), 1000),
             "status": self._truncate_text(active_execution.get("status", ""), 64),
-            "current_step_index": active_execution.get("current_step_index", 0)
-            if isinstance(active_execution.get("current_step_index"), int)
-            else 0,
-            "updated_at": self._safe_str(active_execution.get("updated_at")).strip(),
-            "steps": [
-                {
-                    "title": self._truncate_text(step.get("title", ""), 500),
-                    "status": self._truncate_text(step.get("status", ""), 64),
-                }
-                for step in (active_execution.get("steps") or [])[:20]
-                if isinstance(step, dict)
-            ],
+            "current_step_index": (
+                active_execution.get("current_step_index", 0)
+                if isinstance(active_execution.get("current_step_index"), int)
+                else 0
+            ),
+            "updated_at": self._safe_str(
+                active_execution.get("updated_at")
+            ).strip(),
+            "steps": [],
         }
+
+        raw_steps = active_execution.get("steps") or []
+
+        if isinstance(raw_steps, list):
+            for raw_step in raw_steps[:20]:
+                if not isinstance(raw_step, dict):
+                    continue
+
+                safe_step = {}
+
+                for key, value in raw_step.items():
+                    if not isinstance(key, str):
+                        continue
+
+                    safe_step[key] = value
+
+                safe_execution["steps"].append(safe_step)
+
+        return safe_execution
 
     def sanitize_session_for_storage(self, session: dict) -> dict:
         if not isinstance(session, dict):
@@ -370,6 +409,20 @@ class SessionService:
 
         cleaned["id"] = self._truncate_text(session.get("id", ""), 128)
         cleaned["title"] = self._truncate_text(session.get("title", ""), 300)
+        # NOVA_SESSION_TOP_LEVEL_ATTACHMENTS_20260913
+        # Preserve the session-level attachment registry alongside
+        # the per-message attachment metadata.
+        session_attachments = session.get("attachments")
+
+        if not isinstance(session_attachments, list):
+            session_attachments = []
+
+        cleaned["attachments"] = (
+            self._sanitize_attachments_for_storage(
+                session_attachments
+            )
+        )
+
         cleaned["created_at"] = self._safe_str(session.get("created_at")).strip()
         cleaned["updated_at"] = self._safe_str(session.get("updated_at")).strip()
         cleaned["pinned"] = bool(session.get("pinned", False))
@@ -401,7 +454,7 @@ class SessionService:
             )
         )
 
-        # keep working state tiny if present
+        # Keep working state compact while preserving structured execution data.
         working_state = session.get("working_state")
 
         if isinstance(working_state, dict):
@@ -442,8 +495,29 @@ class SessionService:
                 "updated_at": self._safe_str(
                     working_state.get("updated_at")
                 ).strip(),
-            }
 
+                # Preserve complete execution metadata.
+                "active_execution": (
+                    self._sanitize_active_execution_for_storage(
+                        working_state.get("active_execution")
+                    )
+                ),
+                "execution_state": (
+                    self._sanitize_active_execution_for_storage(
+                        working_state.get("execution_state")
+                    )
+                ),
+                "execution": (
+                    self._sanitize_active_execution_for_storage(
+                        working_state.get("execution")
+                    )
+                ),
+                "last_execution": (
+                    self._sanitize_active_execution_for_storage(
+                        working_state.get("last_execution")
+                    )
+                ),
+            }
         else:
             cleaned["working_state"] = {
                 "active_task": "",
@@ -1102,52 +1176,95 @@ class SessionService:
 
         return deepcopy(state)
 
-    def update_working_state(self, session_id: str, patch: Dict[str, Any]):
+    def update_working_state(
+        self,
+        session_id: str,
+        patch: Dict[str, Any],
+    ):
         sessions = self._load_sessions()
         i = self._find(sessions, session_id)
+
         if i < 0:
             return _new_working_state()
 
-        state = _normalize_working_state(sessions[i].get("working_state"))
+        state = _normalize_working_state(
+            sessions[i].get("working_state")
+        )
+
+        structured_keys = {
+            "active_execution",
+            "execution_state",
+            "execution",
+            "last_execution",
+        }
 
         for key in WORKING_STATE_KEYS:
             if key == "updated_at":
                 continue
-            if key in patch:
-                state[key] = str(patch[key] or "").strip()
+
+            if key not in patch:
+                continue
+
+            value = patch[key]
+
+            if key in structured_keys:
+                if isinstance(value, dict):
+                    state[key] = value
+                elif value in (None, "", {}):
+                    state[key] = None
+                else:
+                    # Reject malformed structured state instead of stringifying it.
+                    state[key] = None
+            else:
+                state[key] = str(value or "").strip()
 
         state["updated_at"] = iso_now()
         sessions[i]["working_state"] = state
         sessions[i]["updated_at"] = state["updated_at"]
 
         self._save_sessions(sessions, session_id)
+
         return deepcopy(state)
 
-    def clear_working_state(self, session_id: str):
-        sessions = self._load_sessions()
-        i = self._find(sessions, session_id)
+        def clear_working_state(self, session_id: str):
+            sessions = self._load_sessions()
+            i = self._find(sessions, session_id)
 
-        if i < 0:
-            return _new_working_state()
+            if i < 0:
+                return _new_working_state()
 
-        if not self._belongs_to_user(
-            sessions[i],
-            self._current_owner_id(),
-        ):
-            return _new_working_state()
+            if not self._belongs_to_user(
+                sessions[i],
+                self._current_owner_id(),
+            ):
+                return _new_working_state()
 
-        state = _new_working_state()
-        state["updated_at"] = iso_now()
+            state = _new_working_state()
+            state["updated_at"] = iso_now()
 
-        sessions[i]["working_state"] = state
-        sessions[i]["updated_at"] = state["updated_at"]
+            sessions[i]["working_state"] = state
+            sessions[i]["updated_at"] = state["updated_at"]
 
-        self._save_sessions(sessions, session_id)
-        return deepcopy(state)
+            self._save_sessions(sessions, session_id)
+            return deepcopy(state)
 
-    # -----------------------
+        # -----------------------
     # CORE METHODS
     # -----------------------
+
+    def get_active(self):
+        """
+        Compatibility method for session bootstrap code.
+
+        Returns the full active session dictionary rather than only
+        the active session ID.
+        """
+        active_id = self.get_active_session_id()
+
+        if not active_id:
+            return None
+
+        return self.get_session(active_id)
 
     def get_active_session_id(self):
         store = self._read_store()
@@ -1440,6 +1557,8 @@ class SessionService:
 
     def get_by_id(self, session_id):
         return self.get_session(session_id)
+
+
 
 
 

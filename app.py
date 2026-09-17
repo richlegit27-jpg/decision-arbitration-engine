@@ -16,6 +16,7 @@ from nova_backend.services.state_route_service import StateRouteService
 from nova_backend.services.attachment_service import attachment_service
 from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.services.image_vision_service import ImageVisionService
+
 from flask import (
     Flask,
     Response,
@@ -485,9 +486,12 @@ artifact_service = ArtifactService(
 upload_ownership_service = UploadOwnershipService(
     "data/nova_upload_ownership.json"
 )
+attachment_analysis_service = AttachmentAnalysisService()
+
 upload_route_service = UploadRouteService(
     uploads_dir=UPLOADS_DIR,
     upload_ownership_service=upload_ownership_service,
+    attachment_analysis_service=attachment_analysis_service,
 )
 project_aware_context_service = ProjectAwareContextService(
     memory_context_service,
@@ -593,7 +597,6 @@ print(
 runtime_response_sanitizer = RuntimeResponseSanitizerService()
 attachment_keypoints_service = AttachmentKeypointsService()
 # install_project_chat_response_router moved below app creation
-attachment_analysis_service = AttachmentAnalysisService()
 attachment_summary_lock_service = None
 from nova_backend.services.attachment_summary_lock_service import (
     apply_attachment_summary_lock,
@@ -1584,6 +1587,9 @@ def api_models_select_route():
 @app.route("/api/chat", methods=["POST"])
 def api_chat_route():
     data = request.get_json(silent=True) or {}
+    print("[CHAT RAW CONTENT TYPE]", request.content_type, flush=True)
+    print("[CHAT RAW DATA]", request.get_data(cache=True), flush=True)
+    print("[CHAT PARSED DATA]", repr(data), flush=True)
 
     user_text = str(
         data.get("user_text")
@@ -1752,6 +1758,34 @@ def api_projects():
             "projects": project_workspace_service.list_projects(),
         }
     )
+
+@app.route("/api/debug/chat-route", methods=["GET"])
+def api_debug_chat_route():
+    rules = []
+
+    for rule in app.url_map.iter_rules():
+        if rule.rule == "/api/chat":
+            view_func = app.view_functions.get(rule.endpoint)
+
+            rules.append({
+                "rule": rule.rule,
+                "endpoint": rule.endpoint,
+                "view_function": getattr(
+                    view_func,
+                    "__name__",
+                    repr(view_func),
+                ),
+                "module": getattr(
+                    view_func,
+                    "__module__",
+                    "",
+                ),
+            })
+
+    return jsonify({
+        "ok": True,
+        "routes": rules,
+    })
 
 @app.route(
     "/api/projects/<project_id>",
@@ -1964,6 +1998,36 @@ def _nova_casual_chat_guard():
             or ""
         ).strip()
 
+        # Explicit execution requests must bypass the casual-chat guard.
+        execution_markers = (
+            "create a file",
+            "write a file",
+            "save a file",
+            "make a file",
+            "generate a file",
+            "run ",
+            "execute ",
+            "delete ",
+            "modify ",
+            "edit ",
+            "replace ",
+        )
+
+        clean_execution_text = " ".join(
+            user_text.lower().split()
+        )
+
+        if any(
+            marker in clean_execution_text
+            for marker in execution_markers
+        ):
+            print(
+                "[HOOK 1 BYPASSING CASUAL GUARD FOR EXECUTION]",
+                repr(user_text),
+                flush=True,
+            )
+            return None
+
         # NOVA_AUTO_PLAN_EXECUTION_START_GUARD_20260607
 
         chat_guard_result = chat_guard_service.handle_casual_chat_guard(
@@ -1972,6 +2036,11 @@ def _nova_casual_chat_guard():
         )
 
         if chat_guard_result is not None:
+            print(
+                "[HOOK 1 RETURNING CHAT GUARD RESULT]",
+                repr(chat_guard_result),
+                flush=True,
+            )
             return jsonify(chat_guard_result)
 
 
@@ -3027,12 +3096,36 @@ def api_chat():
 
     # NOVA_EXECUTION_TARGET_CAPTURE_GATE
     try:
-
         execution_state = (
             chat_execution_service.get_state(
                 session_id
             )
         )
+
+        # Do not reuse terminal execution state from a previous
+        # failed/completed/cancelled execution for a new request.
+        if (
+            isinstance(execution_state, dict)
+            and str(
+                execution_state.get("status")
+                or ""
+            ).strip().lower()
+            in {
+                "failed",
+                "complete",
+                "completed",
+                "cancelled",
+                "canceled",
+            }
+        ):
+            execution_state = {
+                "status": "idle",
+                "steps": [],
+                "current_index": 0,
+                "current_step": None,
+                "last_action": None,
+                "error": None,
+            }
 
         current_step = execution_state.get(
             "current_step"
@@ -4611,7 +4704,7 @@ try:
     if "api_chat" in globals():
         for _nova_rule in app.url_map.iter_rules():
             if str(_nova_rule.rule) == "/api/chat":
-                app.view_functions[_nova_rule.endpoint] = api_chat
+                app.view_functions[_nova_rule.endpoint] = api_chat_route
                 _nova_boot_log_20260701(f"[NOVA ROUTE REPAIR] /api/chat endpoint={_nova_rule.endpoint} rebound to api_chat")
 
 except Exception as _nova_route_repair_error:
@@ -5101,15 +5194,8 @@ def stream_events():
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream():
 
-    active_api_chat = app.view_functions.get(
-        "api_chat_route"
-    )
-
-    if not callable(active_api_chat):
-        active_api_chat = api_chat
-
     return chat_stream_service.stream(
-        active_api_chat
+        api_chat
     )
 
 @app.before_request
@@ -5607,6 +5693,22 @@ if __name__ == "__main__":
         "seconds",
         flush=True,
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

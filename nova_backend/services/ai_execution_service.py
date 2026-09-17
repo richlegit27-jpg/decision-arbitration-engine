@@ -52,6 +52,10 @@ class AIExecutionService:
 
         description = self._safe_str(
             step.get("description")
+            or step.get("text")
+            or step.get("task")
+            or step.get("instruction")
+            or step.get("name")
         ).strip()
 
         action = self._safe_str(
@@ -268,6 +272,10 @@ class AIExecutionService:
 
         description = self._safe_str(
             step.get("description")
+            or step.get("text")
+            or step.get("task")
+            or step.get("instruction")
+            or step.get("name")
         ).strip()
 
         execution_mode = self._safe_str(
@@ -501,6 +509,10 @@ class AIExecutionService:
             return output_text
 
         return ""
+
+
+
+
 
 
 

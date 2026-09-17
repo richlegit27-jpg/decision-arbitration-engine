@@ -1,3 +1,4 @@
+﻿import re
 import uuid
 from datetime import datetime
 
@@ -12,7 +13,89 @@ class ExecutionService:
         self.chat_service = chat_service
         self.chat_execution_service = chat_execution_service
 
+    @staticmethod
+    def safe_str(value):
+        """
+        Safely normalize arbitrary values into a string.
+        """
+        if value is None:
+            return ""
 
+        if isinstance(value, str):
+            return value
+
+        try:
+            return str(value)
+        except Exception:
+            return ""
+
+
+
+    def _extract_file_creation_request(
+        self,
+        user_text,
+    ):
+        """
+        Extract a requested filename and file contents from natural language.
+        """
+
+        original_text = str(user_text or "").strip()
+
+        filename_match = re.search(
+            r"(?:named|called|file)\s+[`\"']?([A-Za-z0-9_.-]+\.[A-Za-z0-9]+)",
+            original_text,
+            re.IGNORECASE,
+        )
+
+        if not filename_match:
+            filename_match = re.search(
+                r"\b([A-Za-z0-9_.-]+\.(?:txt|md|json|csv|py|js|html|css))\b",
+                original_text,
+                re.IGNORECASE,
+            )
+
+        if not filename_match:
+            return {
+                "filename": "",
+                "target_file": "",
+                "content": "",
+            }
+
+        filename = filename_match.group(1).strip()
+
+        content_match = re.search(
+            r"(?:containing|with)\s+(?:the\s+)?(?:text|content|contents?)\s+(.+?)(?=\s+then\s+verify\b|\s+and\s+verify\b|$)",
+            original_text,
+            re.IGNORECASE | re.DOTALL,
+        )
+
+        if not content_match:
+            content_match = re.search(
+                r"(?:text|content|contents?)\s*[:=]\s*[`\"']?(.+?)(?:[`\"']?\s+then\s+verify\b|[`\"']?\s+and\s+verify\b|$)",
+                original_text,
+                re.IGNORECASE | re.DOTALL,
+            )
+
+        content = ""
+        if content_match:
+            content = content_match.group(1).strip()
+            content = content.strip("`\"' ")
+            content = content.rstrip(" .,;:")
+            content = content.rstrip(" .,;:")
+            content = content.rstrip(" .,;:")
+
+        target_file = filename
+
+        if not re.match(r"^[A-Za-z]:[\\/]", target_file):
+            target_file = str(
+                __import__("pathlib").Path.cwd() / filename
+            )
+
+        return {
+            "filename": filename,
+            "target_file": target_file,
+            "content": content,
+        }
     def _build_goal(
         self,
         user_text,
@@ -22,10 +105,45 @@ class ExecutionService:
         Converts raw input into a structured goal.
         """
 
-        text = (
+        original_text = str(
             user_text
             or ""
-        ).lower()
+        ).strip()
+
+        text = original_text.lower()
+
+        file_creation_request = (
+            (
+                "create" in text
+                or "make" in text
+                or "write" in text
+            )
+            and (
+                "file" in text
+                or ".txt" in text
+                or ".md" in text
+                or ".json" in text
+                or ".csv" in text
+                or ".py" in text
+                or ".js" in text
+                or ".html" in text
+                or ".css" in text
+            )
+        )
+
+        if file_creation_request:
+            file_request = self._extract_file_creation_request(
+                original_text
+            )
+
+            return {
+                "type": "file_creation",
+                "goal": original_text,
+                "original_text": original_text,
+                "filename": file_request.get("filename") or "",
+                "target_file": file_request.get("target_file") or "",
+                "content": file_request.get("content") or "",
+            }
 
         if (
             "fix" in text
@@ -79,8 +197,14 @@ class ExecutionService:
         goal_obj: dict,
     ):
         """
-        Turns a goal into structured execution phases.
+        Turns a structured goal into executable plan steps.
         """
+
+        goal_obj = (
+            goal_obj
+            if isinstance(goal_obj, dict)
+            else {}
+        )
 
         goal_type = str(
             goal_obj.get("type") or ""
@@ -91,19 +215,27 @@ class ExecutionService:
             return [
                 {
                     "action": "analyze",
-                    "input": "inspect issue and identify root cause",
+                    "input": (
+                        "Inspect the issue and identify "
+                        "the root cause."
+                    ),
                 },
                 {
                     "action": "diagnose",
-                    "input": "determine affected components",
+                    "input": (
+                        "Determine the affected components."
+                    ),
                 },
                 {
                     "action": "fix",
-                    "input": "apply correction",
+                    "input": "Apply the required correction.",
                 },
                 {
                     "action": "validate",
-                    "input": "test result and confirm resolution",
+                    "input": (
+                        "Test the result and confirm "
+                        "the resolution."
+                    ),
                 },
             ]
 
@@ -112,15 +244,101 @@ class ExecutionService:
             return [
                 {
                     "action": "analyze",
-                    "input": "inspect provided information",
+                    "input": (
+                        "Inspect the provided information."
+                    ),
                 },
                 {
                     "action": "organize",
-                    "input": "extract important patterns",
+                    "input": (
+                        "Extract the important patterns."
+                    ),
                 },
                 {
                     "action": "summarize",
-                    "input": "generate useful insights",
+                    "input": (
+                        "Generate useful insights."
+                    ),
+                },
+            ]
+
+        if goal_type in {
+            "planning",
+            "plan",
+        }:
+
+            return [
+                {
+                    "action": "analyze",
+                    "input": (
+                        "Analyze the requested objective "
+                        "and identify the required work."
+                    ),
+                },
+                {
+                    "action": "plan",
+                    "input": (
+                        "Create an ordered execution plan "
+                        "for the requested objective."
+                    ),
+                },
+                {
+                    "action": "validate",
+                    "input": (
+                        "Validate that the execution plan "
+                        "contains actionable steps."
+                    ),
+                },
+            ]
+
+        if goal_type == "file_creation":
+
+            original_text = str(
+                goal_obj.get("original_text")
+                or goal_obj.get("goal")
+                or ""
+            ).strip()
+
+            filename = str(
+                goal_obj.get("filename")
+                or ""
+            ).strip()
+
+            target_file = str(
+                goal_obj.get("target_file")
+                or ""
+            ).strip()
+
+            content = str(
+                goal_obj.get("content")
+                or ""
+            )
+
+            return [
+                {
+                    "action": "create",
+                    "title": (
+                        f"Create {filename}"
+                        if filename
+                        else "Create requested file"
+                    ),
+                    "input": original_text,
+                    "description": original_text,
+                    "target_file": target_file,
+                    "content": content,
+                    "file_content": content,
+                    "code": content,
+                },
+                {
+                    "action": "verify",
+                    "title": (
+                        f"Verify {filename}"
+                        if filename
+                        else "Verify requested file"
+                    ),
+                    "input": original_text,
+                    "description": original_text,
+                    "target_file": target_file,
                 },
             ]
 
@@ -129,60 +347,116 @@ class ExecutionService:
             return [
                 {
                     "action": "planning",
-                    "input": "understand requirements and define scope",
+                    "input": (
+                        "Understand the requirements "
+                        "and define the scope."
+                    ),
                 },
                 {
                     "action": "architecture",
-                    "input": "design system structure and components",
+                    "input": (
+                        "Design the system structure "
+                        "and components."
+                    ),
                 },
                 {
                     "action": "design",
-                    "input": "create detailed implementation plan",
+                    "input": (
+                        "Create a detailed implementation plan."
+                    ),
                 },
                 {
                     "action": "implementation",
-                    "input": "build core functionality",
-                    "target_file": (
-                        r"C:\Users\Owner\nova\nova_backend\sandbox\agent_target.py"
+                    "input": (
+                        "Build the core functionality."
                     ),
-                    "target_function": "placeholder_function",
+                    "target_file": (
+                        r"C:\Users\Owner\nova\nova_backend"
+                        r"\sandbox\agent_target.py"
+                    ),
+                    "target_function": (
+                        "placeholder_function"
+                    ),
                 },
                 {
                     "action": "integration",
-                    "input": "connect components and services",
+                    "input": (
+                        "Connect the components and services."
+                    ),
                 },
                 {
                     "action": "testing",
-                    "input": "validate functionality and detect issues",
+                    "input": (
+                        "Validate functionality and detect "
+                        "issues."
+                    ),
                     "target_file": (
-                        r"C:\Users\Owner\nova\nova_backend\sandbox\agent_target.py"
+                        r"C:\Users\Owner\nova\nova_backend"
+                        r"\sandbox\agent_target.py"
                     ),
                 },
                 {
                     "action": "optimization",
-                    "input": "improve quality, reliability, and performance",
+                    "input": (
+                        "Improve quality, reliability, "
+                        "and performance."
+                    ),
                 },
                 {
                     "action": "delivery",
-                    "input": "prepare final result and summarize work",
+                    "input": (
+                        "Prepare the final result and "
+                        "summarize the work."
+                    ),
                 },
             ]
 
         return [
             {
-                "action": "respond",
-                "input": "direct reply",
+                "action": "execute",
+                "input": (
+                    "Execute the requested objective."
+                ),
             },
         ]
-
 
     def _execute_tool(
         self,
         step: dict,
     ):
 
-        action = step.get("action")
-        input_data = step.get("input")
+        step = (
+            step
+            if isinstance(step, dict)
+            else {}
+        )
+
+        action = str(
+            step.get("action")
+            or ""
+        ).strip().lower()
+
+        input_data = (
+            step.get("input")
+            or step.get("description")
+            or step.get("text")
+            or ""
+        )
+
+        if action in {
+            "execute",
+            "run_step",
+        }:
+            return (
+                "Executed the requested task: "
+                f"{input_data}"
+            )
+
+        if action == "verify":
+            return (
+                "Verified the execution result "
+                "for the requested task."
+            )
 
         if action == "analyze":
             return f"analyzed: {input_data}"
@@ -196,7 +470,10 @@ class ExecutionService:
         if action == "validate":
             return f"validated: {input_data}"
 
-        if action == "planning":
+        if action in {
+            "plan",
+            "planning",
+        }:
             return f"planned: {input_data}"
 
         if action == "architecture":
@@ -205,7 +482,10 @@ class ExecutionService:
         if action == "design":
             return f"designed: {input_data}"
 
-        if action == "implementation":
+        if action in {
+            "implement",
+            "implementation",
+        }:
             return f"implemented: {input_data}"
 
         if action == "integration":
@@ -307,6 +587,110 @@ class ExecutionService:
     def _process_goal_and_plan(self, user_text: str, session_id: str):
         user_text = self.safe_str(user_text).strip()
 
+        existing_state = (
+            self.chat_service._load_execution_state(
+                session_id
+            )
+        )
+
+        if (
+            isinstance(existing_state, dict)
+            and isinstance(existing_state.get("steps"), list)
+            and existing_state.get("steps")
+        ):
+            current_index = existing_state.get(
+                "current_index",
+                0,
+            )
+
+            try:
+                current_index = int(
+                    current_index
+                )
+            except (TypeError, ValueError):
+                current_index = 0
+
+            execution_status = str(
+                existing_state.get("status")
+                or ""
+            ).strip().lower()
+
+            current_step = (
+                existing_state["steps"][current_index]
+                if 0 <= current_index < len(
+                    existing_state["steps"]
+                )
+                else {}
+            )
+
+            current_action = str(
+                current_step.get("action")
+                if isinstance(current_step, dict)
+                else ""
+            ).strip().lower()
+
+            continuation_terms = (
+                "continue",
+                "resume",
+                "next step",
+                "finish",
+                "proceed",
+                "retry",
+                "run it",
+                "execute it",
+                "go ahead",
+            )
+
+            is_continuation = any(
+                term in user_text.lower()
+                for term in continuation_terms
+            )
+
+            reusable_status = execution_status in {
+                "running",
+                "waiting",
+                "paused",
+                "pending",
+            }
+
+            reusable_action = current_action not in {
+                "",
+                "implement",
+                "create_file",
+                "write_file",
+            }
+
+            if (
+                current_index < len(
+                    existing_state["steps"]
+                )
+                and reusable_status
+                and is_continuation
+                and reusable_action
+            ):
+                exec_debug(
+                    "REUSING EXISTING EXECUTION STATE "
+                    f"session_id={session_id} "
+                    f"current_index={current_index} "
+                    f"steps={len(existing_state['steps'])}"
+                )
+
+                return existing_state
+
+            exec_debug(
+                "DISCARDING STALE OR NON-CONTINUATION "
+                "EXECUTION STATE "
+                f"session_id={session_id} "
+                f"status={execution_status} "
+                f"current_action={current_action} "
+                f"current_index={current_index}"
+            )
+
+            self._save_execution_state(
+                session_id,
+                {},
+            )
+
         goal = self._build_goal(user_text)
 
         if (
@@ -318,10 +702,7 @@ class ExecutionService:
                 "BLOCKED GENERAL CHAT EXECUTION PLAN"
             )
 
-            self._save_execution_state(
-                session_id,
-                {},
-            )
+            self._save_execution_state(session_id, {})
 
             return None
 
@@ -368,6 +749,11 @@ class ExecutionService:
                         "    print(greet())\n"
                     )
 
+                    step["mutation_mode"] = "create"
+                    step["next_action"] = "execute"
+                    step["mutation_ready"] = True
+                    step["payload_required"] = False
+
                 if (
                     "flask api" in user_text.lower()
                     or "create a flask api" in user_text.lower()
@@ -389,11 +775,17 @@ class ExecutionService:
                         "    app.run(debug=True)\n"
                     )
 
+                    step["mutation_mode"] = "create"
+                    step["next_action"] = "execute"
+                    step["mutation_ready"] = True
+                    step["payload_required"] = False
+
                 print(
                     "DEBUG RAW STEP BEFORE NORMALIZE =",
                     step,
                     flush=True,
                 )
+
 
                 normalized_steps.append(
                     {
@@ -401,15 +793,85 @@ class ExecutionService:
                         "title": title,
                         "action": action,
                         "input": input_value,
-                        "target_file": step.get("target_file") or "",
-                        "target_function": step.get("target_function") or "",
-                        "content": step.get("content") or "",
+
+                        "target_file": (
+                            step.get("target_file")
+                            or ""
+                        ),
+
+                        "target_files": (
+                            step.get("target_files")
+                            or []
+                        ),
+
+                        "target_function": (
+                            step.get("target_function")
+                            or ""
+                        ),
+
+                        "content": (
+                            step.get("content")
+                            or ""
+                        ),
+
                         "file_content": (
                             step.get("file_content")
+                            or step.get("content")
                             or step.get("code")
                             or ""
                         ),
-                        "code": step.get("code") or "",
+
+                        "code": (
+                            step.get("code")
+                            or ""
+                        ),
+
+                        "mutation_mode": (
+                            step.get("mutation_mode")
+                        ),
+
+                        "next_action": (
+                            step.get("next_action")
+                        ),
+
+                        "mutation_ready": bool(
+                            step.get("mutation_ready")
+                        ),
+
+                        "payload_required": bool(
+                            step.get("payload_required")
+                        ),
+
+                        "execution_file": (
+                            step.get("execution_file")
+                            or ""
+                        ),
+
+                        "run_file": (
+                            step.get("run_file")
+                            or ""
+                        ),
+
+                        "script_file": (
+                            step.get("script_file")
+                            or ""
+                        ),
+
+                        "test_script": (
+                            step.get("test_script")
+                            or ""
+                        ),
+
+                        "test_file": (
+                            step.get("test_file")
+                            or ""
+                        ),
+
+                        "command": (
+                            step.get("command")
+                            or ""
+                        ),
+
                         "status": "pending",
                         "result": "",
                         "error": None,
@@ -563,3 +1025,7 @@ class ExecutionService:
         )
 
         return execution_state
+
+
+
+

@@ -1400,11 +1400,30 @@ class ChatService:
                 "steps"
             )
         ):
-            return self.execution_handler.run_next_move(
-                action="run_step",
-                session_id=session_id,
-                execution_state=existing_execution,
-            )
+                continuation_action = str(
+                    existing_execution.get(
+                        "command"
+                    )
+                    or "run_step"
+                ).strip().lower()
+
+                if continuation_action in {
+                    "execute",
+                    "execute_all",
+                }:
+                    continuation_action = "run_all"
+                elif continuation_action in {
+                    "next",
+                    "continue",
+                    "go",
+                }:
+                    continuation_action = "run_step"
+
+                return self.execution_handler.run_next_move(
+                    action=continuation_action,
+                    session_id=session_id,
+                    execution_state=existing_execution,
+                )
 
         text = str(
             user_text or ""

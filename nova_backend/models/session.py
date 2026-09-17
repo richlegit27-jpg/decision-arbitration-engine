@@ -108,6 +108,11 @@ def normalize_session(session: Dict[str, Any] | None) -> SessionDict:
         "created_at": created_at,
         "updated_at": updated_at,
         "messages": messages,
+        "attachments": (
+            payload.get("attachments")
+            if isinstance(payload.get("attachments"), list)
+            else []
+        ),
         "message_count": int(payload.get("message_count") or len(messages)),
         "last_message_preview": str(
             payload.get("last_message_preview") or last_message_preview
@@ -139,6 +144,11 @@ def new_session(
         "created_at": now,
         "updated_at": now,
         "messages": normalized_messages,
+        "attachments": (
+            extra.get("attachments")
+            if isinstance(extra.get("attachments"), list)
+            else []
+        ),
         "message_count": len(normalized_messages),
         "last_message_preview": (
             str(normalized_messages[-1].get("text") or "").strip()[:160]
@@ -205,4 +215,6 @@ __all__ = [
     "touch_session",
     "append_message",
 ]
+
+
 

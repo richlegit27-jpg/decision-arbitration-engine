@@ -1,4 +1,4 @@
-﻿
+
 
 from __future__ import annotations
 
@@ -99,6 +99,106 @@ class ExecutionHandler:
             user_text,
             session_id,
         )
+
+        if not isinstance(execution, dict):
+            raise RuntimeError(
+                "Execution planning returned an invalid state."
+            )
+
+        steps = execution.get("steps") or []
+
+        if steps:
+            current_index = execution.get(
+                "current_index",
+                execution.get("current_step_index", 0),
+            )
+
+            try:
+                current_index = int(current_index)
+            except (TypeError, ValueError):
+                current_index = 0
+
+            if 0 <= current_index < len(steps):
+                print(
+                    "DEBUG EXECUTION HANDLER ABOUT TO RUN NEXT STEP",
+                    {
+                        "execution_id": execution.get("id"),
+                        "current_index": current_index,
+                        "step_count": len(steps),
+                        "has_project_handler": hasattr(
+                            self.service,
+                            "project_execution_handler",
+                        ),
+                        "project_handler_type": type(
+                            getattr(
+                                self.service,
+                                "project_execution_handler",
+                                None,
+                            )
+                        ).__name__,
+                    },
+                    flush=True,
+                )
+
+                project_handler = getattr(
+                    self.service,
+                    "project_execution_handler",
+                    None,
+                )
+
+                if project_handler is None:
+                    raise RuntimeError(
+                        "Chat service has no project_execution_handler."
+                    )
+
+                current_step = (
+                    steps[current_index]
+                    if isinstance(steps[current_index], dict)
+                    else {}
+                )
+
+                execution_action = (
+                    current_step.get("action")
+                    or execution.get("action")
+                    or execution.get("execution_action")
+                    or "execute"
+                )
+
+                step_result = project_handler.run_next_step(
+                    action=execution_action,
+                    execution_state=execution,
+                    session_id=session_id,
+                )
+
+                if (
+                    isinstance(step_result, dict)
+                    and isinstance(
+                        step_result.get("execution_state"),
+                        dict,
+                    )
+                ):
+                    execution = step_result["execution_state"]
+                else:
+                    execution = step_result
+
+                print(
+                    "DEBUG EXECUTION HANDLER AFTER RUN NEXT STEP",
+                    {
+                        "execution_id": execution.get("id")
+                        if isinstance(execution, dict)
+                        else None,
+                        "status": execution.get("status")
+                        if isinstance(execution, dict)
+                        else None,
+                        "current_index": execution.get("current_index")
+                        if isinstance(execution, dict)
+                        else None,
+                        "current_step": execution.get("current_step")
+                        if isinstance(execution, dict)
+                        else None,
+                    },
+                    flush=True,
+                )
 
         print(
             "DEBUG EXECUTION HANDLER RETURN =",
@@ -611,6 +711,169 @@ Rules:
 
             result_lines.append(
                 "Result: Design step completed."
+            )
+
+        elif action in {
+            "implement",
+            "create_file",
+            "write",
+            "create",
+            "generate",
+            "build",
+        }:
+            payload = dict(
+                step.get("payload")
+                or {}
+            )
+
+            target_file = str(
+                step.get("target_file")
+                or payload.get("target_file")
+                or payload.get("file_path")
+                or ""
+            ).strip()
+
+            content = (
+                step.get("content")
+                if step.get("content") is not None
+                else step.get("file_content")
+            )
+
+            if content is None:
+                content = (
+                    payload.get("content")
+                    if payload.get("content") is not None
+                    else payload.get("file_content")
+                )
+
+            if content is None:
+                content = (
+                    step.get("generated_content")
+                    or step.get("code")
+                    or step.get("replacement")
+                    or payload.get("generated_content")
+                    or payload.get("code")
+                    or payload.get("replacement")
+                    or ""
+                )
+
+            payload["target_file"] = target_file
+            payload["content"] = str(content)
+
+            move = NextMove(
+                id=str(
+                    step.get("id")
+                    or step.get("step_id")
+                    or title
+                ),
+                type=action,
+                payload=payload,
+            )
+
+            print(
+                "DEBUG FILE MUTATION MOVE =",
+                {
+                    "type": move.type,
+                    "target_file": target_file,
+                    "content_length": len(str(content)),
+                },
+                flush=True,
+            )
+
+            print(
+                "DEBUG DIRECT MUTATION ABOUT TO EXECUTE =",
+                {
+                    "action": action,
+                    "target_file": target_file,
+                    "content": str(content),
+                    "content_length": len(str(content)),
+                },
+                flush=True,
+            )
+
+            execution_result = default_executor(move)
+
+            print(
+                "DEBUG DIRECT MUTATION RESULT =",
+                {
+                    "status": getattr(execution_result, "status", None),
+                    "output": getattr(execution_result, "output", None),
+                    "error": getattr(execution_result, "error", None),
+                },
+                flush=True,
+            )
+
+            result_status = str(
+                getattr(
+                    execution_result,
+                    "status",
+                    "",
+                )
+                or ""
+            ).strip().lower()
+
+            result_output = getattr(
+                execution_result,
+                "output",
+                None,
+            )
+
+            result_error = getattr(
+                execution_result,
+                "error",
+                None,
+            )
+
+            if result_status != "success":
+                step["status"] = "failed"
+                step["error"] = (
+                    str(result_error)
+                    if result_error
+                    else "File mutation failed."
+                )
+                step["result"] = (
+                    result_output
+                    if result_output is not None
+                    else step["error"]
+                )
+                step["next_action"] = None
+                step["mutation_ready"] = False
+                step["payload_required"] = False
+
+                result_lines.append(
+                    f"Result: {step['error']}"
+                )
+            else:
+                step["status"] = "completed"
+                step["error"] = None
+                step["result"] = (
+                    result_output
+                    if result_output is not None
+                    else "File mutation completed."
+                )
+                step["next_action"] = None
+                step["mutation_ready"] = False
+                step["payload_required"] = False
+                step["mutation_mode"] = "create"
+
+                result_lines.append(
+                    "Result: File mutation completed and verified."
+                )
+
+        elif action in {
+            "execute",
+            "run_step",
+        }:
+
+            step["status"] = "completed"
+            step["error"] = None
+            step["next_action"] = None
+            step["mutation_ready"] = False
+            step["payload_required"] = False
+            step["mutation_mode"] = None
+
+            result_lines.append(
+                "Result: Execution step completed."
             )
 
         elif action == "test":
@@ -2108,10 +2371,17 @@ No explanation.
             ):
                 step["status"] = "completed"
 
-            if (
+            step_action = str(
+                step.get("action") or ""
+            ).strip().lower()
+
+            preserve_previous_completion = (
                 previous_status == "completed"
+                and step_action not in {"verify", "test", "inspect"}
                 and step.get("status") != "completed"
-            ):
+            )
+
+            if preserve_previous_completion:
                 step["status"] = "completed"
 
             steps[current_index] = step
@@ -2128,20 +2398,25 @@ No explanation.
 
                 current_index += 1
 
-            elif (
-                step.get("status") == "failed"
-                and step.get("action")
-                in {"test", "inspect"}
-            ):
+            elif step.get("status") == "failed":
 
-                current_index += 1
+                execution_state["status"] = "failed"
+                execution_state["current_step"] = (
+                    step.get("title", "step")
+                )
+                execution_state["current_step_title"] = (
+                    step.get("title", "step")
+                )
 
             execution_state["steps"] = steps
             execution_state["history"] = history
             execution_state["current_index"] = current_index
             execution_state["last_action"] = action
 
-            if current_index >= len(steps):
+            if (
+                current_index >= len(steps)
+                and step.get("status") != "failed"
+            ):
 
                 execution_state["status"] = "complete"
                 execution_state["current_step"] = (
@@ -2230,6 +2505,9 @@ No explanation.
                 )
 
                 previous_status = step.get("status")
+                step_action = str(
+                    step.get("action") or ""
+                ).strip().lower()
 
                 step = self._execute_runtime_step(
                     step=step,
@@ -2252,6 +2530,7 @@ No explanation.
 
                 if (
                     previous_status == "completed"
+                    and step_action not in {"verify", "test", "inspect"}
                     and step.get("status") != "completed"
                 ):
                     step["status"] = "completed"
@@ -2289,13 +2568,6 @@ No explanation.
                     break
 
                 if step.get("status") == "failed":
-
-                    if step.get("action") in {
-                        "test",
-                        "inspect",
-                    }:
-                        current_index += 1
-                        continue
 
                     for blocked_index in range(
                         current_index + 1,
@@ -2450,22 +2722,51 @@ No explanation.
     ) -> list[dict]:
         results = []
 
+        normalized_action = str(
+            action or ""
+        ).strip().lower()
+
+        if normalized_action in {
+            "execute",
+            "execute_all",
+        }:
+            normalized_action = "run_all"
+        elif normalized_action in {
+            "next",
+            "continue",
+            "go",
+        }:
+            normalized_action = "run_step"
+
         for _ in range(max_steps):
             result = self.run_next_move(
-                action=action,
+                action=normalized_action,
                 session_id=session_id,
                 execution_state=execution_state or {},
                 **kwargs,
             )
             results.append(result)
 
-            status = str(result.get("status") or "").lower()
-            execution_state = result.get("execution_state") or execution_state or {}
+            status = str(
+                result.get("status") or ""
+            ).lower()
 
-            if status in {"complete", "completed", "failed", "error"}:
+            execution_state = (
+                result.get("execution_state")
+                or execution_state
+                or {}
+            )
+
+            if status in {
+                "complete",
+                "completed",
+                "failed",
+                "error",
+            }:
                 break
 
-            action = "run_step"
+            if normalized_action != "run_all":
+                normalized_action = "run_step"
 
         return results
 def _apply_function_fix_single_file(
@@ -2619,6 +2920,103 @@ def default_executor(move: NextMove) -> ExecutionResult:
     try:
         move_type = str(move.type or "").strip().lower()
         payload = move.payload or {}
+
+        if move_type in {
+            "create_file",
+            "implement",
+            "write",
+            "create",
+            "generate",
+            "build",
+        }:
+            target_file = str(
+                payload.get("target_file")
+                or payload.get("file_path")
+                or payload.get("target")
+                or ""
+            ).strip()
+
+            content = (
+                payload.get("content")
+                or payload.get("file_content")
+                or payload.get("generated_content")
+                or payload.get("code")
+                or payload.get("replacement")
+                or ""
+            )
+
+            content = str(content)
+
+            if not target_file:
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing target_file/file_path for file creation.",
+                )
+
+            if not content.strip():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing file content for file creation.",
+                )
+
+            try:
+                path = Path(target_file)
+
+                if not path.is_absolute():
+                    path = Path.cwd() / path
+
+                path.parent.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
+
+                path.write_text(
+                    content,
+                    encoding="utf-8",
+                )
+
+                written_content = path.read_text(
+                    encoding="utf-8",
+                )
+
+                if written_content != content:
+                    return ExecutionResult(
+                        move_id=move.id,
+                        status="failed",
+                        output={
+                            "file_path": str(path),
+                            "written": False,
+                        },
+                        error=(
+                            "File write verification failed: "
+                            "written content does not match."
+                        ),
+                    )
+
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="success",
+                    output={
+                        "file_path": str(path),
+                        "written": True,
+                        "verified": True,
+                        "content_length": len(content),
+                        "message": f"Created file: {path}",
+                    },
+                )
+
+            except Exception as exc:
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    output={
+                        "file_path": target_file,
+                        "written": False,
+                    },
+                    error=str(exc),
+                )
 
         if move_type == "test_fail":
             return ExecutionResult(
@@ -2921,6 +3319,7 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 error=first_error,
             )
 
+
         return ExecutionResult(
             move_id=move.id,
             status="failed",
@@ -2933,6 +3332,12 @@ def default_executor(move: NextMove) -> ExecutionResult:
             status="failed",
             error=str(e),
         )
+
+
+
+
+
+
 
 
 

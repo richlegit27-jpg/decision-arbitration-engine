@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
@@ -432,7 +432,27 @@ class ProjectBuilderService:
                 ]
             )
 
-            task_text_lower = task_text.lower()
+
+            task_command = str(
+                task.get("command")
+                or task.get("shell_command")
+                or task.get("run_command")
+                or task.get("execution_command")
+                or task.get("cmd")
+                or ""
+            ).strip()
+
+            if not task_command:
+                command_match = re.search(
+                    r"(?:run|execute|command(?:\s+is)?|shell(?:\s+command)?)\s*:\s*(.+)",
+                    task_text,
+                    flags=re.IGNORECASE,
+                )
+
+                if command_match:
+                    task_command = command_match.group(1).strip()
+
+            task["command"] = task_command
 
             is_contract_task = (
                 "specify the exact" in task_title_lower
@@ -738,6 +758,12 @@ class ProjectBuilderService:
                     canonical_execution_file
                 )
 
+                canonical_task["command"] = str(
+                    canonical_task.get("command")
+                    or task.get("command")
+                    or ""
+                ).strip()
+
                 # The execution task captures output but does not
                 # itself persist the output artifact.
                 canonical_task["target_file"] = ""
@@ -779,6 +805,12 @@ class ProjectBuilderService:
                     canonical_step["execution_file"] = (
                         canonical_execution_file
                     )
+
+                    canonical_step["command"] = str(
+                        canonical_step.get("command")
+                        or task.get("command")
+                        or ""
+                    ).strip()
                     canonical_step["target_file"] = ""
                     canonical_step["target_files"] = []
 
@@ -1493,6 +1525,7 @@ class ProjectBuilderService:
                         break
 
             task_text_lower = task_text.lower()
+
             task_title_lower = task_title_text.lower()
 
             is_execution_task = (
@@ -2028,6 +2061,7 @@ class ProjectBuilderService:
 
                     task_title_lower = task_title.lower()
                     task_text_lower = task_text.lower()
+
 
                     is_execution_task = (
                         task_title_lower.startswith("execute ")
@@ -3518,6 +3552,10 @@ class ProjectBuilderService:
             )
 
             return
+
+
+
+
 
 
 

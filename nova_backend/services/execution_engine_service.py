@@ -363,6 +363,20 @@ class ExecutionEngineService:
                 merged_payload.get("file_path") or ""
             ).strip()
 
+            action = str(
+                step.get("action")
+                or step.get("type")
+                or ""
+            ).strip().lower()
+
+            mutation_mode = str(
+                merged_payload.get("mutation_mode") or ""
+            ).strip().lower()
+
+            next_action = str(
+                step.get("next_action") or ""
+            ).strip().lower()
+
             if (
                 file_path
                 and function_name
@@ -375,6 +389,32 @@ class ExecutionEngineService:
                 and code
             ):
                 move_type = "fix_file"
+
+            elif (
+                action in {
+                    "implement",
+                    "write",
+                    "create",
+                    "modify",
+                    "edit",
+                    "replace",
+                    "repair",
+                }
+                and file_path
+            ):
+                move_type = "implement"
+
+            elif (
+                mutation_mode == "file"
+                and file_path
+            ):
+                move_type = "implement"
+
+            elif (
+                next_action == "generate_file_replacement"
+                and file_path
+            ):
+                move_type = "implement"
 
             else:
                 move_type = "echo"
@@ -753,14 +793,54 @@ class ExecutionEngineService:
                 move
             )
 
-            result_status = str(
-                getattr(
-                    result,
-                    "status",
-                    "",
+            if isinstance(result, dict):
+
+                result_status = str(
+                    result.get(
+                        "status",
+                        "",
+                    )
+                    or ""
+                ).strip().lower()
+
+                output = result.get(
+                    "output",
+                    {},
                 )
-                or ""
-            ).strip().lower()
+
+                result_error = str(
+                    result.get(
+                        "error",
+                        "",
+                    )
+                    or ""
+                )
+
+            else:
+
+                result_status = str(
+                    getattr(
+                        result,
+                        "status",
+                        "",
+                    )
+                    or ""
+                ).strip().lower()
+
+                output = getattr(
+                    result,
+                    "output",
+                    {},
+                )
+
+                result_error = str(
+                    getattr(
+                        result,
+                        "error",
+                        "",
+                    )
+                    or ""
+                )
 
             success = result_status in {
                 "success",
@@ -768,12 +848,6 @@ class ExecutionEngineService:
                 "complete",
                 "ok",
             }
-
-            output = getattr(
-                result,
-                "output",
-                {},
-            )
 
             if success:
 
@@ -820,13 +894,12 @@ class ExecutionEngineService:
                     "execution": execution,
                 }
 
-            error = str(
-                getattr(
-                    result,
-                    "error",
-                    "",
+            error = (
+                result_error
+                or (
+                    "Execution failed with status: "
+                    f"{result_status or 'unknown'}"
                 )
-                or f"Execution failed with status: {result_status or 'unknown'}"
             )
 
             self.mark_step_failed(
@@ -839,7 +912,6 @@ class ExecutionEngineService:
                 session_id,
                 execution,
             )
-
             return {
                 "ok": False,
                 "status": "error",
