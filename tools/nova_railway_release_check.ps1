@@ -71,7 +71,7 @@ function Get-Text {
 Write-Host "Checking public pages..."
 
 $publicChecks = @(
-    @{ Path = "/nova-home-preview"; Contains = "Nova" },
+    @{ Path = "/"; Contains = "Nova" },
     @{ Path = "/contact"; Contains = "Contact" },
     @{ Path = "/privacy"; Contains = "Privacy" },
     @{ Path = "/terms"; Contains = "Terms" },
@@ -151,13 +151,13 @@ Write-Host ""
 Write-Host ""
 Write-Host "Checking owner-only admin pills..."
 
-$ownerHome = Get-Text -Path "/nova-home-preview" -Session $session
+$ownerHome = Get-Text -Path "/" -Session $session
 $ownerHomeBody = Get-ResponseText -Response $ownerHome
-Write-Host "/nova-home-preview owner admin pill -> $($ownerHome.StatusCode) | $($ownerHomeBody.Length)"
+Write-Host "/ owner admin pill -> $($ownerHome.StatusCode) | $($ownerHomeBody.Length)"
 
-Assert-True ($ownerHome.StatusCode -eq 200) "/nova-home-preview owner did not return 200"
-Assert-True ($ownerHomeBody -match "Open Nova admin dashboard") "/nova-home-preview missing owner admin pill after login"
-Assert-True ($ownerHomeBody -match 'href="/admin"') "/nova-home-preview owner admin pill missing /admin href"
+Assert-True ($ownerHome.StatusCode -eq 200) "/ owner did not return 200"
+Assert-True ($ownerHomeBody -match "Open Nova admin dashboard") "/ missing owner admin pill after login"
+Assert-True ($ownerHomeBody -match 'href="/admin"') "/ owner admin pill missing /admin href"
 
 $ownerContact = Get-Text -Path "/contact" -Session $session
 $ownerContactBody = Get-ResponseText -Response $ownerContact
@@ -176,5 +176,6 @@ Assert-True (-not ($publicContactBody -match "Open Nova admin dashboard")) "/con
 # NOVA_RAILWAY_RELEASE_CHECK_OWNER_PILLS_20260709
 
 Write-Host "NOVA RAILWAY RELEASE CHECK PASSED"
+
 
 
