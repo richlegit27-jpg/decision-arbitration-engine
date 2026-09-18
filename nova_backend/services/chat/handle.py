@@ -9,6 +9,7 @@ def chat_handle(
     attachments=None,
     brain_state=None,
     decision=None,
+    working_state=None,
     regenerate=False,
 ):
     _t0 = time.perf_counter()
@@ -692,6 +693,46 @@ def chat_handle(
                 session_id=session_id,
                 attachments=attachments,
             )
+
+        # ==========================================
+        # PROJECT STATE / NEXT STEP ROUTE
+        # ==========================================
+
+        if (
+            intent == "mission_control"
+            and isinstance(
+                brain_state,
+                dict,
+            )
+        ):
+
+            next_step = (
+                brain_state.get("next_step")
+                or brain_state.get("current_step")
+            )
+
+            if isinstance(
+                next_step,
+                dict,
+            ):
+                next_step = (
+                    next_step.get("title")
+                    or next_step.get("name")
+                    or str(next_step)
+                )
+
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": (
+                        next_step
+                        or "No active project step is available yet."
+                    ),
+                },
+                "session_id": session_id,
+                "brain_state": brain_state,
+            }
 
         # ==========================================
         # NORMAL MODEL CHAT

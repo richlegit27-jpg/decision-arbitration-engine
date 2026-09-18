@@ -410,6 +410,32 @@ class ExecutionOrchestratorService:
 
         command = self._safe_str(command).strip().lower()
 
+        if command in {
+            "yes",
+            "y",
+            "yeah",
+            "yep",
+            "sure",
+            "okay",
+            "ok",
+            "go ahead",
+            "do it",
+            "approve",
+            "approved",
+        }:
+            command = "approve"
+
+        elif command in {
+            "no",
+            "n",
+            "nope",
+            "deny",
+            "denied",
+            "cancel",
+            "stop",
+        }:
+            command = "deny"
+
         print(
             "EXECUTION INPUT DEBUG",
             {
@@ -983,6 +1009,58 @@ class ExecutionOrchestratorService:
                     waiting=False,
                 )
             )
+
+            # =========================
+            # PRE-EXECUTION APPROVAL GATE
+            # =========================
+            step_status = self._safe_str(
+                step.get("status")
+            ).lower().strip()
+
+            approval_required = (
+                step.get("requires_approval") is True
+                or step.get("approval_required") is True
+                or step_status in {
+                    "waiting_approval",
+                    "awaiting_approval",
+                    "approval_required",
+                }
+            )
+
+            if approval_required:
+                approval_reason = self._safe_str(
+                    step.get("error")
+                    or "Approval required before execution."
+                )
+
+                execution_state["steps"][current_index] = dict(step)
+
+                execution_state = (
+                    self.execution_mutation_service.mark_waiting_approval(
+                        execution_state,
+                        step_index=current_index,
+                        reason=approval_reason,
+                    )
+                )
+
+                self._save_execution_state(
+                    session_id,
+                    execution_state,
+                )
+
+                return {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            f"Approval required: "
+                            f"{step.get('title')}. "
+                            f"{approval_reason}"
+                        ),
+                    },
+                    "execution": execution_state,
+                    "step_output": "",
+                }
 
             print(
                 "DEBUG BEFORE EXECUTE_STEP_LOGIC",

@@ -27,6 +27,38 @@ class ProjectBuilderService:
     # PUBLIC API
     # ------------------------------------------------------------------
 
+    def should_use_phases(self, plan):
+        """
+        Decide whether a project needs phase structure.
+
+        Small projects stay task-only.
+        Larger projects get phases + tasks.
+        """
+
+        if not isinstance(plan, dict):
+            return False
+
+        phases = (
+            plan.get("phases")
+            or []
+        )
+
+        tasks = (
+            plan.get("tasks")
+            or []
+        )
+
+        task_count = len(tasks)
+        phase_count = len(phases)
+
+        if task_count <= 5:
+            return False
+
+        if phase_count >= 3:
+            return True
+
+        return False
+
     def _normalize_task_reference(
         self,
         reference,
@@ -280,8 +312,8 @@ class ProjectBuilderService:
                 derived_phase_groups.values()
             )
 
-        # Ensure there is always at least one phase.
-        if not normalized_phases:
+        # Ensure there is always at least one phase when phases are enabled.
+        if not normalized_phases and use_phases:
             normalized_phases = [
                 {
                     "planner_id": "phase_1",
@@ -324,6 +356,11 @@ class ProjectBuilderService:
             ).strip()
 
         created_phases = []
+
+        use_phases = self.should_use_phases(plan)
+
+        if not use_phases:
+            normalized_phases = []
 
         for phase_spec in normalized_phases:
             created_phase = (
@@ -431,7 +468,7 @@ class ProjectBuilderService:
                     str(task.get("completion_criteria") or ""),
                 ]
             )
-
+            task_text_lower = task_text.lower()
 
             task_command = str(
                 task.get("command")
@@ -1130,10 +1167,10 @@ class ProjectBuilderService:
                     task_phase_key
                 )
 
-                if not persistent_phase_id:
-                    persistent_phase_id = phase_id_map.get(
-                        task_phase_key.lower()
-                    )
+            if use_phases and not persistent_phase_id:
+                raise RuntimeError(
+                    "Task did not contain a valid phase_id"
+                )
 
             # 2. Resolve by task title and metadata.
             searchable_task_text = " ".join(
@@ -1179,6 +1216,7 @@ class ProjectBuilderService:
             if not persistent_phase_id:
                 for created_phase in created_phases:
                     created_phase_id = created_phase.get("id")
+
                     created_phase_title = str(
                         created_phase.get("title") or ""
                     ).strip().lower()
@@ -1289,7 +1327,7 @@ class ProjectBuilderService:
             ):
                 dependencies = []
 
-            if not persistent_phase_id:
+            if use_phases and not persistent_phase_id:
                 raise RuntimeError(
                     "Task did not contain a valid phase_id"
                 )

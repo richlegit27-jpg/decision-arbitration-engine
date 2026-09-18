@@ -280,6 +280,24 @@
                 command=explicit_command,
             )
 
+        if (
+            "what should i do next" in lower_text
+            or "best next step" in lower_text
+        ):
+            return {
+                "route": "project_brain",
+                "mode": "project_state",
+                "intent": "mission_control",
+                "confidence": 1.0,
+                "reasons": [
+                    "next_step_request",
+                ],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": True,
+                "prompt": user_text,
+            }
+
         if any(
             phrase in lower_text
             for phrase in [
@@ -291,6 +309,7 @@
                 "where are we",
             ]
         ):
+
             return {
                 "route": "project_brain",
                 "mode": "project_state",
@@ -354,6 +373,7 @@
             "status",
             "what's next",
             "whats next",
+            "what should i do next",
             "next move",
             "current blocker",
             "where are we",

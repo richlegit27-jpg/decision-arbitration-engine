@@ -280,19 +280,18 @@ class ChatService:
 
         self.execution_handler = ExecutionHandler(self)
 
-        # Wire the active ChatExecutionService to this ChatService's
-        # ExecutionHandler. The module-level ChatExecutionService singleton
-        # is created before ChatService exists, so it cannot receive the
-        # handler during its own construction.
+        # Wire the active ChatExecutionService dependencies.
+        # The module-level ChatExecutionService singleton is created before
+        # ChatService exists, so runtime dependencies must be attached here.
         if self.chat_execution_service is not None:
             self.chat_execution_service.execution_handler = (
                 self.execution_handler
             )
 
-        if self.chat_execution_service:
             self.chat_execution_service.set_session_service(
                 session_service
             )
+
         self.response_handler = ChatResponseHandler(self)
         self.chat_router = ChatRouter(self)
         self.planner_service = PlannerService(self)
@@ -301,6 +300,7 @@ class ChatService:
             self.project_workspace_service
         )
         self.intelligence_router = IntelligenceRouter(self)
+
         # =========================
         # UNIFIED TOOL RUNTIME
         # =========================
@@ -369,12 +369,17 @@ class ChatService:
         self.working_state_service = working_state_service
         self.execution_state_service = execution_state_service
 
+        # Attach persistence-backed execution state after initialization.
+        if self.chat_execution_service:
+            self.chat_execution_service.execution_state_service = (
+                self.execution_state_service
+            )
+
         # =========================
         # ACTIVE EXECUTION CACHE
         # =========================
 
         self.active_execution_cache = {}
-
         # =========================
         # EXISTING ALIASES
         # DO NOT REMOVE
@@ -639,6 +644,8 @@ class ChatService:
         requested_model: str | None = None,
     ):
 
+        brain_state = {}
+
         print(
             "[CHAT HANDLE ENTER]",
             user_text,
@@ -807,14 +814,83 @@ class ChatService:
         # Classify before any project/mission orchestration.
         # ==================================================
 
-        primary_decision = self._decide_route(
-            user_text=user_text,
-            attachments=attachments,
-            session_id=session_id,
+        execution_state = self._load_execution_state(
+            session_id
         )
+
+        print(
+            "[APPROVAL STATE CHECK]",
+            {
+                "session_id": session_id,
+                "execution_state": execution_state,
+                "status": (
+                    execution_state.get("status")
+                    if isinstance(execution_state, dict)
+                    else None
+                ),
+                "keys": (
+                    list(execution_state.keys())
+                    if isinstance(execution_state, dict)
+                    else None
+                ),
+            },
+            flush=True,
+        )
+
+        approval_override = False
+
+        if (
+            isinstance(execution_state, dict)
+            and execution_state.get("status")
+            == "waiting_approval"
+            and self.safe_str(
+                user_text
+            ).strip().lower()
+            in {
+                "yes",
+                "y",
+                "approve",
+                "approved",
+                "confirm",
+                "confirmed",
+            }
+        ):
+            approval_override = True
+
+        print(
+            "[APPROVAL FINAL VALUE]",
+            {
+                "approval_override": approval_override,
+                "user_text": user_text,
+                "status": (
+                    execution_state.get("status")
+                    if isinstance(
+                        execution_state,
+                        dict,
+                    )
+                    else None
+                ),
+            },
+            flush=True,
+        )
+
+        if approval_override:
+            primary_decision = {
+                "route": "execution",
+                "mode": "execution",
+                "intent": "continue_execution",
+                "continue_request": True,
+                "approval_confirmed": True,
+            }
+        else:
+            primary_decision = self._decide_route(
+                user_text,
+                session_id=session_id,
+            )
 
         if requested_model:
             primary_decision["model"] = requested_model
+
 
         if not isinstance(primary_decision, dict):
             primary_decision = {
@@ -883,6 +959,59 @@ class ChatService:
                 )
             )
 
+            print(
+                "[CHAT SERVICE GET STATE RESULT]",
+                {
+                    "session_id": session_id,
+                    "execution_state": execution_state,
+                    "status": (
+                        execution_state.get("status")
+                        if isinstance(execution_state, dict)
+                        else None
+                    ),
+                    "waiting": (
+                        execution_state.get("waiting")
+                        if isinstance(execution_state, dict)
+                        else None
+                    ),
+                    "steps": (
+                        len(execution_state.get("steps", []))
+                        if isinstance(execution_state, dict)
+                        else None
+                    ),
+                },
+                flush=True,
+            )
+
+        if approval_override:
+            print(
+                "[CHAT HANDLE APPROVAL OVERRIDE]",
+                {
+                    "session_id": session_id,
+                    "user_text": user_text,
+                },
+                flush=True,
+            )
+
+            execution_result = self._handle_execution_control(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+                approval_override=True,
+            )
+
+            if execution_result is not None:
+                if (
+                    isinstance(execution_result, dict)
+                    and "execution" in execution_result
+                    and "execution_state" not in execution_result
+                ):
+                    execution_result["execution_state"] = (
+                        execution_result["execution"]
+                    )
+
+                return execution_result
+
             if (
                 self.chat_execution_service.is_execution_trigger(
                     user_text
@@ -910,6 +1039,7 @@ class ChatService:
                     user_text=user_text,
                     session_id=session_id,
                     attachments=attachments,
+                    approval_override=approval_override,
                 )
             )
 
@@ -971,13 +1101,49 @@ class ChatService:
             brain_state = self.orchestrator.run(
                 user_text=user_text,
                 session_context=session_payload,
-                session_id=session_id,
+                session_id=(
+                    session_id
+                    or (
+                        session_payload.get("id")
+                        if isinstance(session_payload, dict)
+                        else ""
+                    )
+                ),
+                decision=primary_decision,
+            )
+
+            if (
+                primary_decision.get("intent")
+                == "mission_control"
+                and isinstance(brain_state, dict)
+            ):
+
+                if isinstance(
+                    brain_state.get("plan"),
+                    dict,
+                ):
+                    primary_decision["brain_plan"] = (
+                        brain_state["plan"]
+                    )
+
+            print(
+                "[ORCH RESULT DEBUG]",
+                {
+                    "intent": primary_decision.get("intent"),
+                    "plan": brain_state.get("plan"),
+                    "execution": brain_state.get("execution"),
+                },
+                flush=True,
             )
 
             if not isinstance(brain_state, dict):
                 brain_state = {}
 
-            brain_state["decision"] = primary_decision
+            brain_state["decision_summary"] = {
+                "route": primary_decision.get("route"),
+                "mode": primary_decision.get("mode"),
+                "intent": primary_decision.get("intent"),
+            }
 
             print(
                 "[AFTER ORCHESTRATOR]",
@@ -1014,6 +1180,12 @@ class ChatService:
                 flush=True,
             )
 
+        print(
+            "[BRAIN STATE BEFORE CHAT_HANDLE]",
+            brain_state,
+            flush=True,
+        )
+
         response = chat_handle(
             self,
             user_text,
@@ -1021,6 +1193,7 @@ class ChatService:
             attachments,
             brain_state=brain_state,
             decision=primary_decision,
+            working_state=brain_state,
             regenerate=regenerate,
         )
 
@@ -2196,6 +2369,28 @@ Rules:
             current_index = len(steps)
 
         if text in {
+            "yes",
+            "y",
+            "approve",
+            "approved",
+            "confirm",
+            "confirmed",
+        }:
+            if (
+                execution_state.get("status")
+                == "waiting_approval"
+            ):
+                return {
+                    "ok": True,
+                    "is_mission": True,
+                    "type": "continue",
+                    "mission": mission,
+                    "next_action": "run_step",
+                    "continue_request": True,
+                    "execution": execution_state,
+                }
+
+        if text in {
             "next",
             "nex",
             "k",
@@ -2634,10 +2829,35 @@ Rules:
                     )
                 )
 
+                print(
+                    "[RAW EXECUTION SERVICE STATE]",
+                    {
+                        "session_id": session_id,
+                        "execution_state": execution_state,
+                    },
+                    flush=True,
+                )
+
                 if (
                     isinstance(execution_state, dict)
-                    and execution_state.get("steps")
+                    and execution_state
+                    and (
+                        execution_state.get("status")
+                        or execution_state.get("steps")
+                        or execution_state.get("execution_id")
+                    )
                 ):
+                    print(
+                        "[EXECUTION LOAD FROM SERVICE]",
+                        {
+                            "session_id": session_id,
+                            "status": execution_state.get("status"),
+                            "approval_status": execution_state.get(
+                                "approval_status"
+                            ),
+                        },
+                        flush=True,
+                    )
                     return execution_state
 
         except Exception as exc:
@@ -7288,11 +7508,13 @@ Rules:
         user_text: str,
         session_id: str,
         attachments=None,
+        approval_override=False,
     ):
 
         text = self.safe_str(
             user_text
         ).strip().lower()
+
         active_execution = (
             self._load_execution_state(
                 session_id
@@ -7312,6 +7534,57 @@ Rules:
                 and meta_execution.get("steps")
             ):
                 active_execution = meta_execution
+
+        if approval_override:
+            active_execution["continue_request"] = True
+            active_execution["approval_confirmed"] = True
+            active_execution["approval_status"] = "approved"
+            active_execution["status"] = "ready"
+            active_execution["waiting"] = False
+
+            for step in active_execution.get("steps", []):
+                if isinstance(step, dict):
+                    step["approval_status"] = "approved"
+                    step["approval_required"] = False
+                    step["requires_approval"] = False
+
+            self._save_execution_state(
+                session_id,
+                active_execution,
+            )
+
+        if approval_override:
+            execution_result = (
+                self.chat_execution_service.advance(
+                    session_id,
+                    user_text=user_text,
+                )
+            )
+
+            if isinstance(
+                execution_result,
+                dict,
+            ):
+                execution_state = (
+                    execution_result.get(
+                        "execution_state"
+                    )
+                    or execution_result.get(
+                        "execution"
+                    )
+                    or execution_result
+                )
+
+                if isinstance(
+                    execution_state,
+                    dict,
+                ):
+                    self._save_execution_state(
+                        session_id,
+                        execution_state,
+                    )
+
+            return execution_result
 
         active_steps = (
             active_execution.get("steps")
@@ -11874,7 +12147,9 @@ Rules:
         user_text: str,
         decision: dict,
         session_id: str = "",
+        working_state=None,
     ) -> str:
+
         user_text = self.safe_str(user_text)
 
         memory_items = self._rank_memory_context(
@@ -11901,6 +12176,16 @@ Rules:
         )
 
         sections = []
+
+        if isinstance(
+            working_state,
+            dict,
+        ) and working_state:
+
+            sections.append(
+                "Current project state:\n"
+                f"{working_state}"
+            )
 
         try:
             from nova_backend.services.chat_turn_attachment_context import (
@@ -12003,12 +12288,14 @@ Rules:
         decision: dict,
         session_id: str = "",
         requested_model: str | None = None,
+        working_state=None,
     ) -> str:
 
         prompt = self._build_chat_input(
             user_text=user_text,
             decision=decision,
             session_id=session_id,
+            working_state=working_state,
         )
 
         try:

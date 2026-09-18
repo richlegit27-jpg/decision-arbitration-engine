@@ -57,6 +57,7 @@ class ChatExecutionService:
         state_path: Optional[str] = None,
         execution_handler=None,
         session_service=None,
+        execution_state_service=None,
     ) -> None:
 
         self.state_path = (
@@ -67,6 +68,7 @@ class ChatExecutionService:
 
         self.execution_handler = execution_handler
         self.session_service = session_service
+        self.execution_state_service = execution_state_service
         self._states: Dict[str, Dict[str, Any]] = {}
         self._save_lock = threading.RLock()
         self._load_states()
@@ -301,17 +303,20 @@ class ChatExecutionService:
             session_id
         )
 
-        state = self._states.get(
+        state = self.get_state(
             safe_session_id
         )
 
-        if not state:
+        if (
+            not state
+            or state.get("status") == "idle"
+        ):
             try:
                 self._load_states()
 
                 state = self._states.get(
                     safe_session_id
-                )
+                ) or state
 
             except Exception as e:
                 logger.error(
@@ -1701,7 +1706,11 @@ except Exception as _nova_execution_empty_complete_error_20260630:
 # NOVA_CHAT_EXECUTION_SINGLETON_20260710
 
 # Shared execution service instance for imports across Nova.
-chat_execution_service = ChatExecutionService()
+from nova_backend.services.execution_state_service import ExecutionStateService
+
+chat_execution_service = ChatExecutionService(
+    execution_state_service=ExecutionStateService(),
+)
 
 # Wire the shared runtime execution handler after the service singleton
 # exists. This avoids requiring ExecutionHandler during class definition
@@ -1730,6 +1739,12 @@ except Exception as _nova_chat_execution_handler_wire_error:
         "[NOVA_CHAT_EXECUTION_HANDLER_WIRE_FAILED]",
         _nova_chat_execution_handler_wire_error,
     )
+
+
+
+
+
+
 
 
 

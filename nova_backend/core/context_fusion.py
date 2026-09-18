@@ -6,11 +6,13 @@ class ContextFusionEngine:
         memory=None,
         brain_state=None,
         knowledge_graph=None,
+        project_workspace=None,
     ):
 
         self.memory = memory
         self.brain_state = brain_state
         self.knowledge_graph = knowledge_graph
+        self.project_workspace = project_workspace
 
 
 
@@ -26,6 +28,7 @@ class ContextFusionEngine:
             "memory": [],
             "brain_state": {},
             "knowledge": [],
+            "project": {},
             "active_context": {},
         }
 
@@ -44,6 +47,20 @@ class ContextFusionEngine:
 
             except Exception:
                 fused["memory"] = []
+
+
+
+        if self.project_workspace:
+
+            try:
+                fused["project"] = (
+                    self.project_workspace
+                    .get_active_project()
+                    or {}
+                )
+
+            except Exception:
+                fused["project"] = []
 
 
 
@@ -72,6 +89,7 @@ class ContextFusionEngine:
                 fused["knowledge"] = []
 
 
+
         fused["active_context"] = (
             self._summarize_context(
                 fused
@@ -94,6 +112,9 @@ class ContextFusionEngine:
             ),
             "has_history": bool(
                 fused["conversation"]
+            ),
+            "has_project": bool(
+                fused["project"]
             ),
             "has_knowledge": bool(
                 fused["knowledge"]

@@ -107,7 +107,6 @@ class ExecutionStateService:
                     )
 
         return steps
-
     def index(self, execution, steps):
         value = (
             (execution or {}).get("current_index")
@@ -121,12 +120,17 @@ class ExecutionStateService:
             index = 0
 
         if steps:
-            index = max(0, min(index, len(steps) - 1))
+            index = max(
+                0,
+                min(index, len(steps) - 1)
+            )
         else:
-            index = max(0, index)
+            index = max(
+                0,
+                index
+            )
 
         return index
-
     def current_step(self, execution):
         steps = self.steps(execution)
         index = self.index(execution, steps)
@@ -139,12 +143,17 @@ class ExecutionStateService:
             return current
 
         if steps and 0 <= index < len(steps):
-            return steps[index]
+            step = steps[index]
+
+            if isinstance(step, dict):
+                return step.get("title") or step.get("text") or ""
+
+            return str(step)
 
         return ""
-
     def execution_status_text(self, execution):
         goal = self.goal(execution)
+
         status = str(
             (execution or {}).get("status") or "ready"
         ).strip() or "ready"
@@ -179,37 +188,34 @@ class ExecutionStateService:
             )
 
         return "\n".join(lines).strip()
-
     def read_sessions_file(self):
         path = (
             Path(__file__).resolve().parents[2]
             / "data"
-            / "nova_sessions.json"
+            / "sessions.json"
         )
 
         if not path.exists():
-            return None, path
+            return {}, path
 
         try:
-            return (
-                json.loads(
-                    path.read_text(
-                        encoding="utf-8",
-                        errors="replace",
-                    )
-                ),
-                path,
+            data = json.loads(
+                path.read_text(
+                    encoding="utf-8"
+                )
             )
-        except Exception:
-            return None, path
 
+            return data, path
+
+        except Exception:
+            return {}, path
     def find_session(self, container, session_id):
         if not session_id:
             return None
 
         if isinstance(container, dict):
 
-            if str(container.get("id") or "") == session_id:
+            if str(container.get("id") or "") == str(session_id):
                 return container
 
             direct = container.get(session_id)
@@ -231,9 +237,7 @@ class ExecutionStateService:
                     return found
 
             for value in container.values():
-
                 if isinstance(value, (dict, list)):
-
                     found = self.find_session(
                         value,
                         session_id,
@@ -245,7 +249,6 @@ class ExecutionStateService:
         elif isinstance(container, list):
 
             for item in container:
-
                 found = self.find_session(
                     item,
                     session_id,
@@ -255,7 +258,6 @@ class ExecutionStateService:
                     return found
 
         return None
-
     def get_working_state(
         self,
         session_id,
@@ -297,41 +299,33 @@ class ExecutionStateService:
                 break
 
         if not isinstance(session, dict):
-            sessions_data, _path = (
-                self.read_sessions_file()
-            )
+            sessions_data, _path = self.read_sessions_file()
 
-            if isinstance(
+            session = self.find_session(
                 sessions_data,
-                (dict, list),
-            ):
-                session = self.find_session(
-                    sessions_data,
-                    session_id,
-                )
+                session_id,
+            )
 
         if not isinstance(session, dict):
             return {}
 
-        working_state = session.get(
+        state = session.get(
             "working_state"
         )
 
-        if not isinstance(working_state, dict):
-            return {}
+        if not isinstance(state, dict):
+            state = {}
 
-        # working_state is the canonical source.
-        #
-        # Do not merge root-level execution fields:
-        #   session["active_execution"]
-        #   session["execution_state"]
-        #   session["execution"]
-        #   session["last_execution"]
-        #
-        # Those fields are legacy duplicates and may contain
-        # stale execution data.
-        return dict(working_state)
+        for key in (
+            "active_execution",
+            "execution_state",
+            "execution",
+            "last_execution",
+        ):
+            if key in session and key not in state:
+                state[key] = session.get(key)
 
+        return state
     def persist_working_state(
         self,
         session_id,
@@ -358,7 +352,6 @@ class ExecutionStateService:
                     session_id,
                     patch,
                 )
-
                 service_saved = True
 
             except Exception:
@@ -374,19 +367,6 @@ class ExecutionStateService:
             session_id,
         )
 
-        print(
-            "DEBUG SAVE FOUND SESSION:",
-            {
-                "session_id": session_id,
-                "found": isinstance(session, dict),
-                "keys": (
-                    list(session.keys())
-                    if isinstance(session, dict)
-                    else []
-                ),
-            },
-        )
-
         if not isinstance(session, dict):
             session = {
                 "id": session_id,
@@ -399,15 +379,10 @@ class ExecutionStateService:
             }
 
             if isinstance(data, dict):
-
-                sessions_value = data.get(
-                    "sessions"
-                )
+                sessions_value = data.get("sessions")
 
                 if isinstance(sessions_value, list):
-                    sessions_value.append(
-                        session
-                    )
+                    sessions_value.append(session)
 
                 elif isinstance(sessions_value, dict):
                     sessions_value[session_id] = session
@@ -416,23 +391,17 @@ class ExecutionStateService:
                     data[session_id] = session
 
             elif isinstance(data, list):
-                data.append(
-                    session
-                )
+                data.append(session)
 
             else:
                 return service_saved
 
-        state = session.get(
-            "working_state"
-        )
+        state = session.get("working_state")
 
         if not isinstance(state, dict):
             state = {}
 
-        state.update(
-            patch
-        )
+        state.update(patch)
 
         session["working_state"] = state
 
@@ -456,19 +425,10 @@ class ExecutionStateService:
                 encoding="utf-8",
             )
 
-            print(
-                "DEBUG WORKING STATE WRITTEN:",
-                session_id,
-                list(
-                    patch.keys()
-                ),
-            )
-
             return True
 
         except Exception:
             return service_saved
-
     def get_execution_state(
         self,
         session_id,
@@ -484,61 +444,34 @@ class ExecutionStateService:
             session_id
         ) or {}
 
-        print(
-            "DEBUG GET EXECUTION STATE INPUT:",
-            {
-                "session_id": session_id,
-                "keys": list(
-                    state.keys()
-                ),
-            },
+        if not state:
+            try:
+                session = self.session_service.get_session(
+                    session_id
+                )
+
+                if isinstance(session, dict):
+                    state = {
+                        "execution_state": session.get("execution_state"),
+                        "active_execution": session.get("active_execution"),
+                        "execution": session.get("execution"),
+                        "last_execution": session.get("last_execution"),
+                    }
+
+            except Exception:
+                state = {}
+
+        execution = (
+            state.get("execution_state")
+            or state.get("active_execution")
+            or state.get("execution")
+            or state.get("last_execution")
         )
 
-        execution = state.get(
-            "execution_state"
-        )
-
-        if (
-            isinstance(execution, dict)
-            and execution
-        ):
-            print(
-                "DEBUG EXECUTION RETURN execution_state:",
-                {
-                    "status": execution.get("status"),
-                    "current_index": execution.get("current_index"),
-                    "steps": execution.get("steps"),
-                },
-            )
-
+        if isinstance(execution, dict) and execution:
             return execution
-
-        execution = state.get(
-            "active_execution"
-        )
-
-        if (
-            isinstance(execution, dict)
-            and execution
-        ):
-            print(
-                "DEBUG EXECUTION RETURN active_execution:",
-                {
-                    "status": execution.get("status"),
-                    "current_index": execution.get("current_index"),
-                    "steps": execution.get("steps"),
-                },
-            )
-
-            return execution
-
-        print(
-            "DEBUG EXECUTION EMPTY:",
-            session_id,
-        )
 
         return {}
-
     def save_execution_state(
         self,
         session_id,
@@ -552,46 +485,54 @@ class ExecutionStateService:
         if not isinstance(execution_state, dict):
             return {}
 
-        from datetime import datetime, timezone
-
         incoming = dict(execution_state)
 
         incoming_steps = incoming.get("steps")
+
         if not isinstance(incoming_steps, list):
             incoming_steps = []
 
-        # Preserve complete step dictionaries and all mutation metadata.
         incoming["steps"] = [
             dict(step) if isinstance(step, dict) else step
             for step in incoming_steps
         ]
 
-        # Normalize the two index names from one authoritative value.
         raw_index = incoming.get("current_index")
 
         if raw_index is None:
-            raw_index = incoming.get("current_step_index", 0)
+            raw_index = incoming.get(
+                "current_step_index",
+                0,
+            )
 
         try:
             incoming_index = int(raw_index)
         except (TypeError, ValueError):
             incoming_index = 0
 
-        incoming_index = max(0, incoming_index)
+        incoming_index = max(
+            0,
+            incoming_index,
+        )
 
-        # A completed execution may legitimately point one past
-        # the final step. Do not clamp that value back to the last step.
-        if incoming.get("complete") is True or str(
-            incoming.get("status") or ""
-        ).strip().lower() in {
-            "complete",
-            "completed",
-            "done",
-        }:
+        complete = (
+            incoming.get("complete") is True
+            or str(
+                incoming.get("status") or ""
+            ).strip().lower()
+            in {
+                "complete",
+                "completed",
+                "done",
+            }
+        )
+
+        if complete:
             incoming_index = max(
                 incoming_index,
                 len(incoming["steps"]),
             )
+
         elif incoming["steps"]:
             incoming_index = min(
                 incoming_index,
@@ -601,120 +542,13 @@ class ExecutionStateService:
         incoming["current_index"] = incoming_index
         incoming["current_step_index"] = incoming_index
 
-        existing = self.active_execution_cache.get(session_id)
-
-        # Reject stale saves that move an active execution backward.
-        if isinstance(existing, dict):
-            existing_status = str(
-                existing.get("status") or ""
-            ).strip().lower()
-
-            incoming_status = str(
-                incoming.get("status") or ""
-            ).strip().lower()
-
-            existing_index_value = existing.get(
-                "current_index",
-                existing.get("current_step_index", 0),
-            )
-
-            try:
-                existing_index = int(existing_index_value)
-            except (TypeError, ValueError):
-                existing_index = 0
-
-            existing_complete = (
-                existing.get("complete") is True
-                or existing_status in {
-                    "complete",
-                    "completed",
-                    "done",
-                }
-            )
-
-            incoming_complete = (
-                incoming.get("complete") is True
-                or incoming_status in {
-                    "complete",
-                    "completed",
-                    "done",
-                }
-            )
-
-            if (
-                existing_complete
-                and not incoming_complete
-            ):
-                print(
-                    "DEBUG SAVE REJECTED STALE INCOMING:",
-                    {
-                        "session_id": session_id,
-                        "existing_status": existing_status,
-                        "incoming_status": incoming_status,
-                        "existing_index": existing_index,
-                        "incoming_index": incoming_index,
-                    },
-                )
-                return existing
-
-            if (
-                not existing_complete
-                and not incoming_complete
-                and incoming_index < existing_index
-            ):
-                print(
-                    "DEBUG SAVE REJECTED BACKWARD INDEX:",
-                    {
-                        "session_id": session_id,
-                        "existing_index": existing_index,
-                        "incoming_index": incoming_index,
-                    },
-                )
-                return existing
-
-        incoming["updated_at"] = datetime.now(
-            timezone.utc
-        ).isoformat()
-
-        print(
-            "DEBUG SAVE EXECUTION INCOMING:",
-            {
-                "status": incoming.get("status"),
-                "current_index": incoming.get("current_index"),
-                "complete": incoming.get("complete"),
-                "updated_at": incoming.get("updated_at"),
-            },
-        )
-
-        if (
-            not incoming.get("steps")
-            and not incoming.get("plan")
-            and not incoming.get("goal")
-        ):
-            return {}
-
-        incoming["_execution_processing"] = False
-        incoming["lock"] = False
-
         self.active_execution_cache[session_id] = incoming
-
-        print(
-            "DEBUG BEFORE PERSIST EXECUTION:",
-            {
-                "status": incoming.get("status"),
-                "current_index": incoming.get("current_index"),
-                "current_step_index": incoming.get(
-                    "current_step_index"
-                ),
-                "goal": incoming.get("goal"),
-            },
-        )
 
         self.persist_working_state(
             session_id,
             {
-                "execution_state": incoming,
                 "active_execution": incoming,
+                "execution_state": incoming,
             },
         )
 
@@ -725,42 +559,14 @@ class ExecutionStateService:
         if not session_id:
             return None
 
-        cached = self.active_execution_cache.get(
-            session_id
-        )
-
-        print(
-            "DEBUG ACTIVE EXEC CACHE:",
-            session_id,
-            cached,
-        )
+        cached = self.active_execution_cache.get(session_id)
 
         if self.execution_is_active(cached):
-            print(
-                "DEBUG ACTIVE EXEC RETURN CACHE"
-            )
             return cached
 
         state = self.get_working_state(
             session_id
         ) or {}
-
-        print(
-            "DEBUG GET EXECUTION STATE:",
-            {
-                "session": session_id,
-                "cache": self.active_execution_cache.get(
-                    session_id
-                ),
-                "working_state": state,
-            },
-        )
-
-        print(
-            "DEBUG ACTIVE EXEC WORKING STATE:",
-            session_id,
-            state,
-        )
 
         for key in (
             "active_execution",
@@ -769,70 +575,53 @@ class ExecutionStateService:
         ):
             execution = state.get(key)
 
-            print(
-                "DEBUG ACTIVE EXEC CHECK:",
-                key,
-                execution,
-            )
-
             if self.execution_is_active(execution):
-
-                print(
-                    "DEBUG ACTIVE EXEC RETURN:",
-                    key,
-                )
-
-                self.active_execution_cache[
-                    session_id
-                ] = execution
-
+                self.active_execution_cache[session_id] = execution
                 return execution
 
-        print(
-            "DEBUG ACTIVE EXEC NONE FOUND:",
-            session_id,
-        )
-
         return None
-
     def get_completed_execution(self, session_id):
         session_id = str(session_id or "").strip()
 
-        if session_id:
-            cached = self.completed_execution_cache.get(session_id)
+        if not session_id:
+            return None
 
-            if self.execution_is_complete(cached):
-                return cached
+        cached = self.completed_execution_cache.get(
+            session_id
+        )
 
-        state = self.get_working_state(session_id) or {}
+        if self.execution_is_complete(cached):
+            return cached
 
-
+        state = self.get_working_state(
+            session_id
+        ) or {}
 
         for key in (
+            "last_execution",
             "execution_state",
             "execution",
-            "last_execution",
+            "active_execution",
         ):
             execution = state.get(key)
 
             if self.execution_is_complete(execution):
-                if session_id:
-                    self.completed_execution_cache[session_id] = execution
-
+                self.completed_execution_cache[session_id] = execution
                 return execution
 
         return None
 
 
     def completed_status_text(self, execution):
+        if not isinstance(execution, dict):
+            return ""
+
         goal = self.goal(execution)
 
-        if goal:
-            return (
-                f"No active mission is running. "
-                f"Last completed mission: {goal}"
-            )
-
-        return ""
+        return (
+            f"Completed mission: {goal}"
+            if goal
+            else "No completed mission."
+        )
 
 

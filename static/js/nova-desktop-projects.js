@@ -799,6 +799,48 @@ const active =
         `;
     }
 
+function renderProjectPhases(data) {
+    const container =
+        $("desktopProjectPhaseList");
+
+    if (!container) {
+        return;
+    }
+
+    const phases =
+        Array.isArray(data?.project?.phases)
+            ? data.project.phases
+            : [];
+
+    if (!phases.length) {
+        container.innerHTML = `
+            <div class="session-placeholder">
+                No phases for this project.
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = phases.map(
+        (phase, index) => `
+            <div class="nova-project-phase">
+                <strong>
+                    Phase ${index + 1}: 
+                    ${escapeHtml(
+                        phase.title || "Untitled Phase"
+                    )}
+                </strong>
+
+                <p>
+                    ${escapeHtml(
+                        phase.description || ""
+                    )}
+                </p>
+            </div>
+        `
+    ).join("");
+}
+
 function renderProjectTasks(data) {
     const tasksContainer =
         $("desktopProjectTaskList");
@@ -1198,9 +1240,13 @@ async function loadProjectWorkspace(
             );
         }
 
-        renderProjectTasks(
-            data
-        );
+renderProjectPhases(
+    data
+);
+
+renderProjectTasks(
+    data
+);
 
         const title =
             $("desktopProjectTitle");
@@ -1953,10 +1999,10 @@ if (createNewProjectButton) {
                 const data =
                     await response.json();
 
-                console.log(
-                    "[NOVA PROJECTS] create response",
-                    data
-                );
+console.log(
+    "[NOVA PROJECTS] create response",
+    JSON.stringify(data, null, 2)
+);
 
                 if (
                     !response.ok ||

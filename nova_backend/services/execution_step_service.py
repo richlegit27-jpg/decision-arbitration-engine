@@ -1350,7 +1350,13 @@ class ExecutionStepService:
                 step["next_action"] = "write_file"
                 step["mutation_ready"] = True
                 step["payload_required"] = False
-
+            if step.get("approval_status") != "approved":
+                step["requires_approval"] = True
+                step["approval_required"] = True
+                step["approval_status"] = "pending"
+            else:
+                step["requires_approval"] = False
+                step["approval_required"] = False
                 target_file = natural_target_file
                 content = natural_content
 
@@ -1476,6 +1482,27 @@ class ExecutionStepService:
             # always write the requested content directly.
             # This branch must execute before any
             # generated replacement or command logic.
+
+            if (
+                step.get("approval_required")
+                and step.get("approval_status") != "approved"
+            ):
+                print(
+                    "DEBUG EXECUTOR WAITING FOR APPROVAL =",
+                    {
+                        "target_file": target_file,
+                        "content": content,
+                    },
+                    flush=True,
+                )
+
+                step["status"] = "waiting_approval"
+                step["waiting"] = True
+                step["mutation_ready"] = False
+                step["next_action"] = "approval_required"
+                step["error"] = "Approval required before file creation."
+
+                return step
 
             if (
                 step_action in self.IMPLEMENT_ACTIONS

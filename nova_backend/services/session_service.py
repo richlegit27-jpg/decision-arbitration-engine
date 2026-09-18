@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
@@ -115,6 +115,15 @@ def _normalize_session(session: Dict[str, Any]) -> Dict[str, Any]:
     data["created_at"] = str(data.get("created_at") or now)
     data["updated_at"] = str(data.get("updated_at") or data["created_at"] or now)
     data["working_state"] = _normalize_working_state(data.get("working_state"))
+
+    for key in (
+        "execution_state",
+        "active_execution",
+        "execution",
+        "last_execution",
+    ):
+        if key in data:
+            data[key] = data.get(key)
     return data
 
 
@@ -228,7 +237,7 @@ class SessionService:
         text = self._safe_str(value)
         if len(text) <= limit:
             return text
-        return text[:limit] + " ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦[truncated]"
+        return text[:limit] + " ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦[truncated]"
 
     def _sanitize_meta_for_storage(self, meta) -> dict:
         if not isinstance(meta, dict):
@@ -844,6 +853,14 @@ class SessionService:
                             execution_state
                         )
 
+                    if (
+                        self._find(
+                            sessions,
+                            session.get("id"),
+                        ) < 0
+                    ):
+                        sessions.append(session)
+
 
         except Exception as e:
 
@@ -1157,8 +1174,35 @@ class SessionService:
 
         return True
 
-    def get_working_state(self, session_id: str) -> Dict[str, str]:
-        sessions = self._load_sessions()
+    def get_working_state(
+        self,
+        session_id: str
+    ) -> Dict[str, str]:
+        sessions = self.load()
+
+        print(
+            "DEBUG WORKING STATE SESSION LOOKUP:",
+            {
+                "target": session_id,
+                "count": len(sessions),
+                "matches": [
+                    {
+                        "id": s.get("id"),
+                        "keys": list(s.keys()),
+                        "execution_state": bool(
+                            s.get("execution_state")
+                        ),
+                        "active_execution": bool(
+                            s.get("active_execution")
+                        ),
+                    }
+                    for s in sessions
+                    if s.get("id") == session_id
+                ],
+            },
+            flush=True,
+        )
+
         i = self._find(sessions, session_id)
 
         if i < 0:
@@ -1168,11 +1212,31 @@ class SessionService:
             sessions[i],
             self._current_owner_id(),
         ):
-            return _new_working_state()
+            if not sessions[i].get("user_id"):
+                sessions[i]["user_id"] = (
+                    self._current_owner_id()
+                )
+            else:
+                return _new_working_state()
 
         state = _normalize_working_state(
             sessions[i].get("working_state")
         )
+
+        for key in (
+            "execution_state",
+            "active_execution",
+            "execution",
+            "last_execution",
+        ):
+            if not state.get(key):
+                value = sessions[i].get(key)
+
+                if isinstance(
+                    value,
+                    dict,
+                ):
+                    state[key] = value
 
         return deepcopy(state)
 
@@ -1557,6 +1621,12 @@ class SessionService:
 
     def get_by_id(self, session_id):
         return self.get_session(session_id)
+
+
+
+
+
+
 
 
 

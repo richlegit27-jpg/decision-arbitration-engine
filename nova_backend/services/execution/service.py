@@ -591,6 +591,11 @@ class ExecutionService:
                     "target_file": target_file,
                     "content": content,
                     "file_content": content,
+
+                    "requires_approval": True,
+                    "approval_required": True,
+                    "approval_status": "pending",
+
                     "status": "planned",
                     "notes": "",
                     "payload": {
@@ -1018,6 +1023,29 @@ class ExecutionService:
                         "id": f"step_{index}",
                         "title": title,
                         "action": action,
+
+                        "requires_approval": (
+                            action in {
+                                "create_file",
+                                "write_file",
+                            }
+                        ),
+                        "approval_required": (
+                            action in {
+                                "create_file",
+                                "write_file",
+                            }
+                        ),
+
+                        "approval_status": (
+                            "pending"
+                            if action in {
+                                "create_file",
+                                "write_file",
+                            }
+                            else ""
+                        ),
+
                         "input": input_value,
 
                         "target_file": (
@@ -1156,6 +1184,12 @@ class ExecutionService:
                     "error": None,
                 },
             ]
+
+        print(
+            "[DEBUG FINAL NORMALIZED STEPS]",
+            normalized_steps,
+            flush=True,
+        )
 
         execution_state = {
             "status": "running",

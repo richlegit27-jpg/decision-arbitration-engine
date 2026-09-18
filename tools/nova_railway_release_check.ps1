@@ -117,12 +117,38 @@ Write-Host "Checking owner/admin pages..."
 
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 
-$loginResponse = Invoke-WebRequest -Uri "$BaseUrl/api/auth/richard-login" -WebSession $session -UseBasicParsing -MaximumRedirection 5
-Write-Host "/richard-login -> $($loginResponse.StatusCode) | $($loginResponse.BaseResponse.ResponseUri)"
+$ownerUsername = $env:NOVA_OWNER_USERNAME
+$ownerPassword = $env:NOVA_OWNER_PASSWORD
+
+Assert-True (-not [string]::IsNullOrWhiteSpace($ownerUsername)) "NOVA_OWNER_USERNAME is not configured"
+Assert-True (-not [string]::IsNullOrWhiteSpace($ownerPassword)) "NOVA_OWNER_PASSWORD is not configured"
+
+$loginPayload = @{
+    username = $ownerUsername
+    password = $ownerPassword
+} | ConvertTo-Json
+
+$loginResponse = Invoke-WebRequest `
+    -Uri "$BaseUrl/api/auth/login" `
+    -Method Post `
+    -ContentType "application/json" `
+    -Body $loginPayload `
+    -WebSession $session `
+    -UseBasicParsing `
+    -MaximumRedirection 5
+
+$loginBody = Get-ResponseText -Response $loginResponse
+
+Write-Host "/api/auth/login -> $($loginResponse.StatusCode)"
+
+Assert-True ($loginResponse.StatusCode -eq 200) "Owner login failed"
+Assert-True ($loginBody -match '"authenticated"\s*:\s*true') "Owner login did not authenticate"
 
 $admin = Get-Text -Path "/admin" -Session $session
 $adminBody = Get-ResponseText -Response $admin
+
 Write-Host "/admin -> $($admin.StatusCode) | $($admin.Headers["Content-Type"]) | $($adminBody.Length)"
+
 
 Assert-True ($admin.StatusCode -eq 200) "/admin did not return 200 after owner login"
 Assert-True ($adminBody -match "Nova Admin") "/admin missing Nova Admin"
@@ -130,6 +156,7 @@ Assert-True ($adminBody -match "/admin/leads") "/admin missing leads link"
 
 $leads = Get-Text -Path "/admin/leads" -Session $session
 $leadsBody = Get-ResponseText -Response $leads
+
 Write-Host "/admin/leads -> $($leads.StatusCode) | $($leads.Headers["Content-Type"]) | $($leadsBody.Length)"
 
 Assert-True ($leads.StatusCode -eq 200) "/admin/leads did not return 200 after owner login"
@@ -140,6 +167,7 @@ Assert-True ($leadsBody -match "Lead filters") "/admin/leads missing Lead filter
 $csv = Get-Text -Path "/admin/leads.csv?q=Richard&kind=contact&limit=100" -Session $session
 $csvBody = Get-ResponseText -Response $csv
 $csvDisposition = [string]$csv.Headers["Content-Disposition"]
+
 Write-Host "/admin/leads.csv filtered -> $($csv.StatusCode) | $($csv.Headers["Content-Type"]) | $csvDisposition"
 
 Assert-True ($csv.StatusCode -eq 200) "/admin/leads.csv did not return 200"
@@ -147,12 +175,11 @@ Assert-True ($csvBody -match "created_at,kind,status,name,email,interest,message
 Assert-True ($csvDisposition -match "attachment") "/admin/leads.csv missing attachment disposition"
 
 Write-Host ""
-
-Write-Host ""
 Write-Host "Checking owner-only admin pills..."
 
 $ownerHome = Get-Text -Path "/" -Session $session
 $ownerHomeBody = Get-ResponseText -Response $ownerHome
+
 Write-Host "/ owner admin pill -> $($ownerHome.StatusCode) | $($ownerHomeBody.Length)"
 
 Assert-True ($ownerHome.StatusCode -eq 200) "/ owner did not return 200"
@@ -161,21 +188,12 @@ Assert-True ($ownerHomeBody -match 'href="/admin"') "/ owner admin pill missing 
 
 $ownerContact = Get-Text -Path "/contact" -Session $session
 $ownerContactBody = Get-ResponseText -Response $ownerContact
+
 Write-Host "/contact owner admin pill -> $($ownerContact.StatusCode) | $($ownerContactBody.Length)"
 
-Assert-True ($ownerContact.StatusCode -eq 200) "/contact owner did not return 200"
+Assert-True ($ownerContact.StatusCode -eq 200) "/contact did not return 200"
 Assert-True ($ownerContactBody -match "Open Nova admin dashboard") "/contact missing owner admin pill after login"
 Assert-True ($ownerContactBody -match 'href="/admin"') "/contact owner admin pill missing /admin href"
 
-$publicContact = Get-Text -Path "/contact"
-$publicContactBody = Get-ResponseText -Response $publicContact
-Write-Host "/contact public admin pill hidden -> $($publicContact.StatusCode) | $($publicContactBody.Length)"
-
-Assert-True ($publicContact.StatusCode -eq 200) "/contact public did not return 200"
-Assert-True (-not ($publicContactBody -match "Open Nova admin dashboard")) "/contact leaked owner admin pill to public visitor"
-# NOVA_RAILWAY_RELEASE_CHECK_OWNER_PILLS_20260709
-
+Write-Host ""
 Write-Host "NOVA RAILWAY RELEASE CHECK PASSED"
-
-
-

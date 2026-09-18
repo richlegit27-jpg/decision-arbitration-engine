@@ -113,6 +113,9 @@ class ExecutionBridgeService:
             "next_action": "write_file",
             "mutation_ready": True,
             "payload_required": False,
+            "requires_approval": True,
+            "approval_required": True,
+            "approval_status": "pending",
             "status": "ready",
         }
 
@@ -130,17 +133,126 @@ class ExecutionBridgeService:
         **kwargs,
     ):
         """
-        Compatibility method used by chat_guard_service.
+        Detect active execution continuation states.
 
-        Returns a neutral result when there is no active execution state.
+        Handles approval/resume commands before normal chat routing.
         """
-        return {
-            "handled": False,
-            "active": False,
-            "execution_active": False,
-            "session_id": session_id or "",
+
+        text = str(user_text or "").strip().lower()
+
+        if not session_id:
+            return {
+                "handled": False,
+                "active": False,
+                "execution_active": False,
+                "session_id": "",
+            }
+
+        execution_state = None
+
+        try:
+            if hasattr(self, "chat_service"):
+                execution_state = (
+                    self.chat_service._load_execution_state(
+                        session_id
+                    )
+                )
+        except Exception as exc:
+            print(
+                "[EXECUTION STATUS LOAD ERROR]",
+                exc,
+                flush=True,
+            )
+
+        if not isinstance(execution_state, dict):
+            return {
+                "handled": False,
+                "active": False,
+                "execution_active": False,
+                "session_id": session_id,
+            }
+
+        print(
+            "[BRIDGE LOADED EXECUTION STATE]",
+            {
+                "session_id": session_id,
+                "keys": list(execution_state.keys()),
+                "status": execution_state.get("status"),
+                "approval_status": execution_state.get("approval_status"),
+                "waiting": execution_state.get("waiting"),
+                "approval_required": execution_state.get("approval_required"),
+                "steps_count": len(execution_state.get("steps", []))
+                if isinstance(execution_state.get("steps"), list)
+                else None,
+            },
+            flush=True,
+        )
+
+        status = str(
+            execution_state.get("status") or ""
+        ).strip().lower()
+
+        approval_status = str(
+            execution_state.get("approval_status") or ""
+        ).strip().lower()
+
+        waiting = bool(
+            execution_state.get("waiting")
+            or execution_state.get("approval_required")
+        )
+
+        approval_words = {
+            "yes",
+            "y",
+            "ok",
+            "okay",
+            "approve",
+            "approved",
+            "go ahead",
+            "do it",
         }
 
+        if (
+            status == "waiting_approval"
+            and approval_status == "pending"
+            and waiting
+            and text in approval_words
+        ):
+            print(
+                "[EXECUTION APPROVAL CONTINUATION DETECTED]",
+                {
+                    "session_id": session_id,
+                    "status": status,
+                    "approval_status": approval_status,
+                },
+                flush=True,
+            )
+
+            return {
+                "handled": True,
+                "active": True,
+                "execution_active": True,
+                "route": "execution",
+                "intent": "approve_execution",
+                "command": "approve",
+                "session_id": session_id,
+                "execution_state": execution_state,
+            }
+
+        return {
+            "handled": False,
+            "active": status in {
+                "running",
+                "waiting",
+                "waiting_approval",
+            },
+            "execution_active": status in {
+                "running",
+                "waiting",
+                "waiting_approval",
+            },
+            "session_id": session_id,
+        }
     def try_execution_target_capture(
         self,
         session_id=None,
@@ -365,6 +477,9 @@ class ExecutionBridgeService:
                         "next_action": "write_file",
                         "mutation_ready": True,
                         "payload_required": False,
+                        "requires_approval": True,
+                        "approval_required": True,
+                        "approval_status": "pending",
                         "status": "ready",
                     }
                 ]
@@ -489,6 +604,9 @@ class ExecutionBridgeService:
                             ),
                             "mutation_ready": True,
                             "payload_required": True,
+                            "requires_approval": True,
+                            "approval_required": True,
+                            "approval_status": "pending",
                             "status": "ready",
                         }
                     ]

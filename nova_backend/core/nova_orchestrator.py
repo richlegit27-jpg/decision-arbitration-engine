@@ -81,11 +81,14 @@ from nova_backend.core.project_bridge import (
 from nova_backend.core.nova_state import (
     NovaState,
 )
+
 from nova_backend.core.execution_plan_normalizer import (
     ExecutionPlanNormalizer,
 )
 
+
 class NovaOrchestrator:
+
 
     def __init__(
         self,
@@ -109,6 +112,7 @@ class NovaOrchestrator:
                 memory=memory_service,
             )
         )
+
 
         self.model_router = (
             model_router
@@ -164,9 +168,11 @@ class NovaOrchestrator:
                 step_service=self.execution_step_service,
             )
         )
+
+
         self.execution_plan_normalizer = (
             ExecutionPlanNormalizer()
-            )
+        )
 
 
         self.execution_bridge = (
@@ -192,40 +198,33 @@ class NovaOrchestrator:
         )
 
 
+
     def run(
         self,
         user_text,
         session_context=None,
         session_id="",
+        decision=None,
     ):
 
         if session_id:
-
             self.state.session_id = (
                 session_id
             )
-
 
         self.memory_bridge.apply(
             self.state,
             session_id,
         )
 
-
         state = {
-
             "input": user_text,
-
+            "decision": decision or {},
             "context": {},
-
             "model": {},
-
             "agent": None,
-
             "tools": [],
-
         }
-
 
         state["context"] = (
             self.context_engine.build(
@@ -234,7 +233,6 @@ class NovaOrchestrator:
             )
         )
 
-
         state["model"] = (
             self.model_router.choose(
                 user_text,
@@ -242,52 +240,149 @@ class NovaOrchestrator:
             )
         )
 
-
         state["agent"] = (
             self.agent_router.choose(
                 "general",
             )
         )
 
-
-        state["plan"] = (
-            self.planner_bridge.create_plan(
-                user_text,
-                state["context"],
+        decision_intent = (
+            state["decision"].get("intent")
+            if isinstance(
+                state["decision"],
+                dict,
             )
+            else None
         )
 
-
-        state["plan"] = (
-            self.execution_plan_normalizer.normalize(
-                state["plan"]
-            )
+        print(
+            "[ORCHESTRATOR DECISION DEBUG]",
+            state["decision"],
+            decision_intent,
+            flush=True,
         )
 
+        if decision_intent == "mission_control":
 
-        state["execution"] = (
-            self.execution_bridge.execute(
-                state["plan"],
-                session_id,
+            existing_state = {}
+
+            if session_id:
+                try:
+                    existing_state = (
+                        self.execution_bridge
+                        .execution_state_service
+                        .get_execution_state(
+                            session_id
+                        )
+                        or {}
+                    )
+
+                except Exception as exc:
+                    print(
+                        "[MISSION CONTROL STATE LOAD FAILED]",
+                        exc,
+                        flush=True,
+                    )
+
+            state["execution"] = existing_state
+
+            execution_payload = (
+                existing_state.get(
+                    "execution_state"
+                )
+                or existing_state.get(
+                    "active_execution"
+                )
+                or existing_state.get(
+                    "execution"
+                )
+                or existing_state
             )
-        )
 
+            steps = execution_payload.get(
+                "steps",
+                [],
+            )
+
+            next_step = None
+
+            if isinstance(
+                steps,
+                list,
+            ):
+                for step in steps:
+                    if (
+                        isinstance(step, dict)
+                        and step.get("status")
+                        != "complete"
+                    ):
+                        next_step = step
+                        break
+
+            if isinstance(
+                steps,
+                list,
+            ):
+                for step in steps:
+                    if (
+                        isinstance(step, dict)
+                        and step.get("status")
+                        != "complete"
+                    ):
+                        next_step = step
+                        break
+
+            state["next_step"] = next_step
+
+            state["plan"] = {
+                "steps": steps,
+                "goal": existing_state.get(
+                    "goal"
+                ),
+                "type": "project_state",
+            }
+
+            state["execution"] = (
+                existing_state
+                or {
+                    "status": "waiting_for_project_state",
+                }
+            )
+
+        else:
+
+            state["plan"] = (
+                self.planner_bridge.create_plan(
+                    user_text,
+                    state["context"],
+                )
+            )
+
+            state["plan"] = (
+                self.execution_plan_normalizer.normalize(
+                    state["plan"]
+                )
+            )
+
+            state["execution"] = (
+                self.execution_bridge.execute(
+                    state["plan"],
+                    session_id,
+                )
+            )
 
         self.state.add_decision(
             "model",
             state["model"],
         )
 
-
         self.state.add_decision(
             "agent",
             state["agent"],
         )
 
-
         state["nova_state"] = (
             self.state.export()
         )
-
 
         return state
