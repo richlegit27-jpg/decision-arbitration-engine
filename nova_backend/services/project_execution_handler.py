@@ -162,17 +162,6 @@ class ProjectExecutionHandler:
                 payload=payload,
             )
 
-        return NextMove(
-            id=step_id or "project-step",
-            type="log",
-            payload={
-                "message": str(
-                    current_step.get("description")
-                    or current_step.get("title")
-                    or "Project step completed."
-                )
-            },
-        )
 
         if move is None and step_action in {
             "build",
