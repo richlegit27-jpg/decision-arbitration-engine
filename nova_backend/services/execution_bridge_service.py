@@ -150,19 +150,39 @@ class ExecutionBridgeService:
 
         execution_state = None
 
-        try:
-            if hasattr(self, "chat_service"):
-                execution_state = (
-                    self.chat_service._load_execution_state(
-                        session_id
-                    )
-                )
-        except Exception as exc:
+        new_task_request = any(
+            phrase in text
+            for phrase in [
+                "create a task",
+                "create a simple task",
+                "create a test task",
+                "create steps",
+                "make a task",
+                "build a task",
+                "create a plan",
+            ]
+        )
+
+        if new_task_request:
             print(
-                "[EXECUTION STATUS LOAD ERROR]",
-                exc,
+                "[EXECUTION RESTORE BYPASS - NEW TASK]",
+                user_text,
                 flush=True,
             )
+        else:
+            try:
+                if hasattr(self, "chat_service"):
+                    execution_state = (
+                        self.chat_service._load_execution_state(
+                            session_id
+                        )
+                    )
+            except Exception as exc:
+                print(
+                    "[EXECUTION STATUS LOAD ERROR]",
+                    exc,
+                    flush=True,
+                )
 
         if not isinstance(execution_state, dict):
             return {
@@ -213,7 +233,7 @@ class ExecutionBridgeService:
         }
 
         if (
-            status == "waiting_approval"
+            status in {"waiting", "waiting_approval"}
             and approval_status == "pending"
             and waiting
             and text in approval_words
@@ -315,10 +335,24 @@ class ExecutionBridgeService:
                     matched_prefix = prefix
                     break
 
+            is_task_creation_request = any(
+                phrase in lower
+                for phrase in [
+                    "create a task",
+                    "create a simple task",
+                    "create a test task",
+                    "make a task",
+                    "build a task",
+                    "create steps",
+                    "create a plan",
+                ]
+            )
+
             is_natural_execution_request = (
                 self.chat_execution_service.is_execution_trigger(
                     clean
                 )
+                or is_task_creation_request
             )
 
             if matched_prefix:
@@ -328,6 +362,12 @@ class ExecutionBridgeService:
 
             elif is_natural_execution_request:
                 goal = clean
+
+                print(
+                    "[EXECUTION GOAL CAPTURED]",
+                    goal,
+                    flush=True,
+                )
 
                 execution_phrases = (
                     "and run all steps",
@@ -621,31 +661,61 @@ class ExecutionBridgeService:
                     )
 
                 else:
-                    steps = [
-                        {
-                            "title": (
-                                f"Analyze the goal: {goal}"
-                            ),
-                            "action": "analyze",
-                            "execution_mode": "ai",
-                        },
-                        {
-                            "title": (
-                                "Determine the required work "
-                                "and implementation approach"
-                            ),
-                            "action": "plan",
-                            "execution_mode": "ai",
-                        },
-                        {
-                            "title": (
-                                "Review the result and "
-                                "determine next actions"
-                            ),
-                            "action": "review",
-                            "execution_mode": "ai",
-                        },
-                    ]
+                    lower_goal = goal.lower()
+
+                    concrete_task = (
+                        (
+                            "create " in lower_goal
+                            or "write " in lower_goal
+                            or "make " in lower_goal
+                        )
+                        and (
+                            ".txt" in lower_goal
+                            or ".py" in lower_goal
+                            or "file" in lower_goal
+                        )
+                    )
+
+                    if concrete_task:
+                        steps = [
+                            {
+                                "title": "Create the requested file or artifact",
+                                "action": "create_file",
+                                "execution_mode": "ai",
+                            },
+                            {
+                                "title": "Verify the created artifact",
+                                "action": "review",
+                                "execution_mode": "ai",
+                            },
+                        ]
+
+                    else:
+                        steps = [
+                            {
+                                "title": (
+                                    f"Analyze the goal: {goal}"
+                                ),
+                                "action": "analyze",
+                                "execution_mode": "ai",
+                            },
+                            {
+                                "title": (
+                                    "Determine the required work "
+                                    "and implementation approach"
+                                ),
+                                "action": "plan",
+                                "execution_mode": "ai",
+                            },
+                            {
+                                "title": (
+                                    "Review the result and "
+                                    "determine next actions"
+                                ),
+                                "action": "review",
+                                "execution_mode": "ai",
+                            },
+                        ]
 
             print(
                 "DEBUG AUTOPLAN STEPS BEFORE START:",
@@ -680,6 +750,26 @@ class ExecutionBridgeService:
                     target_file
                     or target_files
                 )
+
+                if (
+                    step.get("action") == "create_file"
+                    and not has_real_target
+                ):
+                    print(
+                        "[INVALID CREATE_FILE DOWNGRADE]",
+                        {
+                            "title": step.get("title"),
+                            "target_file": step.get("target_file"),
+                        },
+                        flush=True,
+                    )
+
+                    step["action"] = "request_target"
+                    step["next_action"] = "request_target"
+                    step["mutation_mode"] = "general"
+                    step["mutation_ready"] = False
+                    step["payload_required"] = True
+                    step["status"] = "waiting"
 
                 if has_real_target:
                     step.setdefault(
@@ -772,6 +862,26 @@ class ExecutionBridgeService:
                 flush=True,
             )
 
+
+            print(
+                "[GOAL BEFORE EXECUTION START]",
+                goal,
+                flush=True,
+            )
+            print(
+                "[FINAL GOAL INTO START]",
+                repr(goal),
+                flush=True,
+            )
+
+            if goal.strip().lower() == "untitled mission":
+                goal = clean
+
+            print(
+                "[RECOVERED EXECUTION GOAL]",
+                repr(goal),
+                flush=True,
+            )
             state = (
                 self.chat_execution_service.start(
                     session_id=session_id,
@@ -972,6 +1082,4 @@ class ExecutionBridgeService:
                 "execution_state": {},
                 "error": str(exc),
             }
-
-
 

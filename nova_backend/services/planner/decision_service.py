@@ -229,6 +229,7 @@
                         "in_progress",
                         "paused",
                         "waiting",
+                        "waiting_approval",
                     }
                     and current_index < len(steps)
                 )
@@ -237,6 +238,27 @@
             print(
                 "[DECISION PENDING EXECUTION CHECK FAILED]",
                 repr(exc),
+            )
+
+        project_execution_request = (
+            (
+                "create a project" in lower_text
+                or "create a tiny test project" in lower_text
+                or "build a project" in lower_text
+                or "make a project" in lower_text
+            )
+            and (
+                "execute" in lower_text
+                or "run" in lower_text
+                or "start" in lower_text
+            )
+        )
+
+        if project_execution_request:
+            return self._execution_decision(
+                user_text=user_text,
+                intent="project_execution",
+                reason="project_creation_with_execution_request",
             )
 
         if pending_execution:
@@ -278,6 +300,20 @@
                 intent="execution_step_creation",
                 reason="explicit_execution_step_request",
                 command=explicit_command,
+            )
+
+        # Explicitly execute the currently selected project step.
+        if (
+            "execute the next step" in lower_text
+            or "run the next step" in lower_text
+            or "proceed with the next step" in lower_text
+            or "continue with the next step" in lower_text
+        ):
+            return self._execution_decision(
+                user_text=user_text,
+                intent="execution_continuation",
+                reason="explicit_next_project_step_execution",
+                mode="execution",
             )
 
         if (
@@ -467,6 +503,39 @@
             "execution step",
         )
 
+        project_execution_request = (
+            (
+                "create a project" in lower_text
+                or "create a tiny test project" in lower_text
+                or "build a project" in lower_text
+                or "make a project" in lower_text
+            )
+            and (
+                "execute" in lower_text
+                or "run" in lower_text
+                or "start" in lower_text
+            )
+        )
+
+        if project_execution_request:
+            return self._execution_decision(
+                user_text=user_text,
+                intent="project_execution",
+                reason="project_creation_with_execution_request",
+            )
+
+        project_creation_execution = (
+            (
+                "project" in lower_text
+                or "workspace" in lower_text
+            )
+            and (
+                "execute" in lower_text
+                or "run" in lower_text
+                or "start" in lower_text
+            )
+        )
+
         is_execution_action = (
             lower_text.startswith(
                 execution_action_prefixes
@@ -477,12 +546,54 @@
             )
         )
 
+        task_creation_triggers = (
+            "create a task",
+            "create task",
+            "make a task",
+            "create a test task",
+            "make a test task",
+            "create steps",
+            "make steps",
+            "create a checklist",
+            "make a checklist",
+        )
+
+        if any(
+            trigger in lower_text
+            for trigger in task_creation_triggers
+        ):
+            return self._execution_decision(
+                user_text=user_text,
+                intent="task_creation",
+                reason="task_creation_request",
+            )
+
         if is_execution_action:
             return self._execution_decision(
                 user_text=user_text,
                 intent="task_execution",
                 reason="explicit_execution_action",
                 command=explicit_command,
+            )
+
+        task_creation_triggers = (
+            "create a task",
+            "create task",
+            "make a task",
+            "make a test task",
+            "create a test task",
+            "create a simple test task",
+            "build a task",
+        )
+
+        if any(
+            trigger in lower_text
+            for trigger in task_creation_triggers
+        ):
+            return self._execution_decision(
+                user_text=user_text,
+                intent="task_creation",
+                reason="task_creation_request",
             )
 
         planning_triggers = (

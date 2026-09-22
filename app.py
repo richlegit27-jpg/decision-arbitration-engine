@@ -156,7 +156,6 @@ _t0 = time.perf_counter()
 from nova_backend.services.execution_bridge_service import (
     ExecutionBridgeService,
 )
-
 print(
     "[IMPORT TIMING] execution_bridge_service",
     round(time.perf_counter() - _t0, 3),
@@ -218,7 +217,6 @@ from nova_backend.config import (
     WEB_TIMEOUT,
     RECON_TIMEOUT,
 )
-
 from nova_backend.services import normal_chat_bleed_guard_service
 from nova_backend.services.session_bootstrap_service import SessionBootstrapService
 from nova_backend.services import attachment_shape_service
@@ -436,13 +434,10 @@ session_service = SessionService(
 command_route_service = CommandRouteService(
     session_service
 )
-
 execution_state_service = ExecutionStateService(
     session_service=session_service
 )
-
 chat_execution_service.execution_state_service = execution_state_service
-
 chat_execution_service.set_session_service(
     session_service
 )
@@ -451,16 +446,13 @@ project_execution_handler = (
         default_executor=default_executor
     )
 )
-
 chat_execution_service.execution_handler = (
     project_execution_handler
 )
 memory_command_service = MemoryCommandService(
     session_service=session_service,
 )
-
 session_bootstrap_service = None
-
 mobile_exchange_service = MobileExchangeService(
     session_service
 )
@@ -585,9 +577,7 @@ intent_router = IntentRouterService()
 import time
 
 _t0 = time.perf_counter()
-
 runtime_brain = SafeUnifiedRuntime()
-
 print(
     "[TIMING] SafeUnifiedRuntime init",
     round(time.perf_counter() - _t0, 3),
@@ -601,7 +591,6 @@ attachment_summary_lock_service = None
 from nova_backend.services.attachment_summary_lock_service import (
     apply_attachment_summary_lock,
 )
-
 class AttachmentSummaryLockServiceCompat:
     def apply_attachment_summary_lock(self, *args, **kwargs):
         return apply_attachment_summary_lock(*args, **kwargs)
@@ -624,14 +613,12 @@ RuntimeBootstrap.save(
 # -----------------------
 # HELPERS
 # -----------------------
-
 IDENTITY_QUESTION_PATTERNS = [
     re.compile(r"\bwhat(?:'s| is)\s+my\s+name\b", re.IGNORECASE),
     re.compile(r"\bdo\s+you\s+know\s+my\s+name\b", re.IGNORECASE),
     re.compile(r"\bwho\s+am\s+i\b", re.IGNORECASE),
     re.compile(r"\bwhat\s+do\s+you\s+know\s+about\s+me\b", re.IGNORECASE),
 ]
-
 NAME_MEMORY_PATTERNS = [
     re.compile(r"^\s*user\s+name\s+is\s+(.+?)\s*$", re.IGNORECASE),
     re.compile(r"^\s*name\s*:\s*(.+?)\s*$", re.IGNORECASE),
@@ -748,7 +735,6 @@ def _nova_durable_data_bootstrap_20260703():
 _nova_durable_data_bootstrap_20260703()
 # /NOVA_DURABLE_DATA_BOOTSTRAP_20260703
 
-
 def _nova_boot_log_20260701(*args, **kwargs):
     import os as _nova_boot_log_os_20260701
 
@@ -817,9 +803,6 @@ register_project_routes(
     chat_execution_service=chat_execution_service,
 )
 
-
-
-
 print("[NOVA_PROJECT_ROUTES_20260901] installed")
 
 session_route_service.install_routes(
@@ -878,9 +861,7 @@ history_route_service.install_routes(
 
 )
 
-
 command_route_service.install_routes(app)
-
 
 _nova_boot_log_20260701(
     "RESTORED RUNTIME OK",
@@ -896,8 +877,6 @@ _nova_boot_log_20260701(
         ),
     },
 )
-
-
 
 last_compressed = getattr(
     runtime_brain,
@@ -1275,14 +1254,6 @@ def preview():
 def mobile():
     return render_template("mobile.html")
 
-
-
-
-# -----------------------
-# HEALTH
-# -----------------------
-
-
 # ============================================================
 # NOVA_USAGE_ROUTES_SERVICE_20260812
 # Token / usage tracking endpoints moved to service layer.
@@ -1330,8 +1301,6 @@ def api_health():
         },
     )
     
-
-
 # -----------------------
 # STATE
 # -----------------------
@@ -1466,7 +1435,6 @@ def api_state():
         memory=memory_service.build_list_payload(),
     )
 
-
 def filter_raw_injection_attachments(
     self,
     attachments,
@@ -1520,26 +1488,21 @@ def terms():
 def features():
     return render_template("nova_features.html")
 
-
 @app.route("/billing")
 def billing():
     return render_template("nova_billing.html")
-
 
 @app.route("/contact")
 def contact():
     return render_template("nova_contact.html")
 
-
 @app.route("/about")
 def about():
     return render_template("nova_about.html")
 
-
 @app.route("/faq")
 def faq():
     return render_template("nova_faq.html")
-
 
 @app.route("/api/models", methods=["GET"])
 def api_models_route():
@@ -1559,7 +1522,6 @@ def api_models_route():
         "default_model": default_model,
         "selected_model": default_model,
     }
-
 
 @app.route("/api/models/select", methods=["POST"])
 def api_models_select_route():
@@ -1910,6 +1872,19 @@ def api_projects_new():
             project_workspace_service.set_active_project(
                 project_id
             )
+
+            session_id = str(
+                data.get("session_id") or ""
+            ).strip()
+
+            if session_id:
+                working_state_service.update_working_state(
+                    session_id,
+                    {
+                        "project": project,
+                        "project_id": project_id,
+                    },
+                )
 
         return jsonify(
             {
@@ -2898,8 +2873,6 @@ def api_chat():
             },
         )
 
-
-
         # NOVA_API_CHAT_EARLY_EXPLICIT_MEMORY_GUARD_LIVE_ANCHOR_20260611_CALL
         try:
             _nova_raw_user_text = str(
@@ -3416,16 +3389,13 @@ def api_session_by_id(session_id: str):
 def api_sessions_switch():
     return session_route_service.api_sessions_switch()
 
-
 @app.post("/api/sessions/rename")
 def api_sessions_rename():
     return session_route_service.api_sessions_rename()
 
-
 @app.post("/api/sessions/pin")
 def api_sessions_pin():
     return session_route_service.api_sessions_pin()
-
 
 @app.post("/api/sessions/delete")
 def api_sessions_delete():

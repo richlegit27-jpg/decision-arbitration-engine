@@ -1,7 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from pathlib import Path
 import re
 
 from nova_backend.services.project_planning_ai_service import (
@@ -510,9 +511,9 @@ class ProjectBuilderService:
             is_execution_task = (
                 not is_contract_task
                 and (
-                    task_title_lower.startswith("execute ")
+                    task_title_lower.startswith("execute")
                     or task_title_lower.startswith("run ")
-                    or "execute " in task_title_lower
+                    or "execute" in task_title_lower
                     or "run " in task_title_lower
                     or "subprocess" in task_text_lower
                     or "standard output" in task_text_lower
@@ -523,8 +524,8 @@ class ProjectBuilderService:
             )
 
             if is_contract_task:
-                task["action"] = "analysis"
-                task["execution_mode"] = "ai"
+                task["action"] = "execute"
+                task["execution_mode"] = "hybrid"
                 task["execution_file"] = ""
 
             elif is_output_persistence_task:
@@ -601,8 +602,16 @@ class ProjectBuilderService:
                                 execution_file = candidate_file
                                 break
 
-                task["action"] = "execute"
-                task["execution_file"] = execution_file
+                if execution_file:
+                    task["action"] = "execute"
+                    task["execution_file"] = execution_file
+                else:
+                    task["action"] = "planning"
+                    task["execution_mode"] = "blocked"
+                    task["execution_file"] = ""
+                    task["notes"] = (
+                        "Execution requested but no runnable Python file was found."
+                    )
 
             else:
                 task["action"] = str(
@@ -1072,9 +1081,20 @@ class ProjectBuilderService:
                     ]
 
             else:
-                canonical_task["action"] = "analyze"
-                canonical_task["execution_mode"] = "ai"
-                canonical_task["execution_file"] = ""
+                canonical_task["action"] = str(
+                    canonical_task.get("action")
+                    or "analyze"
+                ).strip().lower()
+
+                canonical_task["execution_mode"] = (
+                    canonical_task.get("execution_mode")
+                    or "ai"
+                )
+
+                canonical_task["execution_file"] = (
+                    canonical_task.get("execution_file")
+                    or ""
+                )
 
             canonical_steps = canonical_task.get("steps")
 
@@ -1100,8 +1120,8 @@ class ProjectBuilderService:
                     canonical_step["execution_file"] = ""
 
                 else:
-                    canonical_step["action"] = "analyze"
-                    canonical_step["execution_mode"] = "ai"
+                    canonical_step["action"] = "execute"
+                    canonical_step["execution_mode"] = "hybrid"
                     canonical_step["execution_file"] = ""
 
         planned_tasks = normalized_tasks
@@ -1566,16 +1586,24 @@ class ProjectBuilderService:
 
             task_title_lower = task_title_text.lower()
 
+            is_create_and_execute_task = (
+                "create" in task_title_lower
+                and "execute" in task_title_lower
+            )
+
             is_execution_task = (
-                task_title_lower.startswith("execute ")
-                or task_title_lower.startswith("run ")
-                or task_title_lower.startswith("implement script execution")
-                or "execute " in task_title_lower
-                or "run " in task_title_lower
-                or "script execution" in task_text_lower
-                or "execution metadata" in task_text_lower
-                or "capture output" in task_text_lower
-                or "standard output" in task_text_lower
+                not is_create_and_execute_task
+                and (
+                    task_title_lower.startswith("execute ")
+                    or task_title_lower.startswith("run ")
+                    or task_title_lower.startswith("implement script execution")
+                    or "execute " in task_title_lower
+                    or "run " in task_title_lower
+                    or "script execution" in task_text_lower
+                    or "execution metadata" in task_text_lower
+                    or "capture output" in task_text_lower
+                    or "standard output" in task_text_lower
+                )
             )
 
             is_output_persistence_task = (
@@ -1649,6 +1677,13 @@ class ProjectBuilderService:
 
             final_task_title_lower = final_task_title.lower()
             final_task_text_lower = final_task_text.lower()
+
+            if (
+                normalized_action == "create"
+                and target_file
+                and not task_spec.get("content")
+            ):
+                task_spec["content"] = ""
 
             final_is_execution_task = bool(
                 execution_file
@@ -3590,6 +3625,9 @@ class ProjectBuilderService:
             )
 
             return
+
+
+
 
 
 

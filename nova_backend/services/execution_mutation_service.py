@@ -1,4 +1,4 @@
-class ExecutionMutationService:
+﻿class ExecutionMutationService:
 
     def __init__(
         self,
@@ -186,6 +186,8 @@ class ExecutionMutationService:
             existing_step.update(step)
 
         existing_step["status"] = "completed"
+        existing_step["waiting"] = False
+        existing_step["needs_clarification"] = False
 
         if result is not None:
             existing_step["result"] = result
@@ -326,7 +328,31 @@ class ExecutionMutationService:
             execution_state or {}
         )
 
+        print(
+            "[DEBUG ADVANCE ENTER]",
+            {
+                "completed_index": completed_index,
+                "execution_state_type": type(execution_state).__name__,
+                "current_index_before": execution_state.get(
+                    "current_index"
+                ),
+                "step_count": len(
+                    execution_state.get("steps") or []
+                ),
+            },
+            flush=True,
+        )
+
         next_index = int(completed_index) + 1
+
+        print(
+            "[DEBUG ADVANCE CALCULATED]",
+            {
+                "completed_index": completed_index,
+                "next_index": next_index,
+            },
+            flush=True,
+        )
 
         execution_state["current_index"] = next_index
         execution_state["current_step_index"] = next_index

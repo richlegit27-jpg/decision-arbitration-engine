@@ -75,6 +75,17 @@ class ProjectBridge:
                         "working_state"
                     ] = working
 
+                    if isinstance(
+                        working.get("project"),
+                        dict,
+                    ):
+
+                        project_state[
+                            "project"
+                        ] = working.get(
+                            "project"
+                        )
+
 
             except Exception as exc:
 

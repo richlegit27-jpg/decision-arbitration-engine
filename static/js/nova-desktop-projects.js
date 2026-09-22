@@ -1989,12 +1989,16 @@ if (createNewProjectButton) {
                                 "Content-Type":
                                     "application/json",
                             },
-                            body: JSON.stringify({
-                                name,
-                                description,
-                            }),
-                        }
-                    );
+body: JSON.stringify({
+    name,
+    description,
+    session_id:
+        window.NovaAppState?.getActiveChatId?.() ||
+        window.NovaChatState?.state?.activeChatId ||
+        null,
+}),
+                    }
+                );
 
                 const data =
                     await response.json();

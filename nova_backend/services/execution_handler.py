@@ -1,4 +1,4 @@
-
+﻿
 
 from __future__ import annotations
 
@@ -901,6 +901,20 @@ Rules:
                 step.get("command")
                 or ""
             ).strip()
+
+            if (
+                execution_file
+                and execution_file.lower().endswith(".sh")
+            ):
+                execution_command = (
+                    f"bash {execution_file}"
+                )
+
+                step["shell_command"] = execution_command
+                step["command"] = execution_command
+                step["execution_mode"] = "shell"
+
+                execution_file = ""
 
             if not execution_file and not execution_command:
                 step["status"] = "failed"
@@ -2161,6 +2175,45 @@ No explanation.
 
         execution_state = execution_state or {}
 
+        print(
+            "DEBUG HANDLER INPUT:",
+            execution_state.get("status"),
+            execution_state.get("complete"),
+            execution_state.get("current_index"),
+            len(execution_state.get("steps") or []),
+        )
+
+        # HARD STOP: never resume completed executions
+        if (
+            isinstance(execution_state, dict)
+            and (
+                execution_state.get("complete") is True
+                or str(
+                    execution_state.get("status") or ""
+                ).strip().lower()
+                in {
+                    "complete",
+                    "completed",
+                    "done",
+                }
+                or int(
+                    execution_state.get("current_index") or 0
+                )
+                >= len(
+                    execution_state.get("steps") or []
+                )
+            )
+        ):
+            return {
+                "status": "complete",
+                "execution_state": execution_state,
+                "execution": execution_state,
+                "step_output": (
+                    "This task is already complete."
+                ),
+            }
+
+
         if action in {"run_step", "next", "continue", "go"}:
             action = "run_step"
 
@@ -2475,6 +2528,18 @@ No explanation.
                 session_id,
                 execution_state,
             )
+
+            execution_state_service = getattr(
+                self.service,
+                "execution_state_service",
+                None,
+            )
+
+            if execution_state_service:
+                execution_state_service.save_execution_state(
+                    session_id,
+                    execution_state,
+                )
 
             return {
                 "status": (
@@ -3332,15 +3397,4 @@ def default_executor(move: NextMove) -> ExecutionResult:
             status="failed",
             error=str(e),
         )
-
-
-
-
-
-
-
-
-
-
-
 

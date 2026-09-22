@@ -46,6 +46,10 @@ from nova_backend.services.execution_step_service import (
     ExecutionStepService,
 )
 
+from nova_backend.services.project_workspace_service import (
+    project_workspace_service,
+)
+
 from nova_backend.core.evaluation_bridge import (
     EvaluationBridge,
 )
@@ -89,7 +93,6 @@ from nova_backend.core.execution_plan_normalizer import (
 
 class NovaOrchestrator:
 
-
     def __init__(
         self,
         context_engine=None,
@@ -99,6 +102,7 @@ class NovaOrchestrator:
         state=None,
         execution_state_service=None,
         memory_service=None,
+        project_workspace=None,
     ):
 
         self.state = (
@@ -110,20 +114,21 @@ class NovaOrchestrator:
             context_engine
             or ContextFusionEngine(
                 memory=memory_service,
+                project_workspace=(
+                    project_workspace
+                    or project_workspace_service
+                ),
             )
         )
-
 
         self.model_router = (
             model_router
             or ModelRouter()
         )
 
-
         self.agent_registry = (
             AgentRegistry()
         )
-
 
         self.agent_router = (
             agent_router
@@ -132,16 +137,13 @@ class NovaOrchestrator:
             )
         )
 
-
         self.permission_controller = (
             PermissionController()
         )
 
-
         self.tool_registry = (
             ToolRegistry()
         )
-
 
         self.tool_executor = (
             tool_executor
@@ -150,11 +152,9 @@ class NovaOrchestrator:
             )
         )
 
-
         self.memory_bridge = (
             MemoryBridge()
         )
-
 
         self.execution_step_service = (
             ExecutionStepService(
@@ -162,18 +162,15 @@ class NovaOrchestrator:
             )
         )
 
-
         self.execution_engine = (
             ExecutionEngine(
                 step_service=self.execution_step_service,
             )
         )
 
-
         self.execution_plan_normalizer = (
             ExecutionPlanNormalizer()
         )
-
 
         self.execution_bridge = (
             ExecutionBridge(
@@ -182,22 +179,17 @@ class NovaOrchestrator:
             )
         )
 
-
         self.planner_bridge = (
             PlannerBridge()
         )
-
 
         self.learning = (
             LearningLoop()
         )
 
-
         self.reflection = (
             ReflectionEngine()
         )
-
-
 
     def run(
         self,
@@ -206,6 +198,31 @@ class NovaOrchestrator:
         session_id="",
         decision=None,
     ):
+
+        print(
+            "[ORCHESTRATOR SESSION CONTEXT PROJECT DEBUG]",
+            {
+                "has_session_context": isinstance(
+                    session_context,
+                    dict,
+                ),
+                "working_state": (
+                    session_context.get("working_state")
+                    if isinstance(session_context, dict)
+                    else None
+                ),
+                "project": (
+                    session_context.get("working_state", {}).get("project")
+                    if isinstance(session_context, dict)
+                    and isinstance(
+                        session_context.get("working_state"),
+                        dict,
+                    )
+                    else None
+                ),
+            },
+            flush=True,
+        )
 
         if session_id:
             self.state.session_id = (
@@ -231,6 +248,12 @@ class NovaOrchestrator:
                 user_text,
                 session_context,
             )
+        )
+
+        print(
+            "[ORCHESTRATOR FUSED PROJECT DEBUG]",
+            state["context"].get("project"),
+            flush=True,
         )
 
         state["model"] = (
@@ -264,80 +287,179 @@ class NovaOrchestrator:
 
         if decision_intent == "mission_control":
 
-            existing_state = {}
-
-            if session_id:
-                try:
-                    existing_state = (
-                        self.execution_bridge
-                        .execution_state_service
-                        .get_execution_state(
-                            session_id
-                        )
-                        or {}
-                    )
-
-                except Exception as exc:
-                    print(
-                        "[MISSION CONTROL STATE LOAD FAILED]",
-                        exc,
-                        flush=True,
-                    )
-
-            state["execution"] = existing_state
-
-            execution_payload = (
-                existing_state.get(
-                    "execution_state"
+            project = (
+                state["context"].get("project")
+                if isinstance(
+                    state.get("context"),
+                    dict,
                 )
-                or existing_state.get(
-                    "active_execution"
-                )
-                or existing_state.get(
-                    "execution"
-                )
-                or existing_state
+                else {}
             )
 
-            steps = execution_payload.get(
-                "steps",
-                [],
+            if not isinstance(
+                project,
+                dict,
+            ):
+                project = {}
+
+            existing_state = (
+                project.get("execution")
+                or {}
+            )
+
+            state["execution"] = (
+                existing_state
+            )
+
+            tasks = (
+                project.get("tasks", [])
             )
 
             next_step = None
 
             if isinstance(
-                steps,
+                tasks,
                 list,
             ):
-                for step in steps:
-                    if (
-                        isinstance(step, dict)
-                        and step.get("status")
-                        != "complete"
+                for task in tasks:
+
+                    if not isinstance(
+                        task,
+                        dict,
                     ):
-                        next_step = step
+                        continue
+
+                    task_status = str(
+                        task.get(
+                            "status",
+                            "",
+                        )
+                    ).strip().lower()
+
+                    if task_status in {
+                        "completed",
+                        "complete",
+                        "failed",
+                        "blocked",
+                    }:
+                        continue
+
+                    task_steps = (
+                        task.get(
+                            "steps",
+                            [],
+                        )
+                    )
+
+                    if isinstance(
+                        task_steps,
+                        list,
+                    ):
+                        for step in task_steps:
+
+                            if not isinstance(
+                                step,
+                                dict,
+                            ):
+                                continue
+
+                            step_status = str(
+                                step.get(
+                                    "status",
+                                    "",
+                                )
+                            ).strip().lower()
+
+                            if step_status not in {
+                                "completed",
+                                "complete",
+                            }:
+                                next_step = {
+                                    "task_id": task.get(
+                                        "id"
+                                    ),
+                                    "task_title": task.get(
+                                        "title"
+                                    ),
+                                    **step,
+                                    "project_context": (
+                                        step.get(
+                                            "project_context"
+                                        )
+                                        or step.get(
+                                            "context"
+                                        )
+                                        or project.get(
+                                            "description"
+                                        )
+                                        or project.get(
+                                            "request"
+                                        )
+                                        or project.get(
+                                            "title"
+                                        )
+                                        or project.get(
+                                            "name"
+                                        )
+                                        or ""
+                                    ),
+                                    "goal": (
+                                        step.get(
+                                            "goal"
+                                        )
+                                        or project.get(
+                                            "description"
+                                        )
+                                        or project.get(
+                                            "request"
+                                        )
+                                        or project.get(
+                                            "title"
+                                        )
+                                        or project.get(
+                                            "name"
+                                        )
+                                        or ""
+                                    ),
+                                    "content": (
+                                        step.get(
+                                            "content"
+                                        )
+                                        or step.get(
+                                            "file_content"
+                                        )
+                                        or task.get(
+                                            "content"
+                                        )
+                                        or project.get(
+                                            "content"
+                                        )
+                                        or ""
+                                    ),
+                                }
+                                break
+
+                    if next_step is not None:
                         break
 
-            if isinstance(
-                steps,
-                list,
-            ):
-                for step in steps:
-                    if (
-                        isinstance(step, dict)
-                        and step.get("status")
-                        != "complete"
-                    ):
-                        next_step = step
-                        break
+            state["next_step"] = (
+                next_step
+            )
 
-            state["next_step"] = next_step
+            print(
+                "[ORCHESTRATOR NEXT STEP DEBUG]",
+                next_step,
+                flush=True,
+            )
 
             state["plan"] = {
-                "steps": steps,
-                "goal": existing_state.get(
-                    "goal"
+                "steps": (
+                    [next_step]
+                    if next_step is not None
+                    else []
+                ),
+                "goal": project.get(
+                    "description"
                 ),
                 "type": "project_state",
             }

@@ -1547,6 +1547,15 @@ class ProjectWorkspaceService:
                         or ""
                     ).strip()
 
+                    if task["execution_file"]:
+                        if not task["execution_file"].lower().endswith(".py"):
+                            print(
+                                "[EXECUTION FILE BLOCKED - NON PYTHON]",
+                                task["execution_file"],
+                                flush=True,
+                            )
+                            task["execution_file"] = ""
+
                     task["target_files"] = (
                         list(
                             item.get(

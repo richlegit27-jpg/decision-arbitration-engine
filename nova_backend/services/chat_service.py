@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from nova_backend.services.tool_runtime_factory import (
     build_tool_runtime,
@@ -24,7 +24,7 @@ from nova_backend.services.chat.router import ChatRouter
 from nova_backend.services.planner_service import PlannerService
 from nova_backend.services.project_builder_service import ProjectBuilderService
 from nova_backend.services.project_workspace_service import ProjectWorkspaceService
-from nova_backend.services.execution.service import ExecutionService
+from nova_backend.services.execution_service import ExecutionService
 from nova_backend.services.execution_mutation_service import ExecutionMutationService
 from nova_backend.services.intelligence.router import IntelligenceRouter
 from nova_backend.services.auto_fix.service import AutoFixService
@@ -45,7 +45,9 @@ from nova_backend.services.execution_handler import (
 from nova_backend.tools.executor import (
     execute_tool,
 )
-
+from nova_backend.services.project_workspace_service import (
+    project_workspace_service,
+)
 from nova_backend.tools.pending_tool_approval_service import (
     pending_tool_approval_service,
 )
@@ -280,27 +282,27 @@ class ChatService:
 
         self.execution_handler = ExecutionHandler(self)
 
-        # Wire the active ChatExecutionService dependencies.
-        # The module-level ChatExecutionService singleton is created before
-        # ChatService exists, so runtime dependencies must be attached here.
+        # Wire the active ChatExecutionService to this ChatService's
+        # ExecutionHandler. The module-level ChatExecutionService singleton
+        # is created before ChatService exists, so it cannot receive the
+        # handler during its own construction.
         if self.chat_execution_service is not None:
             self.chat_execution_service.execution_handler = (
                 self.execution_handler
             )
 
+        if self.chat_execution_service:
             self.chat_execution_service.set_session_service(
                 session_service
             )
-
         self.response_handler = ChatResponseHandler(self)
         self.chat_router = ChatRouter(self)
         self.planner_service = PlannerService(self)
-        self.project_workspace_service = ProjectWorkspaceService()
+        self.project_workspace_service = project_workspace_service
         self.project_builder_service = ProjectBuilderService(
             self.project_workspace_service
         )
         self.intelligence_router = IntelligenceRouter(self)
-
         # =========================
         # UNIFIED TOOL RUNTIME
         # =========================
@@ -339,6 +341,7 @@ class ChatService:
             NovaOrchestrator(
                 execution_state_service=execution_state_service,
                 memory_service=memory_service,
+                project_workspace=project_workspace_service,
                 tool_executor=self.tool_executor,
             )
         )
@@ -369,17 +372,12 @@ class ChatService:
         self.working_state_service = working_state_service
         self.execution_state_service = execution_state_service
 
-        # Attach persistence-backed execution state after initialization.
-        if self.chat_execution_service:
-            self.chat_execution_service.execution_state_service = (
-                self.execution_state_service
-            )
-
         # =========================
         # ACTIVE EXECUTION CACHE
         # =========================
 
         self.active_execution_cache = {}
+
         # =========================
         # EXISTING ALIASES
         # DO NOT REMOVE
@@ -490,7 +488,11 @@ class ChatService:
         # EXECUTION ENGINE
         # =========================
 
-        self.default_executor = default_executor
+        from nova_backend.services.execution_handler import (
+            default_executor as _default_executor,
+        )
+
+        self.default_executor = _default_executor
 
         self.repair_execution_service = RepairExecutionService(
             execution_handler=self.execution_handler,
@@ -527,6 +529,7 @@ class ChatService:
                 execution_step_service=self.execution_step_service,
             )
         )
+        self.execution_handler = self.project_execution_handler
 
         # Keep the generic handler's service reference available for any
         # legacy execution paths that still use it.
@@ -571,6 +574,9 @@ class ChatService:
                     self.execution_step_service
                 ),
                 execution_bridge=self.execution_bridge,
+                approval_service=(
+                    self.execution_approval_service
+                ),
             )
         )
 
@@ -643,8 +649,6 @@ class ChatService:
         regenerate: bool = False,
         requested_model: str | None = None,
     ):
-
-        brain_state = {}
 
         print(
             "[CHAT HANDLE ENTER]",
@@ -784,12 +788,34 @@ class ChatService:
         )
 
         from nova_backend.services.chat.handle import chat_handle
+
+        print(
+            "[CHAT_HANDLE RUNTIME SOURCE]",
+            {
+                "filename": getattr(
+                    chat_handle.__code__,
+                    "co_filename",
+                    None,
+                ),
+                "firstlineno": getattr(
+                    chat_handle.__code__,
+                    "co_firstlineno",
+                    None,
+                ),
+            },
+            flush=True,
+        )
+
         print(
             "[AFTER CHAT_HANDLE IMPORT]",
             round(time.perf_counter() - _chat_handle_t0, 3),
             flush=True,
         )
-        print("[CHAT HANDLE STEP 3 IMPORTED]", flush=True)
+
+        print(
+            "[CHAT HANDLE STEP 3 IMPORTED]",
+            flush=True,
+        )
 
         print(
             "[CHAT AFTER CHAT_HANDLE IMPORT]",
@@ -814,83 +840,14 @@ class ChatService:
         # Classify before any project/mission orchestration.
         # ==================================================
 
-        execution_state = self._load_execution_state(
-            session_id
+        primary_decision = self._decide_route(
+            user_text=user_text,
+            attachments=attachments,
+            session_id=session_id,
         )
-
-        print(
-            "[APPROVAL STATE CHECK]",
-            {
-                "session_id": session_id,
-                "execution_state": execution_state,
-                "status": (
-                    execution_state.get("status")
-                    if isinstance(execution_state, dict)
-                    else None
-                ),
-                "keys": (
-                    list(execution_state.keys())
-                    if isinstance(execution_state, dict)
-                    else None
-                ),
-            },
-            flush=True,
-        )
-
-        approval_override = False
-
-        if (
-            isinstance(execution_state, dict)
-            and execution_state.get("status")
-            == "waiting_approval"
-            and self.safe_str(
-                user_text
-            ).strip().lower()
-            in {
-                "yes",
-                "y",
-                "approve",
-                "approved",
-                "confirm",
-                "confirmed",
-            }
-        ):
-            approval_override = True
-
-        print(
-            "[APPROVAL FINAL VALUE]",
-            {
-                "approval_override": approval_override,
-                "user_text": user_text,
-                "status": (
-                    execution_state.get("status")
-                    if isinstance(
-                        execution_state,
-                        dict,
-                    )
-                    else None
-                ),
-            },
-            flush=True,
-        )
-
-        if approval_override:
-            primary_decision = {
-                "route": "execution",
-                "mode": "execution",
-                "intent": "continue_execution",
-                "continue_request": True,
-                "approval_confirmed": True,
-            }
-        else:
-            primary_decision = self._decide_route(
-                user_text,
-                session_id=session_id,
-            )
 
         if requested_model:
             primary_decision["model"] = requested_model
-
 
         if not isinstance(primary_decision, dict):
             primary_decision = {
@@ -933,7 +890,11 @@ class ChatService:
         # --------------------------------------------------
 
         elif (
-            primary_route == "execution"
+            (
+                primary_route == "execution"
+                and str(primary_decision.get("intent") or "").lower()
+                != "project_execution"
+            )
             or self._maybe_lock_execution_flow(
                 user_text=user_text,
                 session_id=session_id,
@@ -958,59 +919,6 @@ class ChatService:
                     session_id
                 )
             )
-
-            print(
-                "[CHAT SERVICE GET STATE RESULT]",
-                {
-                    "session_id": session_id,
-                    "execution_state": execution_state,
-                    "status": (
-                        execution_state.get("status")
-                        if isinstance(execution_state, dict)
-                        else None
-                    ),
-                    "waiting": (
-                        execution_state.get("waiting")
-                        if isinstance(execution_state, dict)
-                        else None
-                    ),
-                    "steps": (
-                        len(execution_state.get("steps", []))
-                        if isinstance(execution_state, dict)
-                        else None
-                    ),
-                },
-                flush=True,
-            )
-
-        if approval_override:
-            print(
-                "[CHAT HANDLE APPROVAL OVERRIDE]",
-                {
-                    "session_id": session_id,
-                    "user_text": user_text,
-                },
-                flush=True,
-            )
-
-            execution_result = self._handle_execution_control(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                approval_override=True,
-            )
-
-            if execution_result is not None:
-                if (
-                    isinstance(execution_result, dict)
-                    and "execution" in execution_result
-                    and "execution_state" not in execution_result
-                ):
-                    execution_result["execution_state"] = (
-                        execution_result["execution"]
-                    )
-
-                return execution_result
 
             if (
                 self.chat_execution_service.is_execution_trigger(
@@ -1039,7 +947,6 @@ class ChatService:
                     user_text=user_text,
                     session_id=session_id,
                     attachments=attachments,
-                    approval_override=approval_override,
                 )
             )
 
@@ -1068,11 +975,10 @@ class ChatService:
 
                 return execution_result
 
+
             brain_state = {
                 "decision": primary_decision,
             }
-
-        # --------------------------------------------------
         # Project/planner routes only
         # --------------------------------------------------
 
@@ -1101,49 +1007,14 @@ class ChatService:
             brain_state = self.orchestrator.run(
                 user_text=user_text,
                 session_context=session_payload,
-                session_id=(
-                    session_id
-                    or (
-                        session_payload.get("id")
-                        if isinstance(session_payload, dict)
-                        else ""
-                    )
-                ),
+                session_id=session_id,
                 decision=primary_decision,
-            )
-
-            if (
-                primary_decision.get("intent")
-                == "mission_control"
-                and isinstance(brain_state, dict)
-            ):
-
-                if isinstance(
-                    brain_state.get("plan"),
-                    dict,
-                ):
-                    primary_decision["brain_plan"] = (
-                        brain_state["plan"]
-                    )
-
-            print(
-                "[ORCH RESULT DEBUG]",
-                {
-                    "intent": primary_decision.get("intent"),
-                    "plan": brain_state.get("plan"),
-                    "execution": brain_state.get("execution"),
-                },
-                flush=True,
             )
 
             if not isinstance(brain_state, dict):
                 brain_state = {}
 
-            brain_state["decision_summary"] = {
-                "route": primary_decision.get("route"),
-                "mode": primary_decision.get("mode"),
-                "intent": primary_decision.get("intent"),
-            }
+            brain_state["decision"] = primary_decision
 
             print(
                 "[AFTER ORCHESTRATOR]",
@@ -1181,8 +1052,12 @@ class ChatService:
             )
 
         print(
-            "[BRAIN STATE BEFORE CHAT_HANDLE]",
-            brain_state,
+            "[DEBUG BEFORE CHAT_HANDLE]",
+            {
+                "route": primary_route,
+                "decision": primary_decision,
+                "session": session_id,
+            },
             flush=True,
         )
 
@@ -1193,7 +1068,6 @@ class ChatService:
             attachments,
             brain_state=brain_state,
             decision=primary_decision,
-            working_state=brain_state,
             regenerate=regenerate,
         )
 
@@ -1556,11 +1430,55 @@ class ChatService:
             )
             or {}
         )
+        text = str(
+            user_text or ""
+        ).strip().lower()
+
+        continuation_commands = {
+            "next",
+            "continue",
+            "go",
+            "run",
+            "resume",
+            "run next",
+            "next step",
+            "continue mission",
+        }
 
         if (
-            isinstance(
+            text in continuation_commands
+            and isinstance(
                 existing_execution,
                 dict,
+            )
+            and (
+                existing_execution.get("complete") is True
+                or existing_execution.get("status") in {
+                    "complete",
+                    "completed",
+                    "done",
+                }
+            )
+        ):
+            return {
+                "execution": existing_execution,
+                "step_output": "This task is already complete.",
+                "saved_artifact": None,
+            }
+
+        if (
+            text in continuation_commands
+            and isinstance(
+                existing_execution,
+                dict,
+            )
+            and not (
+                existing_execution.get("complete") is True
+                or existing_execution.get("status") in {
+                    "complete",
+                    "completed",
+                    "done",
+                }
             )
             and existing_execution.get(
                 "status"
@@ -1573,31 +1491,11 @@ class ChatService:
                 "steps"
             )
         ):
-                continuation_action = str(
-                    existing_execution.get(
-                        "command"
-                    )
-                    or "run_step"
-                ).strip().lower()
-
-                if continuation_action in {
-                    "execute",
-                    "execute_all",
-                }:
-                    continuation_action = "run_all"
-                elif continuation_action in {
-                    "next",
-                    "continue",
-                    "go",
-                }:
-                    continuation_action = "run_step"
-
-                return self.execution_handler.run_next_move(
-                    action=continuation_action,
-                    session_id=session_id,
-                    execution_state=existing_execution,
-                )
-
+            return self.execution_handler.run_next_move(
+                action="run_step",
+                session_id=session_id,
+                execution_state=existing_execution,
+            )
         text = str(
             user_text or ""
         ).strip()
@@ -1624,6 +1522,21 @@ class ChatService:
                     )
                 )
 
+                print(
+                    "[DEBUG PROJECT RESULT TASKS BEFORE EXECUTION]",
+                    {
+                        "tasks": project_result.get("tasks"),
+                        "task_types": [
+                            type(x).__name__
+                            for x in (
+                                project_result.get("tasks")
+                                or []
+                            )
+                        ],
+                    },
+                    flush=True,
+                )
+
                 if project_result:
                     return {
                         "status": "ready",
@@ -1642,9 +1555,18 @@ class ChatService:
                             "tasks"
                         ),
                         "goal": text,
-                        "steps": project_result.get(
-                            "tasks"
-                        ) or [],
+                        "steps": (
+                            project_result.get(
+                                "plan",
+                                {}
+                            ).get(
+                                "tasks"
+                            )
+                            or project_result.get(
+                                "tasks"
+                            )
+                            or []
+                        ),
                     }
 
             except Exception as exc:
@@ -1656,6 +1578,29 @@ class ChatService:
         # ----------------------------------------------------------
         # EXISTING EXECUTION / PLANNER PATH
         # ----------------------------------------------------------
+
+        existing_execution = self._load_execution_state(
+            session_id
+        )
+
+        if (
+            isinstance(existing_execution, dict)
+            and (
+                existing_execution.get("complete") is True
+                or str(
+                    existing_execution.get("status") or ""
+                ).strip().lower() in {
+                    "complete",
+                    "completed",
+                    "done",
+                }
+            )
+        ):
+            return {
+                "execution": existing_execution,
+                "step_output": "This task is already complete.",
+                "saved_artifact": None,
+            }
 
         goal = self._build_goal(
             text,
@@ -1674,16 +1619,10 @@ class ChatService:
                 "intent": "planning",
             },
         )
-
         if execution and (
             execution.get("steps")
             or execution.get("goal")
         ):
-            execution["status"] = (
-                execution.get("status")
-                or "ready"
-            )
-
             execution["current_index"] = (
                 execution.get("current_index")
                 or 0
@@ -1734,6 +1673,8 @@ class ChatService:
             "build a project",
             "build the project",
             "create a project",
+            "create a tiny test project",
+            "create a test project",
             "start a project",
             "new project",
             "build an app",
@@ -1822,26 +1763,13 @@ class ChatService:
 
         execution = (
             self.execution_service.build_planning_execution(
-                user_text=self.safe_str(user_text).strip(),
+                user_text=self.safe_str(
+                    user_text
+                ).strip(),
                 title="Nova Execution Plan",
                 max_steps=5,
             )
         )
-
-        if (
-            isinstance(plan, list)
-            and plan
-            and not execution.get("steps")
-        ):
-            execution["steps"] = [
-                {
-                    "id": f"step_{index + 1}",
-                    "text": self.safe_str(step),
-                    "status": "pending",
-                }
-                for index, step in enumerate(plan)
-                if self.safe_str(step)
-            ]
 
         execution["goal"] = self.safe_str(
             user_text
@@ -2094,7 +2022,7 @@ Rules:
         if not code:
             return code
 
-        # 1. convert tabs ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 4 spaces
+        # 1. convert tabs ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 4 spaces
         code = code.replace("\t", "    ")
 
         # 2. normalize line endings
@@ -2367,28 +2295,6 @@ Rules:
 
         if current_index > len(steps):
             current_index = len(steps)
-
-        if text in {
-            "yes",
-            "y",
-            "approve",
-            "approved",
-            "confirm",
-            "confirmed",
-        }:
-            if (
-                execution_state.get("status")
-                == "waiting_approval"
-            ):
-                return {
-                    "ok": True,
-                    "is_mission": True,
-                    "type": "continue",
-                    "mission": mission,
-                    "next_action": "run_step",
-                    "continue_request": True,
-                    "execution": execution_state,
-                }
 
         if text in {
             "next",
@@ -2759,7 +2665,10 @@ Rules:
                 selected_execution_state = output_state
 
             elif (
-                selected_execution_state.get(
+                not selected_execution_state.get(
+                    "steps"
+                )
+                and selected_execution_state.get(
                     "plan",
                     {},
                 ).get("steps")
@@ -2829,35 +2738,10 @@ Rules:
                     )
                 )
 
-                print(
-                    "[RAW EXECUTION SERVICE STATE]",
-                    {
-                        "session_id": session_id,
-                        "execution_state": execution_state,
-                    },
-                    flush=True,
-                )
-
                 if (
                     isinstance(execution_state, dict)
-                    and execution_state
-                    and (
-                        execution_state.get("status")
-                        or execution_state.get("steps")
-                        or execution_state.get("execution_id")
-                    )
+                    and execution_state.get("steps")
                 ):
-                    print(
-                        "[EXECUTION LOAD FROM SERVICE]",
-                        {
-                            "session_id": session_id,
-                            "status": execution_state.get("status"),
-                            "approval_status": execution_state.get(
-                                "approval_status"
-                            ),
-                        },
-                        flush=True,
-                    )
                     return execution_state
 
         except Exception as exc:
@@ -2912,7 +2796,6 @@ Rules:
                 execution_state,
             )
 
-        # Persist into session payload/meta
         try:
             self._set_session_meta(
                 session_id,
@@ -2958,7 +2841,27 @@ Rules:
                         "CHAT EXECUTION SYNC SKIPPED: existing execution",
                         existing_state,
                     )
+
                 else:
+                    print(
+                        "[DEBUG BEFORE CHAT EXECUTION START]",
+                        {
+                            "steps": execution_state.get("steps"),
+                            "step_keys": [
+                                list(step.keys())
+                                for step in (
+                                    execution_state.get("steps")
+                                    or []
+                                )
+                                if isinstance(
+                                    step,
+                                    dict,
+                                )
+                            ],
+                        },
+                        flush=True,
+                    )
+
                     self.chat_execution_service.start(
                         session_id=session_id,
                         goal=(
@@ -2982,7 +2885,6 @@ Rules:
                     "CHAT EXECUTION STATE SYNC FAILED:",
                     e,
                 )
-
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
         session_id = self.safe_str(session_id).strip()
         key = self.safe_str(key).strip()
@@ -3871,9 +3773,9 @@ Rules:
                 "assembly news headlines today",
                 "curated for you",
                 "you're my favorite song",
-                "youÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re my favorite song",
+                "youÃ¢â‚¬â„¢re my favorite song",
                 "introduces today's new top stars",
-                "introduces todayÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s new top stars",
+                "introduces todayÃ¢â‚¬â„¢s new top stars",
                 "gma network",
                 "kanak news odisha",
                 "odia news",
@@ -4786,7 +4688,7 @@ Rules:
             "send the code",
             "send one of these",
             "send the code and",
-            "whatÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢s the symptom",
+            "whatÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -5183,7 +5085,7 @@ Rules:
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement, cleanly indented."
+                "- IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -5221,7 +5123,7 @@ Rules:
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement block, cleanly indented."
+                    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -5237,7 +5139,7 @@ Rules:
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll help patch it."
+                    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -5254,7 +5156,7 @@ Rules:
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll break it down clearly."
+                    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -5274,7 +5176,7 @@ Rules:
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldnÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldnÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -5345,131 +5247,72 @@ Rules:
             exec_debug("FINAL_CLEAN_ERROR:", e)
 
         # ==========================================
-        # EXECUTION STEP — LIVE TOOL-FIRST PIPELINE
+        # EXECUTION STEP � LIVE TOOL-FIRST PIPELINE
         # ==========================================
 
         try:
             decision = self._safe_dict(decision)
-            mission = self._safe_dict(
-                decision.get("mission")
+
+            execution_state = (
+                decision.get("execution_state")
+                or (
+                    self._safe_dict(
+                        decision.get("mission")
+                    ).get("execution")
+                )
+                or {}
             )
-            execution = mission.get("execution")
 
             if (
-                isinstance(execution, dict)
+                isinstance(execution_state, dict)
                 and self._looks_like_execution(user_text)
             ):
+                execution = self._normalize_execution_state(
+                    execution_state
+                )
 
-                exec_result = None
+                decision["execution_state"] = execution
 
-                status = str(
-                    execution.get("status") or ""
-                ).lower()
+                decision["mission"] = (
+                    decision.get("mission")
+                    or {}
+                )
 
-                if status not in [
-                    "complete",
-                    "completed",
-                    "done",
-                ]:
+                decision["mission"]["execution"] = execution
 
-                    exec_result = self._execute_current_step(
-                        execution=execution,
-                        user_text=user_text,
-                        session_id=session_id,
-                        attachments=attachments,
-                    )
+                assistant_text = self._render_execution(
+                    execution,
+                    include_prefix=True,
+                )
 
-                if isinstance(exec_result, dict):
+                self._set_session_meta(
+                    session_id,
+                    "execution_state",
+                    execution,
+                )
 
-                    execution = (
-                        exec_result.get("execution")
-                        or execution
-                    )
+                self._save_active_execution(
+                    session_id,
+                    execution,
+                )
 
-                    decision["mission"] = (
-                        decision.get("mission")
-                        or {}
-                    )
-
-                    decision["mission"]["execution"] = (
-                        execution
-                    )
-
-                    step_output = self.safe_str(
-                        exec_result.get("step_output")
-                    ).strip()
-
-                    saved_artifact = (
-                        exec_result.get("saved_artifact")
-                        or {}
-                    )
-
-                    artifact_body = ""
-
-                    if isinstance(saved_artifact, dict):
-
-                        artifact_body = self.safe_str(
-                            saved_artifact.get("body")
-                        ).strip()
-
-                    # The user should see the actual
-                    # completed step result, not the stale
-                    # execution state rendered before execution.
-                    if step_output:
-
-                        assistant_text = step_output
-
-                    elif artifact_body:
-
-                        assistant_text = artifact_body
-
-                    else:
-
-                        assistant_text = self._render_execution(
-                            execution,
-                            include_prefix=True,
-                        )
-
-                    self._set_session_meta(
-                        session_id,
-                        "execution_state",
-                        execution,
-                    )
-
-                    self._save_active_execution(
+                try:
+                    self._persist_execution_artifact(
                         session_id,
                         execution,
                     )
-
-                    try:
-
-                        self._persist_execution_artifact(
-                            session_id,
-                            execution,
-                        )
-
-                    except Exception as e:
-
-                        exec_debug(
-                            "EXECUTION_SAVE_ERROR:",
-                            e,
-                        )
-
-                elif isinstance(execution, dict):
-
-                    # Completed executions still render
-                    # their latest persisted state.
-                    assistant_text = self._render_execution(
-                        execution,
-                        include_prefix=True,
+                except Exception as e:
+                    exec_debug(
+                        "EXECUTION_SAVE_ERROR:",
+                        e,
                     )
 
         except Exception as e:
-
             exec_debug(
                 "EXECUTION_STEP_ERROR:",
                 e,
             )
+
         return {
             "assistant_text": assistant_text,
             "intelligence": intelligence,
@@ -5631,7 +5474,7 @@ Rules:
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ empty ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ global news
+        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ empty ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ global news
         if not clean_query:
             return [
                 "world news",
@@ -5875,7 +5718,7 @@ Rules:
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cor",
+                    "furniture & dÃƒÆ’Ã‚Â©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -5898,7 +5741,7 @@ Rules:
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢*|")
+                    _low = _line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -6272,11 +6115,11 @@ Rules:
                 summary_looks_raw = (
                     len(summary) > 400
                     or "search wikipedia" in summary.lower()
-                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â¹Ãƒâ€¦Ã¢â‚¬Å“" in summary
-                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢" in summary
-                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â" in summary
-                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢" in summary
-                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œ" in summary
+                    or "ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦" in summary
                 )
 
                 if not assistant_text and (body or summary):
@@ -7508,13 +7351,11 @@ Rules:
         user_text: str,
         session_id: str,
         attachments=None,
-        approval_override=False,
     ):
 
         text = self.safe_str(
             user_text
         ).strip().lower()
-
         active_execution = (
             self._load_execution_state(
                 session_id
@@ -7534,57 +7375,6 @@ Rules:
                 and meta_execution.get("steps")
             ):
                 active_execution = meta_execution
-
-        if approval_override:
-            active_execution["continue_request"] = True
-            active_execution["approval_confirmed"] = True
-            active_execution["approval_status"] = "approved"
-            active_execution["status"] = "ready"
-            active_execution["waiting"] = False
-
-            for step in active_execution.get("steps", []):
-                if isinstance(step, dict):
-                    step["approval_status"] = "approved"
-                    step["approval_required"] = False
-                    step["requires_approval"] = False
-
-            self._save_execution_state(
-                session_id,
-                active_execution,
-            )
-
-        if approval_override:
-            execution_result = (
-                self.chat_execution_service.advance(
-                    session_id,
-                    user_text=user_text,
-                )
-            )
-
-            if isinstance(
-                execution_result,
-                dict,
-            ):
-                execution_state = (
-                    execution_result.get(
-                        "execution_state"
-                    )
-                    or execution_result.get(
-                        "execution"
-                    )
-                    or execution_result
-                )
-
-                if isinstance(
-                    execution_state,
-                    dict,
-                ):
-                    self._save_execution_state(
-                        session_id,
-                        execution_state,
-                    )
-
-            return execution_result
 
         active_steps = (
             active_execution.get("steps")
@@ -7729,6 +7519,32 @@ Rules:
                     user_text=user_text,
                 )
 
+        if (
+            text in {
+                "k",
+                "kk",
+                "next",
+                "nex",
+                "continue",
+                "continue on",
+                "keep going",
+                "go",
+                "resume",
+                "run next",
+                "next step",
+                "what next",
+                "what now",
+                "run_step",
+                "run step",
+            }
+            and steps
+            and current_index < len(steps)
+        ):
+            return self.execution_orchestrator_service.process_execution(
+                session_id=session_id,
+                state=execution_state,
+                command="run_step",
+            )
 
         mission_command = self._resolve_mission_command(
             user_text=user_text,
@@ -8142,7 +7958,7 @@ Rules:
             or "use the web route to verify" in combined_lower
             or "can't directly browse from here" in combined_lower
             or "cannot directly browse from here" in combined_lower
-            or "i canÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢t directly browse from here" in combined_lower
+            or "i canÃ¢â‚¬â„¢t directly browse from here" in combined_lower
             or "i can't directly browse from here" in combined_lower
             or "fastest exact query is" in combined_lower
             or "paste the listing here" in combined_lower
@@ -9947,26 +9763,91 @@ Rules:
 
                     clean_steps.append(
                         {
+                            "id": (
+                                raw.get("id")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
                             "title": title,
+                            "text": (
+                                raw.get("text", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "description": (
+                                raw.get("description", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
                             "action": (
                                 raw.get("action")
                                 if isinstance(raw, dict)
                                 else None
                             ),
-                            "target_file": (
-                                raw.get("target_file")
+                            "execution_mode": (
+                                raw.get("execution_mode", "")
                                 if isinstance(raw, dict)
                                 else ""
                             ),
+                            "execution_file": (
+                                raw.get("execution_file", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "target_file": (
+                                raw.get("target_file", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "target_files": (
+                                raw.get("target_files", [])
+                                if isinstance(raw, dict)
+                                else []
+                            ),
                             "target_function": (
-                                raw.get("target_function")
+                                raw.get("target_function", "")
                                 if isinstance(raw, dict)
                                 else ""
                             ),
                             "mutation_mode": (
-                                raw.get("mutation_mode")
+                                raw.get("mutation_mode", "")
                                 if isinstance(raw, dict)
                                 else ""
+                            ),
+                            "content": (
+                                raw.get("content", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "code": (
+                                raw.get("code", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "replacement": (
+                                raw.get("replacement", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "command": (
+                                raw.get("command", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "expected_output": (
+                                raw.get("expected_output", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "completion_criteria": (
+                                raw.get("completion_criteria", [])
+                                if isinstance(raw, dict)
+                                else []
+                            ),
+                            "dependencies": (
+                                raw.get("dependencies", [])
+                                if isinstance(raw, dict)
+                                else []
                             ),
                             "status": (
                                 raw.get("status", "pending")
@@ -10180,7 +10061,9 @@ Rules:
 
         if status is not None:
             execution["status"] = (
-                self.safe_str(status) or execution.get("status") or "idle"
+                self.safe_str(status)
+                or execution.get("status")
+                or "idle"
             )
 
         if current_step is not None:
@@ -10276,10 +10159,10 @@ Rules:
                     "[>]",
                     "[x]",
                     "[X]",
-                    "âœ“",
-                    "âœ”",
-                    "â†’",
-                    "âž¡",
+                    "✓",
+                    "✔",
+                    "→",
+                    "➡",
                 ]
             ):
                 step_indexes.append(i)
@@ -10695,7 +10578,7 @@ Rules:
         def _clean_value(value: str) -> str:
             value = self.safe_str(value).strip()
             value = value.strip(
-                "+ ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â\r\n-:;,.\""
+                "+ ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â\r\n-:;,.\""
             )
             return value
 
@@ -12147,9 +12030,7 @@ Rules:
         user_text: str,
         decision: dict,
         session_id: str = "",
-        working_state=None,
     ) -> str:
-
         user_text = self.safe_str(user_text)
 
         memory_items = self._rank_memory_context(
@@ -12176,16 +12057,6 @@ Rules:
         )
 
         sections = []
-
-        if isinstance(
-            working_state,
-            dict,
-        ) and working_state:
-
-            sections.append(
-                "Current project state:\n"
-                f"{working_state}"
-            )
 
         try:
             from nova_backend.services.chat_turn_attachment_context import (
@@ -12288,14 +12159,12 @@ Rules:
         decision: dict,
         session_id: str = "",
         requested_model: str | None = None,
-        working_state=None,
     ) -> str:
 
         prompt = self._build_chat_input(
             user_text=user_text,
             decision=decision,
             session_id=session_id,
-            working_state=working_state,
         )
 
         try:
@@ -12671,6 +12540,56 @@ Rules:
 
         step_output = ""
 
+        if (
+            isinstance(execution, dict)
+            and (
+                execution.get("complete") is True
+                or str(
+                    execution.get("status") or ""
+                ).strip().lower() in {
+                    "complete",
+                    "completed",
+                    "done",
+                }
+            )
+        ):
+            return {
+                "execution": execution,
+                "step_output": "This task is already complete.",
+                "saved_artifact": None,
+            }
+
+        # NOVA EXECUTION STEP RESULT AUTHORITY
+
+        if isinstance(current_step, dict):
+
+            step_status = (
+                self.safe_str(
+                    current_step.get("status")
+                )
+                .strip()
+                .lower()
+            )
+
+            existing_result = (
+                current_step.get("result")
+                or current_step.get("execution_result")
+            )
+
+            if (
+                step_status in {
+                    "completed",
+                    "complete",
+                    "success",
+                }
+                and existing_result
+            ):
+                return {
+                    "execution": execution,
+                    "step_output": str(existing_result),
+                    "saved_artifact": None,
+                }
+
         tool_bundle = {}
 
         try:
@@ -12702,70 +12621,8 @@ Rules:
             step_output = f"Step execution failed: {exc}"
 
         if not step_output:
+
             step_output = f"Completed step: {step_title}"
-
-        approval_prompt = self.safe_str(
-            step_output
-        ).lower()
-
-        approval_required = (
-            "approval is required" in approval_prompt
-            or "do you approve" in approval_prompt
-            or "approve? (yes/no)" in approval_prompt
-            or "approval required before" in approval_prompt
-        )
-
-        if approval_required:
-            execution["status"] = "waiting"
-            execution["waiting"] = True
-            execution["complete"] = False
-            execution["lock"] = False
-            execution["current_step"] = step_title
-            execution["current_step_title"] = step_title
-            execution["approval_required"] = True
-            execution["approval_prompt"] = step_output
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution,
-            )
-
-            self._save_active_execution(
-                session_id,
-                execution,
-            )
-
-            self._save_execution_state(
-                session_id,
-                execution,
-            )
-
-            return {
-                "execution": execution,
-                "step_output": step_output,
-                "saved_artifact": {
-                    "kind": "execution",
-                    "title": goal or "Execution",
-                    "body": self._render_execution(execution),
-                    "execution": execution,
-                    "meta": {
-                        "execution": execution,
-                        "goal": goal,
-                        "step_index": current_index,
-                        "step_title": step_title,
-                        "execution_id": self.safe_str(
-                            execution.get("id")
-                        ),
-                        "status": "waiting",
-                        "progress": execution.get(
-                            "progress",
-                            0,
-                        ),
-                        "current_step": step_title,
-                    },
-                },
-            }
 
         step_result = {
             "step_index": current_index,
@@ -14038,8 +13895,6 @@ def _create_model_response(self, model_messages):
         model=self.chat_model,
         input=model_messages,
     )
-
-
 
 
 

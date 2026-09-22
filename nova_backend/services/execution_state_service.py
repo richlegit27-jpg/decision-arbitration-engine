@@ -469,6 +469,74 @@ class ExecutionStateService:
         )
 
         if isinstance(execution, dict) and execution:
+
+            bad_control_goal = (
+                str(
+                    execution.get("goal")
+                    or ""
+                )
+                .strip()
+                .lower()
+                in {
+                    "next",
+                    "continue",
+                    "go",
+                    "run",
+                    "resume",
+                    "run next",
+                    "next step",
+                }
+            )
+
+            bad_control_step = False
+
+            steps = execution.get("steps")
+
+            if isinstance(steps, list):
+                for step in steps:
+                    if not isinstance(step, dict):
+                        continue
+
+                    step_text = str(
+                        step.get("text")
+                        or ""
+                    ).strip().lower()
+
+                    step_title = str(
+                        step.get("title")
+                        or ""
+                    ).strip().lower()
+
+                    if (
+                        step_text in {
+                            "next",
+                            "continue",
+                            "go",
+                            "run",
+                            "resume",
+                        }
+                        or (
+                            step_title
+                            == "create the requested file"
+                            and not step.get("target_file")
+                        )
+                    ):
+                        bad_control_step = True
+                        break
+
+            if bad_control_goal or bad_control_step:
+                print(
+                    "[EXECUTION STATE CORRUPTION BLOCKED]",
+                    {
+                        "goal": execution.get("goal"),
+                        "bad_goal": bad_control_goal,
+                        "bad_step": bad_control_step,
+                    },
+                    flush=True,
+                )
+
+                return {}
+
             return execution
 
         return {}

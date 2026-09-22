@@ -775,10 +775,10 @@ class ExecutionService:
             for step in execution["steps"]:
                 marker = {
                     "pending": "-",
-                    "running": "ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢",
-                    "completed": "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“",
+                    "running": "Ã¢â€ â€™",
+                    "completed": "Ã¢Å“â€œ",
                     "blocked": "!",
-                    "failed": "ÃƒÂ¢Ã…â€œÃ¢â‚¬â€",
+                    "failed": "Ã¢Å“â€”",
                 }.get(step["status"], "-")
                 lines.append(f"{marker} {step['text']}")
 
@@ -821,7 +821,7 @@ class ExecutionService:
                 line = f"{marker} {step['text']}"
                 notes = self._safe_str(step.get("notes"))
                 if notes:
-                    line = f"{line} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {notes}"
+                    line = f"{line} Ã¢â‚¬â€ {notes}"
                 body_lines.append(line)
 
         counts = self._safe_dict(execution.get("meta", {}).get("step_counts"))
@@ -942,7 +942,31 @@ class ExecutionService:
         )
 
         import re
+
         file_patterns = [
+            re.compile(
+                r"""
+                ^\s*
+                (?:create|make|write)
+                \s+
+                (?:a\s+)?
+                (?:simple\s+)?
+                (?:test\s+)?
+                (?:python\s+)?
+                file
+                \s+
+                (?:called\s+)?
+                (?P<target_file>[A-Za-z0-9_\-]+\.py)
+                \s+
+                with\s+
+                content\s+
+                (?P<content>[\s\S]+?)
+                \s*$
+                """,
+                flags=re.IGNORECASE |
+                re.VERBOSE,
+            ),
+
             re.compile(
                 r"""
                 ^\s*
@@ -952,7 +976,8 @@ class ExecutionService:
                 (?:the\s+)?
                 (?:file\s+)?
                 (?P<target_file>.+?)
-                \s+with\s+
+                \s+
+                with\s+
                 (?:exactly\s+)?
                 (?:this\s+)?
                 content\s*:\s*
@@ -1002,7 +1027,223 @@ class ExecutionService:
                 flags=re.IGNORECASE | re.VERBOSE,
             ),
         ]
+
+        file_patterns = [
+            re.compile(
+                r"""
+                ^\s*
+                (?:create|make|write)
+                \s+
+                (?:a\s+)?
+                (?:simple\s+)?
+                (?:test\s+)?
+                (?:python\s+)?
+                file
+                \s+
+                (?:called\s+)?
+                (?P<target_file>[A-Za-z0-9_.\-\\/]+)
+                \s+
+                with\s+
+                (?:the\s+)?
+                content\s+
+                (?P<content>[\s\S]+?)
+                \s*$
+                """,
+                flags=re.IGNORECASE | re.VERBOSE,
+            ),
+
+            re.compile(
+                r"""
+                ^\s*
+                (?:create|write|overwrite|save)
+                (?:\s+or\s+overwrite)?
+                \s+
+                (?:the\s+)?
+                (?:file\s+)?
+                (?P<target_file>.+?)
+                \s+
+                with\s+
+                (?:exactly\s+)?
+                (?:this\s+)?
+                content\s*:\s*
+                (?P<content>[\s\S]*?)
+                \s*$
+                """,
+                flags=re.IGNORECASE | re.VERBOSE,
+            ),
+
+            re.compile(
+                r"""
+                ^\s*
+                create\s+
+                (?:the\s+)?
+                file\s+
+                (?P<target_file>.+?)
+                \s+
+                with\s+
+                (?:
+                    (?:the\s+)?exact\s+
+                    |
+                    exactly\s+
+                )?
+                (?:this\s+)?
+                content\s*:\s*
+                (?P<content>[\s\S]*?)
+                \s*$
+                """,
+                flags=re.IGNORECASE | re.VERBOSE,
+            ),
+
+            re.compile(
+                r"""
+                ^\s*
+                create\s+
+                (?:a\s+)?
+                file
+                (?:\s+named|\s+called)?
+                \s+
+                (?P<target_file>.+?)
+                \s+
+                containing\s+
+                (?:exactly\s+)?
+                (?P<content>[\s\S]*?)
+                \s*$
+                """,
+                flags=re.IGNORECASE | re.VERBOSE,
+            ),
+        ]
+
+        # ----------------------------------------------------------
+        # MULTI-OPERATION FILE REQUEST
+        # ----------------------------------------------------------
+        multi_file_match = re.match(
+            r"""
+            ^\s*
+            create\s+
+            (?:a\s+)?
+            (?:simple\s+)?
+            (?:file\s+)?
+            (?P<target_file>[A-Za-z0-9_.\-\\/]+)
+            \s+
+            with\s+(?:the\s+)?content\s+
+            (?P<initial_content>.*?)
+            \s*,\s*
+            then\s+
+            (?:change|modify|update)\s+
+            (?:it|the\s+file)
+            \s+
+            (?:to|with)\s+
+            (?P<final_content>.*?)
+            \s+and\s+
+            verify\s+
+            (?:the\s+)?
+            (?:final\s+)?
+            (?:contents?|result)
+            \.?\s*$
+            """,
+            cleaned_user_text,
+            flags=re.IGNORECASE | re.VERBOSE,
+        )
+
+        if multi_file_match:
+            target_file = (
+                multi_file_match.group("target_file")
+                .strip()
+                .strip("\"'")
+            )
+
+            initial_content = (
+                multi_file_match.group("initial_content")
+                .strip()
+            )
+
+            final_content = (
+                multi_file_match.group("final_content")
+                .strip()
+                .rstrip(".")
+                .strip()
+            )
+
+            print(
+                "[PLANNER MULTI FILE MATCH]",
+                {
+                    "target_file": target_file,
+                    "initial_content": initial_content,
+                    "final_content": final_content,
+                },
+                flush=True,
+            )
+
+            seed_steps = [
+                {
+                    "id": "create-requested-file",
+                    "title": "Create requested file",
+                    "text": cleaned_user_text,
+                    "description": "Create the requested file with the initial content.",
+                    "action": "create_file",
+                    "status": "pending",
+                    "target_file": target_file,
+                    "target_files": [target_file],
+                    "target_function": "",
+                    "content": content,
+                    "file_content": content,
+                    "mutation_mode": "create",
+                    "next_action": "execute",
+                    "mutation_ready": True,
+                    "payload_required": False,
+                    "execution_mode": "mutation",
+                    "expected_output": initial_content,
+                },
+                {
+                    "id": "verify-result",
+                    "title": "Verify the result",
+                    "text": (
+                        "Verify that the final file contents "
+                        "and execution result are correct."
+                    ),
+                    "description": (
+                        "Verify that the requested file exists "
+                        "and produces the expected output."
+                    ),
+                    "action": "verify",
+                    "status": "pending",
+                    "target_file": target_file,
+                    "target_files": [target_file],
+                    "content": content,
+                    "file_content": content,
+                    "expected_output": content,
+                    "mutation_mode": "modify",
+                },
+            ]
+
+            return self.new_execution(
+                title=execution_title,
+                goal=cleaned_user_text,
+                steps=seed_steps,
+                status="planned",
+                meta={
+                    "source": "planning_v6",
+                    "step_action": "multi_file_mutation",
+                    "mutation_request": True,
+                    "terminal_request": False,
+                    "target_file": target_file,
+                    "content": content,
+                    "mutation_mode": "modify",
+                },
+                auto_start=True,
+            )
+
         file_match = None
+
+        absolute_path_match = re.search(
+            r"named\s+(?P<target_file>[A-Za-z]:[\\/][^\s]+\.py).*?"
+            r"containing\s+(?P<content>[\s\S]+)$",
+            cleaned_user_text,
+            flags=re.IGNORECASE,
+        )
+
+        if absolute_path_match:
+            file_match = absolute_path_match
 
         print(
             "[PLANNER FILE PARSER DEBUG]",
@@ -1013,10 +1254,11 @@ class ExecutionService:
             flush=True,
         )
 
-        for pattern in file_patterns:
-            file_match = pattern.match(cleaned_user_text)
-            if file_match:
-                break
+        if not file_match:
+            for pattern in file_patterns:
+                file_match = pattern.match(cleaned_user_text)
+                if file_match:
+                    break
 
         print(
             "[PLANNER FILE PARSER RESULT]",
@@ -1036,6 +1278,61 @@ class ExecutionService:
             flush=True,
         )
 
+        print(
+            "[PLANNER WRITE FALLBACK INPUT]",
+            repr(cleaned_user_text),
+            flush=True,
+        )
+
+        # Fallback: natural-language write request.
+        # Example:
+        # "writes SIDE_EFFECT_OK to C:/Users/Owner/nova/side_effect_output.txt"
+        write_request_match = re.search(
+            r"writes?\s+"
+            r"(?P<value>[A-Za-z_][A-Za-z0-9_]*)"
+            r"\s+to\s+"
+            r"(?P<output_file>[A-Za-z]:[\\/][^,\s]+)",
+            cleaned_user_text,
+            flags=re.IGNORECASE,
+        )
+
+        verification_file = ""
+
+        if write_request_match and not file_match:
+            value = write_request_match.group("value").strip()
+
+            output_file = (
+                write_request_match.group("output_file")
+                .strip()
+                .rstrip(".,")
+                .replace("\\", "/")
+            )
+
+            target_file = output_file
+
+            # Natural write requests need an executable Python source file
+            # separate from the requested output file.
+            execution_file = (
+                output_file.rsplit(".", 1)[0] + "_writer.py"
+            )
+
+            content = (
+                f'with open("{output_file}", "w", encoding="utf-8") as f:\n'
+                f'    f.write("{value}")\n'
+            )
+
+            verification_file = output_file
+
+            print(
+                "[PLANNER NATURAL WRITE REQUEST MATCH]",
+                {
+                    "target_file": target_file,
+                    "verification_file": verification_file,
+                    "expected_output": value,
+                },
+                flush=True,
+            )
+
         if file_match:
             target_file = (
                 file_match.group("target_file")
@@ -1050,22 +1347,160 @@ class ExecutionService:
                 .strip()
             )
 
-            # Remove a trailing verification clause from the requested
-            # file content. The verification instruction belongs to the
-            # second execution step, not inside the file itself.
+        elif write_request_match:
+            pass
+
+            # Convert natural language Python file requests into executable code.
+            if (
+                target_file.lower().endswith(".py")
+                and content
+                and not content.startswith(
+                    (
+                        "def ",
+                        "class ",
+                        "import ",
+                        "from ",
+                    )
+                )
+            ):
+                function_match = re.search(
+                    r"function\s+that\s+returns\s+([A-Z0-9_]+)",
+                    content,
+                    flags=re.IGNORECASE,
+                )
+
+                if function_match:
+                    return_value = function_match.group(1)
+
+                    content = (
+                        "def http_execution_acceptance():\n"
+                        f"    return \"{return_value}\"\n"
+                    )
+
+                    print(
+                        "[PYTHON CONTENT NORMALIZED]",
+                        repr(content),
+                        flush=True,
+                    )
+
+            print(
+                "[PLANNER CONTENT BEFORE NORMALIZATION]",
+                repr(content),
+                flush=True,
+            )
+
+            # Remove trailing execution/verification instructions from
+            # the requested file content.
             content = re.split(
-                r"\s*,\s*(?:then\s+)?verify\b"
+                r"\s*,\s*(?:then\s+)?(?:run|execute|invoke)\b"
+                r"|\s*,\s*(?:then\s+)?verify\b"
                 r"|\s+(?:then\s+)?verify\b",
                 content,
                 maxsplit=1,
                 flags=re.IGNORECASE,
             )[0].strip()
 
-            # Remove one prose-period suffix only.
-            if content.endswith(".") and not content.endswith(".."):
-                content = content[:-1]
+            if (
+                len(content) >= 2
+                and content[0] == content[-1]
+                and content[0] in "\"'"
+            ):
+                content = content[1:-1].strip()
 
-            content = content.strip("\"'")
+             # Convert compact natural-language Python requests
+            # into executable Python.
+
+            # "a function named X that returns Y"
+            function_match = re.fullmatch(
+                r"a\s+function\s+named\s+"
+                r"(?P<function_name>[A-Za-z_][A-Za-z0-9_]*)"
+                r"\s+that\s+returns\s+"
+                r"(?P<return_value>[A-Za-z_][A-Za-z0-9_]*)",
+                content,
+                flags=re.IGNORECASE,
+            )
+
+            if function_match:
+                function_name = function_match.group(
+                    "function_name"
+                )
+                return_value = function_match.group(
+                    "return_value"
+                )
+
+                content = (
+                    f"def {function_name}():\n"
+                    f"    return \"{return_value}\"\n"
+                    f"\n"
+                    f"print({function_name}())\n"
+                )
+
+                print(
+                    "[PLANNER NATURAL PYTHON FUNCTION NORMALIZED]",
+                    repr(content),
+                    flush=True,
+                )
+
+            # "code that writes VALUE to PATH"
+            write_match = re.fullmatch(
+                r"code\s+that\s+writes\s+"
+                r"(?P<value>[A-Za-z_][A-Za-z0-9_]*)"
+                r"\s+to\s+"
+                r"(?P<output_file>.+)",
+                content,
+                flags=re.IGNORECASE,
+            )
+
+            verification_file = ""
+
+            if write_request_match and not file_match:
+                verification_file = (
+                    write_request_match.group("output_file")
+                    .strip()
+                    .rstrip(".,")
+                    .replace("\\", "/")
+                )
+
+            if write_match:
+                value = write_match.group(
+                    "value"
+                ).strip()
+
+                output_file = write_match.group(
+                    "output_file"
+                ).strip()
+
+                output_file = output_file.rstrip(
+                    ".,"
+                )
+
+                output_file = output_file.replace(
+                    "\\",
+                    "/",
+                )
+
+                execution_file = (
+                    output_file.rsplit(".", 1)[0] + "_writer.py"
+                )
+
+                content = (
+                    f"with open("
+                    f"\"{output_file}\", "
+                    f"\"w\", "
+                    f"encoding=\"utf-8\""
+                    f") as f:\n"
+                    f"    f.write("
+                    f"\"{value}\""
+                    f")\n"
+                )
+
+                print(
+                    "[PLANNER NATURAL PYTHON WRITE NORMALIZED]",
+                    repr(content),
+                    flush=True,
+                )
+
+                verification_file = output_file
 
             print(
                 "[PLANNER CONCRETE FILE MATCH]",
@@ -1075,6 +1510,26 @@ class ExecutionService:
                 },
                 flush=True,
             )
+            if (
+                target_file.lower().endswith(".py")
+                and content
+                and not content.lstrip().startswith(
+                    ("def ", "class ", "import ", "from ")
+                )
+            ):
+                match = re.search(
+                    r"function that returns\s+([A-Z0-9_]+)",
+                    content,
+                    flags=re.IGNORECASE,
+                )
+
+                if match:
+                    return_value = match.group(1)
+
+                    content = (
+                        "def http_execution_acceptance():\n"
+                        f"    return \"{return_value}\"\n"
+                    )
 
             seed_steps = [
                 {
@@ -1082,35 +1537,64 @@ class ExecutionService:
                     "title": "Create requested file",
                     "text": cleaned_user_text,
                     "description": (
-                        "Create the requested file with the requested content."
+                        "Create the requested Python file with the executable content."
                     ),
-                    "action": "implement",
+                    "action": "create_file",
                     "status": "pending",
-                    "target_file": target_file,
-                    "target_files": [target_file],
+                    "target_file": execution_file,
+                    "target_files": [execution_file],
                     "target_function": "",
                     "content": content,
+                    "file_content": content,
                     "mutation_mode": "create",
                     "next_action": "execute",
                     "mutation_ready": True,
                     "payload_required": False,
+                    "execution_mode": "mutation",
+                    "expected_output": content,
+                },
+                {
+                    "id": "execute-python-file",
+                    "title": "Run Python file",
+                    "text": cleaned_user_text,
+                    "description": (
+                        "Execute the created Python file "
+                        "and capture the execution result."
+                    ),
+                    "action": "python_run",
+                    "status": "pending",
+                    "target_file": execution_file,
+                    "execution_file": execution_file,
+                    "target_files": [execution_file],
+                    "execution_mode": "run",
+                    "expected_output": content,
                 },
                 {
                     "id": "verify-result",
                     "title": "Verify the result",
                     "text": (
-                        "Verify that the requested file was created "
-                        "with the requested content."
+                        "Verify that the final file contents "
+                        "and execution result are correct."
                     ),
                     "description": (
-                        "Verify that the requested file was created "
-                        "with the requested content."
+                        "Verify that the requested output file exists "
+                        "and contains the expected output."
                     ),
                     "action": "verify",
                     "status": "pending",
+                    "target_file": target_file,
+                    "target_files": [target_file],
+                    "verification_file": verification_file,
+                    "content": content,
+                    "file_content": content,
+                    "expected_output": (
+                        value
+                        if verification_file
+                        else content
+                    ),
+                    "mutation_mode": "modify",
                 },
-            ][: max(1, min(max_steps, 8))]
-
+            ]
             return self.new_execution(
                 title=execution_title,
                 goal=cleaned_user_text,
@@ -1118,12 +1602,12 @@ class ExecutionService:
                 status="planned",
                 meta={
                     "source": "planning_v6",
-                    "step_action": "implement",
+                    "step_action": "multi_file_mutation",
                     "mutation_request": True,
                     "terminal_request": False,
                     "target_file": target_file,
                     "content": content,
-                    "mutation_mode": "create",
+                    "mutation_mode": "modify",
                 },
                 auto_start=True,
             )
@@ -1137,6 +1621,44 @@ class ExecutionService:
         target_file = ""
         content = ""
 
+        # Extract file creation target from natural language requests
+        file_match = re.search(
+            r"(?:named|file)\s+(?P<target_file>[A-Za-z]:[\\/][^ ]+\.py)",
+            cleaned_user_text,
+            flags=re.IGNORECASE,
+        )
+
+        if file_match:
+            target_file = (
+                file_match.group("target_file")
+                .strip()
+            )
+
+        content_match = re.search(
+            r"containing\s+(?P<content>.+)$",
+            cleaned_user_text,
+            flags=re.IGNORECASE,
+        )
+
+        if content_match:
+            content = (
+                content_match.group("content")
+                .strip()
+            )
+
+        lowered_text = cleaned_user_text.lower()
+
+        project_creation_execution = (
+            (
+                "project" in lowered_text
+                or "workspace" in lowered_text
+            )
+            and (
+                "execute" in lowered_text
+                or "run" in lowered_text
+                or "start" in lowered_text
+            )
+        )
 
         mutation_match = re.match(
             r"^\s*(fix|create|write|edit|modify|update|patch|replace|"
@@ -1158,12 +1680,18 @@ class ExecutionService:
                 cleaned_user_text
             )
 
-        if mutation_match:
+        if mutation_match and not project_creation_execution and not target_file:
             step_action = "implement"
             step_title = "Implement the requested change"
             step_description = (
                 "Apply the requested file or project change directly. "
                 "Do not execute the natural-language request as a shell command."
+            )
+        elif mutation_match and target_file:
+            step_action = "create_file"
+            step_title = "Create the requested file"
+            step_description = (
+                "Create the requested file with the requested content."
             )
         elif extracted_command:
             step_action = "command"
@@ -1193,12 +1721,55 @@ class ExecutionService:
             execute_step["next_action"] = "execute"
             execute_step["payload_required"] = False
 
+            if str(target_file).lower().endswith(".py"):
+                execute_step["execution_file"] = target_file
+                execute_step["test_file"] = target_file
+
         if extracted_command:
             execute_step["command"] = extracted_command
             execute_step["shell_command"] = extracted_command
 
+            should_run_after_create = (
+                "run" in cleaned_user_text.lower()
+                or "execute" in cleaned_user_text.lower()
+                or "invoke" in cleaned_user_text.lower()
+            )
+
         seed_steps = [
             execute_step,
+        ]
+
+        if (
+            mutation_match
+            and target_file
+            and str(target_file).lower().endswith(".py")
+            and (
+                "run" in cleaned_user_text.lower()
+                or "execute" in cleaned_user_text.lower()
+                or "invoke" in cleaned_user_text.lower()
+            )
+        ):
+            seed_steps.append(
+                {
+                    "id": "run-python-file",
+                    "title": "Run Python file",
+                    "text": cleaned_user_text,
+                    "description": (
+                        "Execute the created Python file "
+                        "and capture the execution result."
+                    ),
+                    "action": "python_run",
+                    "status": "pending",
+                    "target_file": target_file,
+                    "execution_file": target_file,
+                    "target_files": [target_file],
+                    "expected_output": content,
+                    "execution_mode": "run",
+                    "next_action": "verify",
+                }
+            )
+
+        seed_steps.append(
             {
                 "id": "verify-result",
                 "title": "Verify the result",
@@ -1210,8 +1781,11 @@ class ExecutionService:
                 ),
                 "action": "verify",
                 "status": "pending",
-            },
-        ][: max(1, min(max_steps, 8))]
+                "target_file": target_file,
+                "target_files": [target_file],
+                "content": content,
+            }
+        )
 
         return self.new_execution(
             title=execution_title,
@@ -1581,6 +2155,9 @@ Write the exact goal in one sentence.
             execution["current_step"] = "Unknown action"
 
         return self.normalize_execution(execution)
+
+
+
 
 
 

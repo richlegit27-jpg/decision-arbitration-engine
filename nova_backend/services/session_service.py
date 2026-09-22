@@ -17,6 +17,8 @@ WORKING_STATE_KEYS = (
     "last_success",
     "next_move",
     "checkpoint",
+    "project",
+    "project_id",
 
     "pending_fix_file_path",
     "pending_fix_code",
@@ -54,6 +56,7 @@ def _normalize_working_state(value: Any) -> Dict[str, Any]:
         return state
 
     structured_keys = {
+        "project",
         "active_execution",
         "execution_state",
         "execution",

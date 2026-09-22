@@ -1,4 +1,39 @@
-﻿import traceback
+﻿            print(
+                "[CHAT_HANDLE EXECUTION BOOTSTRAP]",
+                {
+                    "session_id": session_id,
+                    "user_text": user_text,
+                },
+                flush=True,
+            )
+
+            try:
+
+                execution_state = (
+                    service._process_goal_and_plan(
+                        user_text,
+                        session_id,
+                    )
+                )
+
+            except Exception as exc:
+
+                print(
+                    "[CHAT_HANDLE PLAN BOOTSTRAP FAILED]",
+                    repr(exc),
+                    flush=True,
+                )
+
+                traceback.print_exc()
+
+                execution_state = {}
+
+            print(
+                "[CHAT_HANDLE BOOTSTRAPPED STATE]",
+                execution_state,
+                flush=True,
+            )
+import traceback
 import time
 
 
@@ -202,6 +237,12 @@ def chat_handle(
             # yet. The orchestrator only executes
             # existing steps, so create the plan
             # before sending it to the orchestrator.
+            #
+            # IMPORTANT:
+            # A completed execution is authoritative.
+            # Do not resurrect a stale pending project
+            # step from the workspace after execution
+            # has already completed.
             # ======================================
 
             has_steps = bool(
@@ -212,37 +253,310 @@ def chat_handle(
                 and execution_state.get("steps")
             )
 
-            if not has_steps:
+            decision_intent = (
+                decision.get("intent")
+                if isinstance(decision, dict)
+                else None
+            )
+
+            execution_status = str(
+                execution_state.get("status") or ""
+            ).strip().lower()
+
+            execution_complete = (
+                execution_state.get("complete") is True
+                or execution_status in {
+                    "complete",
+                    "completed",
+                }
+            )
+
+            print(
+                "[CHAT_HANDLE EXECUTION COMPLETION GUARD]",
+                {
+                    "execution_complete": execution_complete,
+                    "status": execution_state.get("status"),
+                    "complete": execution_state.get("complete"),
+                    "current_index": execution_state.get(
+                        "current_index"
+                    ),
+                    "current_step_index": execution_state.get(
+                        "current_step_index"
+                    ),
+                    "has_steps": has_steps,
+                    "decision_intent": decision_intent,
+                },
+                flush=True,
+            )
+
+            if (
+                not execution_complete
+                and (
+                    decision_intent == "execution_continuation"
+                    or not has_steps
+                )
+            ):
+
+
+                decision_intent = (
+                    decision.get("intent")
+                    if isinstance(decision, dict)
+                    else None
+                )
+
+                if decision_intent == "execution_continuation":
+
+                    project_workspace = getattr(
+                        service,
+                        "project_workspace_service",
+                        None,
+                    )
+
+                    active_project = (
+                        project_workspace.get_active_project()
+                        if project_workspace is not None
+                        and hasattr(
+                            project_workspace,
+                            "get_active_project",
+                        )
+                        else None
+                    )
+
+                    project_step = None
+
+                    if isinstance(active_project, dict):
+
+                        print(
+
+                "[CHAT_HANDLE ACTIVE PROJECT RAW DEBUG]",
+                {
+                    "project_id": active_project.get("id"),
+                    "project_keys": list(
+                        active_project.keys()
+                    ),
+                    "project_content": active_project.get(
+                        "content"
+                    ),
+                    "task_count": len(
+                        active_project.get("tasks")
+                        or []
+                    ),
+                    "tasks": [
+                        {
+                            "id": task.get("id"),
+                            "title": task.get("title"),
+                            "keys": list(task.keys()),
+                            "content": task.get("content"),
+                            "steps": task.get("steps"),
+                        }
+                        for task in (
+                            active_project.get("tasks")
+                            or []
+                        )
+                        if isinstance(task, dict)
+                    ],
+                },
+                flush=True,
+            )
+
+            for task in (
+                active_project.get("tasks")
+                or []
+            ):
+
+                if not isinstance(task, dict):
+                    continue
+
+                task_status = str(
+                    task.get("status") or ""
+                ).strip().lower()
+
+                if task_status in {
+                    "completed",
+                    "complete",
+                    "failed",
+                    "blocked",
+                }:
+                    continue
+
+                for candidate_step in (
+                    task.get("steps") or []
+                ):
+
+                    if not isinstance(
+                        candidate_step,
+                        dict,
+                    ):
+                        continue
+
+                    step_status = str(
+                        candidate_step.get("status")
+                        or ""
+                    ).strip().lower()
+
+                    if step_status not in {
+                        "completed",
+                        "complete",
+                        "failed",
+                        "blocked",
+                    }:
+                        project_step = {
+                            **candidate_step,
+                            "project_context": (
+                                candidate_step.get(
+                                    "project_context"
+                                )
+                                or candidate_step.get(
+                                    "context"
+                                )
+                                or active_project.get(
+                                    "description"
+                                )
+                                or active_project.get(
+                                    "request"
+                                )
+                                or active_project.get(
+                                    "title"
+                                )
+                                or active_project.get(
+                                    "name"
+                                )
+                                or ""
+                            ),
+                            "goal": (
+                                candidate_step.get(
+                                    "goal"
+                                )
+                                or active_project.get(
+                                    "description"
+                                )
+                                or active_project.get(
+                                    "request"
+                                )
+                                or active_project.get(
+                                    "title"
+                                )
+                                or active_project.get(
+                                    "name"
+                                )
+                                or ""
+                            ),
+                            "content": (
+                                candidate_step.get(
+                                    "content"
+                                )
+                                or candidate_step.get(
+                                    "file_content"
+                                )
+                                or task.get(
+                                    "content"
+                                )
+                                or active_project.get(
+                                    "content"
+                                )
+                                or ""
+                            ),
+                        }
+                        break
+
+                if project_step is not None:
+                    break
+
+            if project_step is None:
+                raise RuntimeError(
+                    "No pending project execution step found."
+                )
+
+            execution_state = {
+                "status": "ready",
+                "goal": (
+                    active_project.get(
+                        "description"
+                    )
+                    or active_project.get(
+                        "request"
+                    )
+                    or active_project.get(
+                        "title"
+                    )
+                    or active_project.get(
+                        "name"
+                    )
+                    or project_step.get(
+                        "title"
+                    )
+                ),
+                "steps": [
+                    project_step
+                ],
+                "current_index": 0,
+                "current_step": project_step.get(
+                    "id"
+                ),
+                "complete": False,
+                "command": "run_step",
+                "intent": decision_intent,
+                "mode": "execution",
+                "continue_request": True,
+            }
+
+            print(
+                "[CHAT_HANDLE PROJECT EXECUTION STATE]",
+                {
+                    "project_id": (
+                        active_project.get("id")
+                        if isinstance(
+                            active_project,
+                            dict,
+                        )
+                        else None
+                    ),
+                    "step_id": project_step.get(
+                        "id"
+                    ),
+                    "task_id": project_step.get(
+                        "task_id"
+                    ),
+                    "target_file": project_step.get(
+                        "target_file"
+                    ),
+                    "action": project_step.get(
+                        "action"
+                    ),
+                },
+                flush=True,
+            )
+
 
                 print(
                     "[CHAT_HANDLE EXECUTION BOOTSTRAP]",
-                    {
-                        "session_id": session_id,
-                        "user_text": user_text,
-                    },
-                    flush=True,
-                )
-
-                try:
-
-                    execution_state = (
-                        service._process_goal_and_plan(
-                            user_text,
-                            session_id,
-                        )
-                    )
-
-                except Exception as exc:
-
-                    print(
-                        "[CHAT_HANDLE PLAN BOOTSTRAP FAILED]",
-                        repr(exc),
+                        {
+                            "session_id": session_id,
+                            "user_text": user_text,
+                        },
                         flush=True,
                     )
 
-                    traceback.print_exc()
+                    try:
 
-                    execution_state = {}
+                        execution_state = (
+                            service._process_goal_and_plan(
+                                user_text,
+                                session_id,
+                            )
+                        )
+
+                    except Exception as exc:
+
+                        print(
+                            "[CHAT_HANDLE PLAN BOOTSTRAP FAILED]",
+                            repr(exc),
+                            flush=True,
+                        )
+
+                        traceback.print_exc()
+
+                        execution_state = {}
 
                 print(
                     "[CHAT_HANDLE BOOTSTRAPPED STATE]",
@@ -250,10 +564,13 @@ def chat_handle(
                     flush=True,
                 )
 
-                if isinstance(
-                    execution_state,
-                    dict,
-                ) and execution_state:
+                if (
+                    isinstance(
+                        execution_state,
+                        dict,
+                    )
+                    and execution_state
+                ):
 
                     try:
 
@@ -265,7 +582,7 @@ def chat_handle(
                     except Exception as exc:
 
                         print(
-                            "[CHAT_HANDLE PLAN SAVE FAILED]",
+                            "[CHAT_HANDLE SAVE EXECUTION STATE FAILED]",
                             repr(exc),
                             flush=True,
                         )
@@ -281,7 +598,7 @@ def chat_handle(
                     except Exception as exc:
 
                         print(
-                            "[CHAT_HANDLE ACTIVE EXECUTION SAVE FAILED]",
+                            "[CHAT_HANDLE SESSION META SAVE FAILED]",
                             repr(exc),
                             flush=True,
                         )
@@ -830,6 +1147,10 @@ def chat_handle(
             },
             "session_id": session_id,
         }
+
+
+
+
 
 
 

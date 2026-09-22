@@ -32,9 +32,20 @@ class ContextFusionEngine:
             "active_context": {},
         }
 
-
         if session_context:
             fused["conversation"] = session_context
+
+            working_state = session_context.get(
+                "working_state"
+            )
+
+            if isinstance(working_state, dict):
+                session_project = working_state.get(
+                    "project"
+                )
+
+                if isinstance(session_project, dict):
+                    fused["project"] = session_project
 
 
 
@@ -53,14 +64,17 @@ class ContextFusionEngine:
         if self.project_workspace:
 
             try:
-                fused["project"] = (
+                workspace_project = (
                     self.project_workspace
                     .get_active_project()
                     or {}
                 )
 
+                if not fused["project"]:
+                    fused["project"] = workspace_project
+
             except Exception:
-                fused["project"] = []
+                pass
 
 
 
@@ -98,7 +112,6 @@ class ContextFusionEngine:
 
 
         return fused
-
 
 
     def _summarize_context(

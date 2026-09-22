@@ -1009,6 +1009,7 @@ const appended = appendAssistantMessage(
     )
 }
 
+if(!streamService || typeof streamService.send !== "function"){
   reply = await postChat({
     chat_id: chatId,
     message: finalText,
@@ -1016,6 +1017,7 @@ const appended = appendAssistantMessage(
   })
 
   handleNonStreamingReply(reply, chatId)
+}
 }
 
       if(sendToken !== sendSequence){

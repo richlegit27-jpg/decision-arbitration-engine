@@ -1,4 +1,4 @@
-
+﻿
 from __future__ import annotations
 
 
@@ -210,7 +210,7 @@ class ChatExecutionService:
             ),
 
             "history": [],
-            "waiting": True,
+            "waiting": False,
             "complete": False,
             "error": None,
             "mission_id": None,
@@ -323,11 +323,26 @@ class ChatExecutionService:
                     "[ChatExecutionService] LOAD STATE FAILED: %s",
                     e,
                 )
-
         if state and str(
             state.get("status") or ""
         ).strip().lower() == "idle":
             return self._copy_state(
+                state
+            )
+
+        if (
+            isinstance(state, dict)
+            and (
+                state.get("complete") is True
+                or state.get("status") in {
+                    "complete",
+                    "completed",
+                    "done",
+                }
+            )
+        ):
+            return self._copy_state(
+
                 state
             )
 
@@ -475,7 +490,17 @@ class ChatExecutionService:
                 "canceled",
             }
 
-            if current_step_status in terminal_step_statuses:
+            if (
+                current_step_status in terminal_step_statuses
+                and not (
+                    isinstance(current_step, dict)
+                    and (
+                        current_step.get("waiting") is True
+                        or current_step.get("needs_clarification") is True
+                        or current_step.get("payload_required") is True
+                    )
+                )
+            ):
                 state["current_index"] = (
                     current_index + 1
                 )
@@ -508,6 +533,88 @@ class ChatExecutionService:
 
 
 
+        # ---------------------------------
+        # PRESERVE WAITING EXECUTION STATES
+        # ---------------------------------
+        # Never restart or regenerate a step that is
+        # already waiting for user input/clarification.
+
+        current_steps = state.get("steps") or []
+
+        current_index = int(
+            state.get("current_index")
+            or state.get("current_step_index")
+            or 0
+        )
+
+        if (
+            0 <= current_index < len(current_steps)
+            and isinstance(
+                current_steps[current_index],
+                dict,
+            )
+        ):
+            active_step = current_steps[current_index]
+
+            active_status = str(
+                active_step.get("status") or ""
+            ).lower().strip()
+
+            if (
+                active_step.get("waiting") is True
+                or active_step.get("needs_clarification") is True
+                or active_status in {
+                    "waiting",
+                    "waiting_approval",
+                    "awaiting_approval",
+                }
+            ):
+                state["status"] = "waiting"
+                state["waiting"] = True
+                state["current_step"] = active_step
+
+                self._states[safe_session_id] = state
+
+                self._sync_state_to_session(
+                    safe_session_id,
+                    state,
+                )
+
+                self._save_states()
+
+                return self._copy_state(
+                    state
+                )
+        if (
+            isinstance(state, dict)
+            and (
+                state.get("complete") is True
+                or state.get("status") == "complete"
+            )
+            and (
+                state.get("steps")
+                or state.get("goal")
+            )
+        ):
+            return self._copy_state(
+                state
+            )
+
+        if (
+            isinstance(state, dict)
+            and (
+                state.get("complete") is True
+                or state.get("status") == "complete"
+            )
+            and (
+                state.get("steps")
+                or state.get("goal")
+            )
+        ):
+            return self._copy_state(
+                state
+            )
+
         execution_result = (
             self.execution_handler.run_next_move(
                 action="run_step",
@@ -522,14 +629,36 @@ class ChatExecutionService:
             execution_result,
             dict,
         ):
-            returned_state = execution_result.get(
-                "execution_state"
+            returned_state = (
+                execution_result.get(
+                    "execution_state"
+                )
+                or execution_result.get(
+                    "execution"
+                )
             )
 
         if isinstance(
             returned_state,
             dict,
         ):
+            print(
+                "[CHAT EXECUTION STATE UPDATED FROM HANDLER]",
+                {
+                    "status": returned_state.get("status"),
+                    "current_index": returned_state.get("current_index"),
+                    "steps": [
+                        (
+                            step.get("title"),
+                            step.get("status"),
+                        )
+                        for step in returned_state.get("steps", [])
+                        if isinstance(step, dict)
+                    ],
+                },
+                flush=True,
+            )
+
             state = returned_state
 
         self._states[
@@ -579,6 +708,18 @@ class ChatExecutionService:
             state,
         )
 
+        execution_state_service = getattr(
+            self,
+            "execution_state_service",
+            None,
+        )
+
+        if execution_state_service:
+            execution_state_service.save_execution_state(
+                safe_session_id,
+                state,
+            )
+
         self._save_states()
 
         logger.info(
@@ -624,9 +765,7 @@ class ChatExecutionService:
 
             steps = state.get("steps") or []
 
-            dependency_waiting = bool(
-                state.get("waiting")
-            ) or any(
+            dependency_waiting = any(
                 isinstance(step, dict)
                 and (
                     str(
@@ -1166,10 +1305,10 @@ class ChatExecutionService:
                     "target_function": (
                         ""
                     ),
-                    "mutation_mode": "file",
-                    "next_action": "request_target",
+                    "mutation_mode": "",
+                    "next_action": "",
                     "mutation_ready": False,
-                    "payload_required": True,
+                    "payload_required": False,
                 },
                 {
                     "title": "Verify the result",
@@ -1190,6 +1329,36 @@ class ChatExecutionService:
                 step.setdefault(
                     "target_file",
                     "",
+                )
+
+                step.setdefault(
+                    "content",
+                    "",
+                )
+
+                step.setdefault(
+                    "file_content",
+                    "",
+                )
+
+                step.setdefault(
+                    "mutation_mode",
+                    "",
+                )
+
+                step.setdefault(
+                    "next_action",
+                    "",
+                )
+
+                step.setdefault(
+                    "mutation_ready",
+                    False,
+                )
+
+                step.setdefault(
+                    "payload_required",
+                    False,
                 )
 
                 step.setdefault(
@@ -1349,10 +1518,36 @@ class ChatExecutionService:
 
         steps = state.get("steps") or []
 
-        print(
-            "DEBUG COPY_STATE STEPS =",
-            steps,
-        )
+        # Preserve live waiting/running execution state.
+        # Do not allow a stale template plan with pending steps
+        # to overwrite a hydrated execution that already contains
+        # progress, clarification, or waiting state.
+
+        if isinstance(steps, list) and steps:
+            live_steps = [
+                step
+                for step in steps
+                if isinstance(step, dict)
+                and (
+                    step.get("status")
+                    in {
+                        "running",
+                        "waiting",
+                        "completed",
+                        "failed",
+                    }
+                    or step.get("waiting") is True
+                    or step.get("clarification")
+                )
+            ]
+
+            if live_steps:
+                steps = [
+                    dict(step)
+                    if isinstance(step, dict)
+                    else step
+                    for step in steps
+                ]
 
         current_index = int(
             state.get("current_index")
@@ -1370,6 +1565,17 @@ class ChatExecutionService:
         current_step = state.get(
             "current_step"
         )
+
+        # Preserve live current step mutations.
+        # The execution pipeline may update current_step directly
+        # while the backing steps list is stale.
+
+        if (
+            isinstance(current_step, dict)
+            and isinstance(copied_steps, list)
+            and 0 <= current_index < len(copied_steps)
+        ):
+            copied_steps[current_index] = dict(current_step)
 
         if (
             isinstance(copied_steps, list)
@@ -1739,13 +1945,4 @@ except Exception as _nova_chat_execution_handler_wire_error:
         "[NOVA_CHAT_EXECUTION_HANDLER_WIRE_FAILED]",
         _nova_chat_execution_handler_wire_error,
     )
-
-
-
-
-
-
-
-
-
 

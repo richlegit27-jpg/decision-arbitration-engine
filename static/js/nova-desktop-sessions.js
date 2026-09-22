@@ -267,6 +267,15 @@ async function loadDesktopSessionsExternal() {
 
   const active = getSessionId();
 
+  if (active) {
+    await openSession(active);
+  } else if (sessions.length) {
+    await openSession(
+      sessions[0].id ||
+      sessions[0].session_id
+    );
+  }
+
   sessions
     .slice(0, 30)
     .forEach((session) => {
@@ -585,4 +594,21 @@ window.NovaDesktopNewSession = newSessionExternal;
   console.log("[Nova Desktop Sessions External] ready");
 })();
 
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", function () {
+    loadDesktopSessionsExternal().catch(function (error) {
+      console.warn(
+        "[Nova Desktop Sessions External] boot load failed",
+        error
+      );
+    });
+  }, { once: true });
+} else {
+  loadDesktopSessionsExternal().catch(function (error) {
+    console.warn(
+      "[Nova Desktop Sessions External] boot load failed",
+      error
+    );
+  });
+}
 

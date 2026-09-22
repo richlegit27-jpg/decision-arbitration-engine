@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -288,6 +288,9 @@ class ProjectExecutionController:
             "canceled",
             "blocked",
             "failed",
+            "waiting",
+            "waiting_approval",
+            "paused",
         }
 
         def normalize_reference(
@@ -765,6 +768,19 @@ class ProjectExecutionController:
                         field_name
                     )
 
+            print(
+                "[DEBUG BUILT EXECUTION STEP]",
+                {
+                    "id": step.get("id"),
+                    "title": step.get("title"),
+                    "action": step.get("action"),
+                    "execution_mode": step.get("execution_mode"),
+                    "execution_file": step.get("execution_file"),
+                    "command": step.get("command"),
+                },
+                flush=True,
+            )
+
             steps.append(
                 step
             )
@@ -789,8 +805,20 @@ class ProjectExecutionController:
                 ),
             }
 
+        print(
+            "[DEBUG TASKS BEFORE BUILD STEPS]",
+            tasks,
+            flush=True,
+        )
+
         steps = self._build_execution_steps(
             tasks
+        )
+
+        print(
+            "[DEBUG FINAL STEPS SENT TO EXECUTOR]",
+            steps,
+            flush=True,
         )
 
         if not steps:
@@ -799,7 +827,6 @@ class ProjectExecutionController:
                 "execution": {},
                 "message": "No runnable project tasks remain.",
             }
-
         task_ids = [
             str(
                 task.get(
@@ -850,6 +877,12 @@ class ProjectExecutionController:
                     "goal": goal,
                     "step_count": len(steps),
                 },
+                flush=True,
+            )
+
+            print(
+                "[DEBUG CONTROLLER STEPS BEFORE START]",
+                steps,
                 flush=True,
             )
 
@@ -3779,6 +3812,7 @@ class ProjectExecutionController:
                 projects
             )
             break
+
 
 
 
