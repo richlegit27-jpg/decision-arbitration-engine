@@ -309,6 +309,16 @@ class ExecutionGuardService:
             )
 
         elif action == "cancel":
+            if (
+                self.chat_service
+                and hasattr(
+                    self.chat_service,
+                    "execution_orchestrator_service",
+                )
+                and self.chat_service.execution_orchestrator_service
+            ):
+                return None
+
             state = self.chat_execution_service.reset(
                 session_id
             )
