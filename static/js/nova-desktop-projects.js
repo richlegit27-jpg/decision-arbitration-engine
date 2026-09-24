@@ -812,35 +812,569 @@ function renderProjectPhases(data) {
             ? data.project.phases
             : [];
 
-    if (!phases.length) {
-        container.innerHTML = `
-            <div class="session-placeholder">
-                No phases for this project.
+    const tasks =
+        Array.isArray(data?.tasks)
+            ? data.tasks
+            : Array.isArray(data?.project?.tasks)
+                ? data.project.tasks
+                : [];
+
+    /*
+     * LIVE EXECUTION CURSOR
+     *
+     * The backend already exposes the real execution position.
+     * Do not create a second execution state in the UI.
+     */
+    const execution =
+        data?.execution ||
+        data?.execution_state ||
+        {};
+
+    const activeTaskId =
+        execution?.current_task_id ||
+        null;
+
+    const activeStep =
+        execution?.current_step;
+
+    const activeStepId =
+        typeof activeStep === "object"
+            ? activeStep?.id
+            : null;
+
+    const activeStepIndex =
+        Number.isInteger(
+            execution?.current_step_index
+        )
+            ? execution.current_step_index
+            : null;
+
+    const executionStatus =
+        String(
+            execution?.status || ""
+        ).toLowerCase();
+
+    const getTaskSteps = (task) => {
+        const steps =
+            task?.steps ||
+            task?.substeps ||
+            task?.execution_steps ||
+            [];
+
+        return Array.isArray(steps)
+            ? steps
+            : [];
+    };
+
+    const isComplete = (value) => {
+        const normalized =
+            String(value || "").toLowerCase();
+
+        return [
+            "completed",
+            "complete",
+            "done",
+            "success",
+        ].includes(normalized);
+    };
+
+    const isActiveTask = (task) => {
+        if (!activeTaskId) {
+            return false;
+        }
+
+        return String(task?.id || "") ===
+            String(activeTaskId);
+    };
+
+    const isActiveStep = (step, index, task) => {
+        if (!isActiveTask(task)) {
+            return false;
+        }
+
+        if (
+            activeStepId &&
+            step?.id
+        ) {
+            return String(step.id) ===
+                String(activeStepId);
+        }
+
+        if (
+            activeStepIndex !== null
+        ) {
+            return index === activeStepIndex;
+        }
+
+        return false;
+    };
+
+    const getStepTitle = (step, index) => {
+        return (
+            step?.title ||
+            step?.name ||
+            step?.description ||
+            `Step ${index + 1}`
+        );
+    };
+
+    const renderStep = (
+        step,
+        index,
+        task
+    ) => {
+        const status =
+            String(
+                step?.status || "open"
+            ).toLowerCase();
+
+        const active =
+            isActiveStep(
+                step,
+                index,
+                task
+            );
+
+        const complete =
+            isComplete(status);
+
+        const icon =
+            complete
+                ? "✓"
+                : active
+                    ? "▶"
+                    : "○";
+
+        const title =
+            getStepTitle(
+                step,
+                index
+            );
+
+        const activeClass =
+            active
+                ? " nova-project-tree-step-active"
+                : "";
+
+        const completeClass =
+            complete
+                ? " nova-project-tree-step-complete"
+                : "";
+
+        return `
+            <div
+                class="nova-project-tree-step${activeClass}${completeClass}"
+                data-step-id="${step?.id || ""}"
+                data-active="${active ? "true" : "false"}"
+            >
+                <span
+                    class="nova-project-tree-step-icon"
+                >
+                    ${icon}
+                </span>
+
+                <span
+                    class="nova-project-tree-step-title"
+                >
+                    ${title}
+                </span>
+
+                ${
+                    active
+                        ? `
+                            <span
+                                class="nova-project-tree-step-current"
+                            >
+                                CURRENT
+                            </span>
+                        `
+                        : ""
+                }
             </div>
         `;
+    };
+
+    const renderTask = (
+        task,
+        taskIndex
+    ) => {
+        const taskSteps =
+            getTaskSteps(task);
+
+        const completedSteps =
+            taskSteps.filter(
+                (step) =>
+                    isComplete(
+                        step?.status
+                    )
+            ).length;
+
+        const taskActive =
+            isActiveTask(task);
+
+        const taskStatus =
+            String(
+                task?.status || "open"
+            ).toLowerCase();
+
+        const taskComplete =
+            isComplete(taskStatus) ||
+            (
+                taskSteps.length > 0 &&
+                completedSteps ===
+                    taskSteps.length
+            );
+
+        const taskIcon =
+            taskComplete
+                ? "✓"
+                : taskActive
+                    ? "▶"
+                    : "○";
+
+        const taskTitle =
+            task?.title ||
+            task?.name ||
+            `Task ${taskIndex + 1}`;
+
+        const taskNumber =
+            taskIndex + 1;
+
+        const activeClass =
+            taskActive
+                ? " nova-project-tree-task-active"
+                : "";
+
+        const completeClass =
+            taskComplete
+                ? " nova-project-tree-task-complete"
+                : "";
+
+        if (!taskSteps.length) {
+            return `
+                <div
+                    class="nova-project-tree-task nova-project-tree-task-empty${activeClass}${completeClass}"
+                    data-task-id="${task?.id || ""}"
+                    data-active="${taskActive ? "true" : "false"}"
+                >
+                    <span
+                        class="nova-project-tree-task-icon"
+                    >
+                        ${taskIcon}
+                    </span>
+
+                    <span
+                        class="nova-project-tree-task-title"
+                    >
+                        Task ${taskNumber} — ${taskTitle}
+                    </span>
+
+                    <span
+                        class="nova-project-tree-task-count"
+                    >
+                        0/0
+                    </span>
+
+                    ${
+                        taskActive
+                            ? `
+                                <span
+                                    class="nova-project-tree-task-current"
+                                >
+                                    CURRENT
+                                </span>
+                            `
+                            : ""
+                    }
+                </div>
+            `;
+        }
+
+        return `
+            <details
+                class="nova-project-tree-task${activeClass}${completeClass}"
+                data-task-id="${task?.id || ""}"
+                data-active="${taskActive ? "true" : "false"}"
+                ${taskActive ? "open" : ""}
+            >
+                <summary
+                    class="nova-project-tree-task-summary"
+                >
+                    <span
+                        class="nova-project-tree-task-main"
+                    >
+                        <span
+                            class="nova-project-tree-task-icon"
+                        >
+                            ${taskIcon}
+                        </span>
+
+                        <span
+                            class="nova-project-tree-task-title"
+                        >
+                            Task ${taskNumber} — ${taskTitle}
+                        </span>
+                    </span>
+
+                    <span
+                        class="nova-project-tree-task-count"
+                    >
+                        ${completedSteps}/${taskSteps.length}
+                    </span>
+
+                    ${
+                        taskActive
+                            ? `
+                                <span
+                                    class="nova-project-tree-task-current"
+                                >
+                                    CURRENT
+                                </span>
+                            `
+                            : ""
+                    }
+                </summary>
+
+                <div
+                    class="nova-project-tree-step-list"
+                >
+                    ${
+                        taskSteps
+                            .map(
+                                (step, index) =>
+                                    renderStep(
+                                        step,
+                                        index,
+                                        task
+                                    )
+                            )
+                            .join("")
+                    }
+                </div>
+            </details>
+        `;
+    };
+
+    const totalSteps =
+        tasks.reduce(
+            (total, task) =>
+                total +
+                getTaskSteps(task).length,
+            0
+        );
+
+    const completedTasks =
+        tasks.filter(
+            (task) =>
+                isComplete(task?.status) ||
+                (
+                    getTaskSteps(task).length > 0 &&
+                    getTaskSteps(task).every(
+                        (step) =>
+                            isComplete(
+                                step?.status
+                            )
+                    )
+                )
+        ).length;
+
+    const summary =
+        $("novaProjectTreeSummary");
+
+    if (summary) {
+        summary.textContent =
+            `${phases.length} Phase(s) · ` +
+            `${tasks.length} Task(s) · ` +
+            `${totalSteps} Step(s) · ` +
+            `${completedTasks}/${tasks.length} tasks complete`;
+    }
+
+    if (!phases.length) {
+        container.innerHTML = `
+            <div
+                class="nova-project-tree-direct-tasks"
+            >
+                <div
+                    class="nova-project-tree-section-title"
+                >
+                    Tasks
+                    <span>
+                        ${tasks.length} tasks
+                    </span>
+                </div>
+
+                ${
+                    executionStatus
+                        ? `
+                            <div
+                                class="nova-project-tree-execution-status"
+                            >
+                                Execution: ${executionStatus}
+                            </div>
+                        `
+                        : ""
+                }
+
+                <div
+                    class="nova-project-tree-task-list"
+                >
+                    ${
+                        tasks.length
+                            ? tasks
+                                .map(
+                                    renderTask
+                                )
+                                .join("")
+                            : `
+                                <div
+                                    class="session-placeholder"
+                                >
+                                    No tasks found.
+                                </div>
+                            `
+                    }
+                </div>
+            </div>
+        `;
+
         return;
     }
 
-    container.innerHTML = phases.map(
-        (phase, index) => `
-            <div class="nova-project-phase">
-                <strong>
-                    Phase ${index + 1}: 
-                    ${escapeHtml(
-                        phase.title || "Untitled Phase"
-                    )}
-                </strong>
+    container.innerHTML =
+        phases
+            .map(
+                (
+                    phase,
+                    phaseIndex
+                ) => {
+                    const phaseId =
+                        phase?.id ||
+                        phase?.phase_id ||
+                        phase?.phaseId;
 
-                <p>
-                    ${escapeHtml(
-                        phase.description || ""
-                    )}
-                </p>
-            </div>
-        `
-    ).join("");
+                    const phaseTasks =
+                        tasks.filter(
+                            (task) => {
+                                const taskPhaseId =
+                                    task?.phase_id ||
+                                    task?.phaseId;
+
+                                return (
+                                    String(
+                                        taskPhaseId
+                                    ) ===
+                                    String(
+                                        phaseId
+                                    )
+                                );
+                            }
+                        );
+
+                    const phaseSteps =
+                        phaseTasks.reduce(
+                            (
+                                total,
+                                task
+                            ) =>
+                                total +
+                                getTaskSteps(
+                                    task
+                                ).length,
+                            0
+                        );
+
+                    const phaseCompletedSteps =
+                        phaseTasks.reduce(
+                            (
+                                total,
+                                task
+                            ) =>
+                                total +
+                                getTaskSteps(
+                                    task
+                                ).filter(
+                                    (step) =>
+                                        isComplete(
+                                            step?.status
+                                        )
+                                ).length,
+                            0
+                        );
+
+                    const phaseActive =
+                        phaseTasks.some(
+                            (task) =>
+                                isActiveTask(
+                                    task
+                                )
+                        );
+
+                    const phaseTitle =
+                        phase?.title ||
+                        phase?.name ||
+                        `Phase ${phaseIndex + 1}`;
+
+                    return `
+                        <details
+                            class="nova-project-tree-phase"
+                            ${
+                                phaseIndex === 0 ||
+                                phaseActive
+                                    ? "open"
+                                    : ""
+                            }
+                        >
+                            <summary
+                                class="nova-project-tree-phase-summary"
+                            >
+                                <span
+                                    class="nova-project-tree-phase-main"
+                                >
+                                    <span
+                                        class="nova-project-tree-phase-title"
+                                    >
+                                        ${phaseIndex + 1}. ${phaseTitle}
+                                    </span>
+
+                                    <span
+                                        class="nova-project-tree-phase-count"
+                                    >
+                                        ${phaseTasks.length} tasks
+                                    </span>
+                                </span>
+
+                                <span
+                                    class="nova-project-tree-phase-steps"
+                                >
+                                    ${phaseCompletedSteps}/${phaseSteps}
+                                </span>
+                            </summary>
+
+                            <div
+                                class="nova-project-tree-task-list"
+                            >
+                                ${
+                                    phaseTasks.length
+                                        ? phaseTasks
+                                            .map(
+                                                renderTask
+                                            )
+                                            .join("")
+                                        : `
+                                            <div
+                                                class="nova-project-tree-empty"
+                                            >
+                                                No tasks in this phase.
+                                            </div>
+                                        `
+                                }
+                            </div>
+                        </details>
+                    `;
+                }
+            )
+            .join("");
 }
-
 function renderProjectTasks(data) {
     const tasksContainer =
         $("desktopProjectTaskList");
@@ -1243,10 +1777,10 @@ async function loadProjectWorkspace(
 renderProjectPhases(
     data
 );
-
-renderProjectTasks(
-    data
-);
+/*
+ * Legacy task editor disabled.
+ * Project execution is rendered by renderProjectPhases().
+ */
 
         const title =
             $("desktopProjectTitle");
@@ -1267,11 +1801,14 @@ renderProjectTasks(
                 "";
         }
 
-        window.__NOVA_PROJECT_STATE =
-            window.__NOVA_PROJECT_STATE || {};
+window.__NOVA_PROJECT_STATE =
+    window.__NOVA_PROJECT_STATE || {};
 
-        window.__NOVA_PROJECT_STATE.activeProjectId =
-            projectId;
+window.__NOVA_PROJECT_STATE.workspaceData =
+    data;
+
+window.__NOVA_PROJECT_STATE.activeProjectId =
+    projectId;
 
         const workspace =
             document.querySelector(
@@ -2128,9 +2665,18 @@ async function controlProjectExecution(
         const data =
             await response.json();
 
+        const executionStatus = String(
+            data?.execution?.status ||
+            data?.status ||
+            ""
+        ).trim().toLowerCase();
+
+        const approvalWaiting =
+            executionStatus === "paused";
+
         if (
             !response.ok ||
-            !data.ok
+            (!data.ok && !approvalWaiting)
         ) {
             throw new Error(
                 data.error ||
@@ -2144,6 +2690,34 @@ async function controlProjectExecution(
             action,
             data
         );
+
+        /*
+         * Refresh the execution tree immediately from the
+         * canonical execution-control response.
+         *
+         * loadProjectWorkspace() may return a workspace snapshot
+         * without the just-updated execution cursor.
+         */
+        if (
+            data &&
+            data.execution &&
+            typeof renderProjectPhases ===
+                "function"
+        ) {
+            const currentState =
+                window.__NOVA_PROJECT_STATE || {};
+
+            const currentWorkspace =
+                currentState.workspaceData ||
+                currentState.workspace ||
+                {};
+
+            renderProjectPhases({
+                ...currentWorkspace,
+                execution:
+                    data.execution,
+            });
+        }
 
         try {
             const chatState =
@@ -2370,12 +2944,10 @@ async function controlProjectExecution(
         );
     }
 }
+
 document.addEventListener(
     "DOMContentLoaded",
     () => {
-        const continueButton =
-            $("desktopContinueProject");
-
         const runAllButton =
             $("desktopRunAll");
 
@@ -2384,31 +2956,6 @@ document.addEventListener(
 
         const stopButton =
             $("desktopStop");
-
-
-        if (continueButton) {
-            continueButton.addEventListener(
-                "click",
-                async () => {
-                    const projectState =
-                        window.__NOVA_PROJECT_STATE || {};
-
-                    const projectId =
-                        projectState.activeProjectId;
-
-                    console.log(
-                        "[NOVA PROJECT EXECUTION] Continue",
-                        projectId
-                    );
-
-                    await controlProjectExecution(
-                        projectId,
-                        "continue"
-                    );
-                }
-            );
-        }
-
 
         if (runAllButton) {
             runAllButton.addEventListener(
@@ -2482,15 +3029,14 @@ document.addEventListener(
         }
 
 
-        console.log(
-            "[NOVA PROJECT EXECUTION] Controls bound",
-            {
-                continue: !!continueButton,
-                runAll: !!runAllButton,
-                pause: !!pauseButton,
-                stop: !!stopButton,
-            }
-        );
+console.log(
+    "[NOVA PROJECT EXECUTION] Controls bound",
+    {
+        runAll: !!runAllButton,
+        pause: !!pauseButton,
+        stop: !!stopButton,
+    }
+);
     }
 );
 
@@ -2776,6 +3322,10 @@ document.addEventListener(
 
 
 })();
+
+
+
+
 
 
 

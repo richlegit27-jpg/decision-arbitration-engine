@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import re
@@ -114,6 +114,20 @@ Use this exact structure:
 
         "dependencies": [],
 
+        "steps": [
+            {
+                "title": "short concrete step title",
+                "description": "what this step actually does",
+                "action": "implement",
+                "target_file": "",
+                "content": "",
+                "command": "",
+                "expected_output": "what this step should produce",
+                "completion_criteria": "how Nova knows this step is complete"
+            }
+        ],
+
+
         "expected_output": "clear description of the useful result this task should produce",
 
         "completion_criteria": "how Nova can determine that this task is complete"
@@ -134,6 +148,25 @@ GENERAL PLANNING RULES:
 - Tasks must be specific to the actual project.
 - Avoid generic placeholder tasks.
 - Break large work into logical implementation steps.
+- Every task must contain a "steps" array.
+- "steps" is REQUIRED for every task and MUST be populated with at least one step.
+- NEVER omit the "steps" field.
+- NEVER return an empty "steps" array.
+- The task itself is the outcome; the steps are the ordered work required to produce that outcome.
+- Each step must be a distinct concrete action.
+- The first step should begin the actual work, not merely restate the task title.
+- For example, a task "Implement backend API with database persistence" should contain steps such as:
+  1. Define the database schema and persistence model.
+  2. Implement the database access layer.
+  3. Implement the API endpoints.
+  4. Verify API persistence and retrieval behavior.
+- Choose the number of steps based on actual complexity.
+- Simple tasks may have 1 step, but that step must represent the actual work required.
+- Moderate tasks should normally have 2â€“4 steps.
+- Larger tasks may have 4â€“8 or more steps when genuinely required.
+- Never add steps merely to increase the count.
+- Each step must represent real work, not a restatement of the task title.
+- Steps must be ordered according to their dependencies.
 - Respect dependency order.
 - Include analysis, implementation, verification, and documentation
   only where they are genuinely needed.
@@ -143,6 +176,7 @@ GENERAL PLANNING RULES:
 - Do not ask the user questions unless planning is genuinely impossible
   without clarification.
 - Prefer useful, concrete work over long lists of speculative tasks.
+
 - When the user's request explicitly asks to build, create, implement, write,
   modify, fix, run, execute, or produce a concrete artifact, tasks for that
   requested work must use an executable action such as create, write,
@@ -150,10 +184,22 @@ GENERAL PLANNING RULES:
 - For execution-oriented requests, include the concrete target_file,
     target_files, content, command, execution_file, or other execution metadata
     whenever it can be determined from the request.
+- For every executable file mutation step, populate the step's concrete
+  execution metadata directly.
+- If the step creates or overwrites a file, provide the exact target_file
+  and exact content to write.
+- If the step appends to a file, provide the exact target_file and exact
+  content to append.
+- If a shell command is required, provide the complete command in command.
+- Never use vague prose such as "the content", "the value", or "the operation"
+  in the content field.
+- The content field must contain only the literal content that will be
+  written to the target file.
+- The command field must be directly executable without requiring Nova to
+  infer missing values from the step description.
 - Do not mark an execution-oriented task complete through planning or design
-    prose alone; its action and completion_criteria must describe work that can
-    actually be performed and verified.
-
+  prose alone; its action and completion_criteria must describe work that can
+  actually be performed and verified.
 APPROVAL RULES:
 
 - Approval is an execution control, not a project task.
@@ -669,22 +715,39 @@ idea through planning, execution, adaptation, and completion.
                 if content:
                     task["content"] = content
 
-                # Convert natural-language file descriptions into
-                # executable Python content when no code block exists.
+                # Preserve exact file content stated in the planner
+                # requirements when the structured content field is empty.
                 if (
                     target_file
-                    and content
-                    and content.lower().startswith(
-                        "a function that returns"
-                    )
+                    and not content
                 ):
-                    content = (
-                        "def http_execution_acceptance():\n"
-                        "    return \"HTTP_EXECUTION_OK\"\n"
+                    requirements = plan.get(
+                        "requirements",
+                        [],
                     )
-                    task["content"] = content
 
-                    task["content"] = content
+                    if isinstance(requirements, list):
+                        for requirement in requirements:
+                            requirement_text = str(
+                                requirement or ""
+                            ).strip()
+
+                            match = re.search(
+                                r"content must be exactly\s+(.+)$",
+                                requirement_text,
+                                re.IGNORECASE,
+                            )
+
+                            if match:
+                                content = match.group(1).strip()
+                                content = content.strip("\"'")
+                                task["content"] = content
+                                break
+
+                # Content supplied by the planner is authoritative.
+                # Do not replace requested file content with synthetic
+                # execution/acceptance code.
+                task["content"] = content
 
                 raw_target_files = task.get(
                     "target_files",
@@ -820,57 +883,169 @@ idea through planning, execution, adaptation, and completion.
                 )
 
 
-                normalized_tasks.append(
-                    {
-                        "title": title,
-                        "priority": priority,
-                        "description": description,
-                        "action": action,
-                        "execution_mode": execution_mode,
-                        "execution_file": execution_file,
-                        "target_file": target_file,
-                        "target_files": target_files,
-                        "dependencies": dependencies,
-                        "expected_output": expected_output,
-                        "completion_criteria": completion_criteria,
-                        "target_function": str(
-                            task.get(
-                                "target_function",
-                                "",
-                            )
-                            or ""
-                        ).strip(),
-                        "content": str(
-                            task.get(
-                                "content",
-                                "",
-                            )
-                            or ""
-                        ),
-                        "code": str(
-                            task.get(
-                                "code",
-                                "",
-                            )
-                            or ""
-                        ),
-                        "replacement": str(
-                            task.get(
-                                "replacement",
-                                "",
-                            )
-                            or ""
-                        ),
-                        "command": str(
-                            task.get(
-                                "command",
-                                "",
-                            )
-                            or ""
-                        ).strip(),
-                    }
-                )
+                raw_steps = task.get("steps", [])
 
+                if not isinstance(raw_steps, list):
+                    raw_steps = []
+
+                normalized_steps = []
+
+                for index, step in enumerate(raw_steps, start=1):
+                    if not isinstance(step, dict):
+                        continue
+
+                    step_title = str(
+                        step.get("title", "")
+                        or ""
+                    ).strip()
+
+                    if not step_title:
+                        continue
+
+                    normalized_step_action = str(
+                        step.get(
+                            "action",
+                            action,
+                        )
+                        or action
+                    ).strip().lower()
+
+                    normalized_step_target_file = str(
+                        step.get(
+                            "target_file",
+                            target_file,
+                        )
+                        or target_file
+                    ).strip()
+
+                    normalized_step_content = str(
+                        step.get(
+                            "content",
+                            "",
+                        )
+                        or ""
+                    )
+
+                    normalized_step_command = str(
+                        step.get(
+                            "command",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+
+                    if (
+                        not normalized_step_command
+                        and normalized_step_target_file
+                        and normalized_step_content
+                    ):
+                        if normalized_step_action == "create":
+                            normalized_step_command = (
+                                "Set-Content "
+                                f"-LiteralPath '{normalized_step_target_file}' "
+                                f"-Value '{normalized_step_content}' "
+                                "-NoNewline"
+                            )
+                        elif normalized_step_action in {
+                            "append",
+                            "modify",
+                        }:
+                            normalized_step_command = (
+                                "Add-Content "
+                                f"-LiteralPath '{normalized_step_target_file}' "
+                                f"-Value '{normalized_step_content}'"
+                            )
+
+                    normalized_steps.append(
+                        {
+                            "id": str(
+                                step.get(
+                                    "id",
+                                    f"step-{index}",
+                                )
+                                or f"step-{index}"
+                            ).strip(),
+                            "title": step_title,
+                            "description": str(
+                                step.get(
+                                    "description",
+                                    "",
+                                )
+                                or ""
+                            ).strip(),
+                            "action": normalized_step_action,
+                            "target_file": normalized_step_target_file,
+                            "content": normalized_step_content,
+                            "command": normalized_step_command,
+                            "expected_output": str(
+                                step.get(
+                                    "expected_output",
+                                    "",
+                                )
+                                or ""
+                            ).strip(),
+                            "completion_criteria": str(
+                                step.get(
+                                    "completion_criteria",
+                                    "",
+                                )
+                                or ""
+                            ).strip(),
+                        }
+                    )
+
+                normalized_tasks.append(
+                        {
+                            "title": title,
+                            "priority": priority,
+                            "description": description,
+                            "action": action,
+                            "execution_mode": execution_mode,
+                            "execution_file": execution_file,
+                            "target_file": target_file,
+                            "target_files": self._string_list(
+                                task.get(
+                                    "target_files",
+                                    [],
+                                )
+                            ),
+                            "dependencies": self._string_list(
+                                task.get(
+                                    "dependencies",
+                                    [],
+                                )
+                            ),
+                            "steps": normalized_steps,
+                            "expected_output": str(
+                                task.get(
+                                    "expected_output",
+                                    "",
+                                )
+                                or ""
+                            ).strip(),
+                            "completion_criteria": str(
+                                task.get(
+                                    "completion_criteria",
+                                    "",
+                                )
+                                or ""
+                            ).strip(),
+                            "content": str(
+                                task.get(
+                                    "content",
+                                    "",
+                                )
+                                or ""
+                            ),
+                            "command": str(
+                                task.get(
+                                    "command",
+                                    "",
+                                )
+                                or ""
+                            ).strip(),
+                        }
+                    )
         return {
             "name": str(
                 plan.get(
@@ -1038,3 +1213,4 @@ idea through planning, execution, adaptation, and completion.
 project_planning_ai_service = (
     ProjectPlanningAIService()
 )
+

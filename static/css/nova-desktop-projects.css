@@ -697,3 +697,589 @@
     border-radius: 10px;
     padding: 12px 14px;
 }
+/* ============================================================
+   NOVA PROJECT EXECUTION TREE — DISPLAY LAYER V1
+   ============================================================ */
+
+.nova-project-execution-tree {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.nova-project-tree-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.nova-project-tree-header h3 {
+    margin: 0;
+}
+
+.nova-project-tree-header p {
+    margin: 5px 0 0;
+    opacity: 0.68;
+    font-size: 13px;
+}
+
+.nova-project-tree-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.nova-project-tree-controls button,
+.nova-project-tree-header button {
+    border: 1px solid rgba(128, 128, 128, 0.28);
+    border-radius: 8px;
+    padding: 7px 12px;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+}
+
+.nova-project-tree-controls button:hover,
+.nova-project-tree-header button:hover {
+    background: rgba(128, 128, 128, 0.10);
+}
+
+.nova-project-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.nova-project-tree-phase {
+    border: 1px solid rgba(128, 128, 128, 0.20);
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(128, 128, 128, 0.035);
+}
+
+.nova-project-tree-phase > summary {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 13px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.nova-project-tree-phase > summary::-webkit-details-marker {
+    display: none;
+}
+
+.nova-project-tree-chevron {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    opacity: 0.65;
+}
+
+.nova-project-tree-phase[open]
+    .nova-project-tree-chevron {
+    transform: rotate(90deg);
+}
+
+.nova-project-tree-phase-title {
+    min-width: 0;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nova-project-tree-count,
+.nova-project-tree-steps {
+    font-size: 12px;
+    opacity: 0.68;
+    white-space: nowrap;
+}
+
+.nova-project-tree-steps {
+    min-width: 42px;
+    text-align: right;
+}
+
+.nova-project-tree-task-list {
+    padding: 2px 12px 10px 40px;
+}
+
+.nova-project-tree-task {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 6px 8px;
+    border-top: 1px solid rgba(128, 128, 128, 0.10);
+}
+
+.nova-project-tree-task-icon {
+    opacity: 0.72;
+    text-align: center;
+}
+
+.nova-project-tree-task-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nova-project-tree-task-count {
+    font-size: 12px;
+    opacity: 0.62;
+    white-space: nowrap;
+}
+
+.nova-project-tree-empty {
+    padding: 12px 8px;
+    opacity: 0.55;
+    font-size: 13px;
+}
+
+#desktopProjectTaskList {
+    display: none !important;
+}
+
+#desktopProjectPhases {
+    display: none !important;
+}
+
+#desktopProjectTasks {
+    display: none !important;
+}
+
+.nova-project-execution-tree .session-placeholder {
+    padding: 20px 8px;
+    text-align: center;
+    opacity: 0.60;
+}
+
+@media (max-width: 700px) {
+    .nova-project-tree-header {
+        flex-direction: column;
+    }
+
+    .nova-project-tree-header button {
+        align-self: flex-start;
+    }
+
+    .nova-project-tree-phase > summary {
+        grid-template-columns: 20px minmax(0, 1fr) auto;
+    }
+
+    .nova-project-tree-steps {
+        display: none;
+    }
+
+    .nova-project-tree-task-list {
+        padding-left: 28px;
+    }
+
+    .nova-project-tree-controls {
+        gap: 6px;
+    }
+
+    .nova-project-tree-controls button {
+        flex: 1 1 auto;
+    }
+}
+
+/* ============================================================
+   NOVA PROJECT EXECUTION TREE — DISPLAY LAYER V1
+   ============================================================ */
+
+.nova-project-execution-tree {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.nova-project-tree-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.nova-project-tree-header h3 {
+    margin: 0;
+}
+
+.nova-project-tree-header p {
+    margin: 5px 0 0;
+    opacity: 0.68;
+    font-size: 13px;
+}
+
+.nova-project-tree-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.nova-project-tree-controls button,
+.nova-project-tree-header button {
+    border: 1px solid rgba(128, 128, 128, 0.28);
+    border-radius: 8px;
+    padding: 7px 12px;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+}
+
+.nova-project-tree-controls button:hover,
+.nova-project-tree-header button:hover {
+    background: rgba(128, 128, 128, 0.10);
+}
+
+.nova-project-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.nova-project-tree-phase {
+    border: 1px solid rgba(128, 128, 128, 0.20);
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(128, 128, 128, 0.035);
+}
+
+.nova-project-tree-phase > summary {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 13px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.nova-project-tree-phase > summary::-webkit-details-marker {
+    display: none;
+}
+
+.nova-project-tree-chevron {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    opacity: 0.65;
+}
+
+.nova-project-tree-phase[open]
+    .nova-project-tree-chevron {
+    transform: rotate(90deg);
+}
+
+.nova-project-tree-phase-title {
+    min-width: 0;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nova-project-tree-count,
+.nova-project-tree-steps {
+    font-size: 12px;
+    opacity: 0.68;
+    white-space: nowrap;
+}
+
+.nova-project-tree-steps {
+    min-width: 42px;
+    text-align: right;
+}
+
+.nova-project-tree-task-list {
+    padding: 2px 12px 10px 40px;
+}
+
+.nova-project-tree-task {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 6px 8px;
+    border-top: 1px solid rgba(128, 128, 128, 0.10);
+}
+
+.nova-project-tree-task-icon {
+    opacity: 0.72;
+    text-align: center;
+}
+
+.nova-project-tree-task-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nova-project-tree-task-count {
+    font-size: 12px;
+    opacity: 0.62;
+    white-space: nowrap;
+}
+
+.nova-project-tree-empty {
+    padding: 12px 8px;
+    opacity: 0.55;
+    font-size: 13px;
+}
+
+#desktopProjectTaskList {
+    display: none !important;
+}
+
+#desktopProjectPhases {
+    display: none !important;
+}
+
+#desktopProjectTasks {
+    display: none !important;
+}
+
+.nova-project-execution-tree .session-placeholder {
+    padding: 20px 8px;
+    text-align: center;
+    opacity: 0.60;
+}
+
+@media (max-width: 700px) {
+    .nova-project-tree-header {
+        flex-direction: column;
+    }
+
+    .nova-project-tree-header button {
+        align-self: flex-start;
+    }
+
+    .nova-project-tree-phase > summary {
+        grid-template-columns: 20px minmax(0, 1fr) auto;
+    }
+
+    .nova-project-tree-steps {
+        display: none;
+    }
+
+    .nova-project-tree-task-list {
+        padding-left: 28px;
+    }
+
+    .nova-project-tree-controls {
+        gap: 6px;
+    }
+
+    .nova-project-tree-controls button {
+        flex: 1 1 auto;
+    }
+}
+
+/* ============================================================
+   NOVA PROJECT EXECUTION TREE — DISPLAY LAYER V1
+   ============================================================ */
+
+.nova-project-execution-tree {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.nova-project-tree-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.nova-project-tree-header h3 {
+    margin: 0;
+}
+
+.nova-project-tree-header p {
+    margin: 5px 0 0;
+    opacity: 0.68;
+    font-size: 13px;
+}
+
+.nova-project-tree-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.nova-project-tree-controls button,
+.nova-project-tree-header button {
+    border: 1px solid rgba(128, 128, 128, 0.28);
+    border-radius: 8px;
+    padding: 7px 12px;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+}
+
+.nova-project-tree-controls button:hover,
+.nova-project-tree-header button:hover {
+    background: rgba(128, 128, 128, 0.10);
+}
+
+.nova-project-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.nova-project-tree-phase {
+    border: 1px solid rgba(128, 128, 128, 0.20);
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(128, 128, 128, 0.035);
+}
+
+.nova-project-tree-phase > summary {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 13px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.nova-project-tree-phase > summary::-webkit-details-marker {
+    display: none;
+}
+
+.nova-project-tree-chevron {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    opacity: 0.65;
+}
+
+.nova-project-tree-phase[open]
+    .nova-project-tree-chevron {
+    transform: rotate(90deg);
+}
+
+.nova-project-tree-phase-title {
+    min-width: 0;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nova-project-tree-count,
+.nova-project-tree-steps {
+    font-size: 12px;
+    opacity: 0.68;
+    white-space: nowrap;
+}
+
+.nova-project-tree-steps {
+    min-width: 42px;
+    text-align: right;
+}
+
+.nova-project-tree-task-list {
+    padding: 2px 12px 10px 40px;
+}
+
+.nova-project-tree-task {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 6px 8px;
+    border-top: 1px solid rgba(128, 128, 128, 0.10);
+}
+
+.nova-project-tree-task-icon {
+    opacity: 0.72;
+    text-align: center;
+}
+
+.nova-project-tree-task-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nova-project-tree-task-count {
+    font-size: 12px;
+    opacity: 0.62;
+    white-space: nowrap;
+}
+
+.nova-project-tree-empty {
+    padding: 12px 8px;
+    opacity: 0.55;
+    font-size: 13px;
+}
+
+#desktopProjectTaskList {
+    display: none !important;
+}
+
+#desktopProjectPhases {
+    display: none !important;
+}
+
+#desktopProjectTasks {
+    display: none !important;
+}
+
+.nova-project-execution-tree .session-placeholder {
+    padding: 20px 8px;
+    text-align: center;
+    opacity: 0.60;
+}
+
+@media (max-width: 700px) {
+    .nova-project-tree-header {
+        flex-direction: column;
+    }
+
+    .nova-project-tree-header button {
+        align-self: flex-start;
+    }
+
+    .nova-project-tree-phase > summary {
+        grid-template-columns: 20px minmax(0, 1fr) auto;
+    }
+
+    .nova-project-tree-steps {
+        display: none;
+    }
+
+    .nova-project-tree-task-list {
+        padding-left: 28px;
+    }
+
+    .nova-project-tree-controls {
+        gap: 6px;
+    }
+
+    .nova-project-tree-controls button {
+        flex: 1 1 auto;
+    }
+}
+
+/* NOVA PROJECT TREE — HIDE LEGACY TASK EDITOR */
+#desktopProjectTaskList {
+    display: none !important;
+}

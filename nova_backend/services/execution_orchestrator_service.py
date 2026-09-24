@@ -1177,6 +1177,12 @@ class ExecutionOrchestratorService:
                 "project_context",
                 "goal",
                 "content",
+                "target_file",
+                "target_files",
+                "code",
+                "replacement",
+                "command",
+                "execution_file",
             ):
                 original_value = (
                     original_step.get(preserved_key)

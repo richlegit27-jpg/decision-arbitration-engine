@@ -1,4 +1,4 @@
-import traceback
+﻿import traceback
 import time
 
 from nova_backend.services.auth_context import get_current_user_id
@@ -656,6 +656,27 @@ def chat_handle(
                                 )
                                 or ""
                             ),
+
+                        "target_file": (
+                            candidate_step.get(
+                                "target_file"
+                            )
+                            or selected_task.get(
+                                "target_file"
+                            )
+                            or ""
+                        ),
+                        "target_files": (
+                            candidate_step.get(
+                                "target_files"
+                            )
+                            or selected_task.get(
+                                "target_files"
+                            )
+                            or []
+                        ),
+
+
                             "goal": (
                                 candidate_step.get(
                                     "goal"
@@ -1455,6 +1476,67 @@ def chat_handle(
                     next_step
                 )
 
+            # Restore concrete execution metadata from the
+            # selected project task before building project_step.
+            if (
+                isinstance(next_step, dict)
+                and isinstance(active_project, dict)
+            ):
+                next_task_id = str(
+                    next_step.get("task_id")
+                    or next_step.get("id")
+                    or ""
+                ).strip()
+
+                for task in (
+                    active_project.get("tasks")
+                    or []
+                ):
+                    if not isinstance(task, dict):
+                        continue
+
+                    task_id = str(
+                        task.get("id")
+                        or ""
+                    ).strip()
+
+                    task_title = str(
+                        task.get("title")
+                        or ""
+                    ).strip()
+
+                    if (
+                        next_task_id
+                        and next_task_id
+                        not in {
+                            task_id,
+                            task_title,
+                        }
+                    ):
+                        continue
+
+                    for field in (
+                        "target_file",
+                        "target_files",
+                        "content",
+                        "file_content",
+                        "execution_file",
+                        "execution_mode",
+                        "action",
+                        "command",
+                        "code",
+                        "replacement",
+                    ):
+                        if (
+                            not next_step.get(field)
+                            and task.get(field)
+                        ):
+                            next_step[field] = task.get(
+                                field
+                            )
+
+                    break
+
             if not isinstance(
                 next_step,
                 dict,
@@ -1646,6 +1728,9 @@ def chat_handle(
                             or next_step.get("title")
                             or ""
                         ),
+
+
+
                         "project_context": (
                             candidate_step.get(
                                 "project_context"
@@ -1661,7 +1746,26 @@ def chat_handle(
                             )
                             or ""
                         ),
+                        "target_file": (
+                            candidate_step.get(
+                                "target_file"
+                            )
+                            or selected_task.get(
+                                "target_file"
+                            )
+                            or ""
+                        ),
+                        "target_files": (
+                            candidate_step.get(
+                                "target_files"
+                            )
+                            or selected_task.get(
+                                "target_files"
+                            )
+                            or []
+                        ),
                         "goal": (
+
                             candidate_step.get(
                                 "goal"
                             )
@@ -1849,6 +1953,103 @@ def chat_handle(
                 )
             ):
                 execution_state = existing_execution
+
+                # Preserve concrete project execution metadata when
+                # reusing an approval/waiting execution state.
+                existing_steps = execution_state.get(
+                    "steps"
+                )
+
+                if (
+                    isinstance(existing_steps, list)
+                    and existing_steps
+                    and isinstance(
+                        existing_steps[0],
+                        dict,
+                    )
+                    and isinstance(
+                        project_step,
+                        dict,
+                    )
+                ):
+                    existing_step = existing_steps[0]
+
+                    execution_fields = (
+                        "target_file",
+                        "target_files",
+                        "content",
+                        "file_content",
+                        "execution_file",
+                        "execution_mode",
+                        "action",
+                        "command",
+                        "code",
+                        "replacement",
+                    )
+
+                    # Prefer the concrete project step, but fall back
+                    # to the selected project task when the nested step
+                    # does not carry execution metadata.
+                    metadata_sources = [
+                        project_step,
+                        selected_task,
+                    ]
+
+                    for field in execution_fields:
+                        if existing_step.get(field):
+                            continue
+
+                        for source in metadata_sources:
+                            if not isinstance(source, dict):
+                                continue
+
+                            value = source.get(field)
+
+                            if value:
+                                existing_step[field] = value
+                                break
+
+                    execution_state["steps"] = (
+                        existing_steps
+                    )
+
+                    for field in execution_fields:
+                        if existing_step.get(field):
+                            continue
+
+                        value = project_step.get(field)
+
+                        if not value and isinstance(
+                            selected_task,
+                            dict,
+                        ):
+                            value = selected_task.get(field)
+
+                        if value:
+                            existing_step[field] = value
+
+                    execution_state["steps"] = (
+                        existing_steps
+                    )
+
+                    print(
+                        "[CHAT HANDLE NEXT STEP ENRICHED EXISTING EXECUTION]",
+                        {
+                            "target_file": existing_step.get(
+                                "target_file"
+                            ),
+                            "target_files": existing_step.get(
+                                "target_files"
+                            ),
+                            "content": existing_step.get(
+                                "content"
+                            ),
+                            "action": existing_step.get(
+                                "action"
+                            ),
+                        },
+                        flush=True,
+                    )
 
                 print(
                     "[CHAT HANDLE NEXT STEP REUSING EXISTING EXECUTION]",

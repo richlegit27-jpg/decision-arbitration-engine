@@ -1401,88 +1401,81 @@ observer.observe(document.documentElement, {
     </div>
 
 <div
-  id="desktopProjectPhases"
-  class="project-panel-card"
+  id="desktopProjectExecutionTree"
+  class="project-panel-card nova-project-execution-tree"
 >
-  <h3>Phases</h3>
+  <div class="nova-project-tree-header">
+    <div>
+      <h3>Project Execution</h3>
+      <p id="novaProjectTreeSummary">
+        Select a project to view execution.
+      </p>
+    </div>
 
-  <div id="desktopProjectPhaseList">
+    <button
+      id="desktopProjectAddTaskButton"
+      type="button"
+    >
+      + Add Task
+    </button>
+  </div>
+
+  <div
+    id="nova-project-tree-controls"
+    class="nova-project-tree-controls"
+    aria-label="Project execution controls"
+  >
+    <button
+      id="novaLeftRunAll"
+      type="button"
+    >
+      Run All
+    </button>
+
+    <button
+      id="novaLeftNextTask"
+      type="button"
+    >
+      Continue
+    </button>
+
+    <button
+      id="novaLeftNextStep"
+      type="button"
+    >
+      Next Step
+    </button>
+
+    <button
+      id="novaLeftStop"
+      type="button"
+    >
+      Stop
+    </button>
+
+    <button
+      id="novaLeftReset"
+      type="button"
+    >
+      Reset
+    </button>
+  </div>
+
+  <div
+    id="desktopProjectPhaseList"
+    class="nova-project-tree"
+  >
     <div class="session-placeholder">
       Select a project to view phases.
     </div>
   </div>
+
+  <div
+    id="desktopProjectTaskList"
+    class="nova-project-task-list"
+    aria-hidden="true"
+  ></div>
 </div>
-
-<div
-  id="desktopProjectTasks"
-  class="project-panel-card"
->
-      <div class="nova-project-tasks-header">
-        <h3>Tasks</h3>
-
-        <button
-          id="desktopProjectAddTaskButton"
-          type="button"
-        >
-          + Add Task
-        </button>
-      </div>
-      <div
-        id="nova-left-execution-controls"
-        class="nova-left-execution-controls"
-        aria-label="Project execution controls"
-      >
-        <div class="nova-left-execution-row">
-          <button
-            id="novaLeftNextStep"
-            type="button"
-          >
-            Next Step
-          </button>
-
-          <button
-            id="novaLeftNextTask"
-            type="button"
-          >
-            Next Task
-          </button>
-        </div>
-
-        <div
-          class="nova-left-execution-row nova-left-execution-row-three"
-        >
-          <button
-            id="novaLeftRunAll"
-            type="button"
-          >
-            Run All
-          </button>
-
-          <button
-            id="novaLeftStop"
-            type="button"
-          >
-            Stop
-          </button>
-
-          <button
-            id="novaLeftReset"
-            type="button"
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-
-      <div
-        id="desktopProjectTaskList"
-        class="nova-project-task-list"
-      >
-        <div class="session-placeholder">
-          Select a project to view tasks.
-        </div>
-      </div>
-    </div>
 
 
     <div
@@ -1719,6 +1712,13 @@ observer.observe(document.documentElement, {
             type="button"
         >
             Continue
+        </button>
+
+        <button
+            id="desktopApproveProject"
+            type="button"
+        >
+            Approve
         </button>
 
         <button
@@ -11807,6 +11807,7 @@ aside.panel.tools > .quick-actions-section {
 
 </body>
 </html>
+
 
 
 

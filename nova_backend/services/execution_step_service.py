@@ -1166,23 +1166,31 @@ class ExecutionStepService:
                 if match:
                     marker = match.group(1)
 
-                    content = (
-                        "def http_execution_acceptance():\n"
-                        f'    return "{marker}"\n'
-                    )
 
-                    step["content"] = content
-                    step["file_content"] = content
-                    step["expected_output"] = marker
 
-                    print(
-                        "[DIRECT WRITE PYTHON NORMALIZED]",
-                        {
-                            "target_file": target_file,
-                            "content": content,
-                        },
-                        flush=True,
-                    )
+                    if not self._safe_str(
+                        step.get("content")
+                        or step.get("file_content")
+                        or step.get("generated_content")
+                    ).strip():
+                        content = (
+                            "def http_execution_acceptance():\n"
+                            f'    return "{return_marker}"\n'
+                        )
+
+                        step["content"] = content
+                        step["file_content"] = content
+                        step["generated_content"] = content
+                        step["expected_output"] = return_marker
+
+                        print(
+                            "[PYTHON CONTENT NORMALIZED]",
+                            {
+                                "target_file": target_file,
+                                "content": content,
+                            },
+                            flush=True,
+                        )
 
             if (
                 action in {
@@ -1199,6 +1207,17 @@ class ExecutionStepService:
                 and target_file
                 and content
             ):
+
+                print(
+                    "[DEBUG DIRECT WRITE FINAL]",
+                    {
+                        "action": action,
+                        "target_file": target_file,
+                        "content": content,
+                        "content_repr": repr(content),
+                    },
+                    flush=True,
+                )
 
                 try:
                     with open(
@@ -1891,108 +1910,44 @@ class ExecutionStepService:
                         step["generated_content"] = content
 
                     elif target_file:
-                        marker_match = re.search(
-                            r"returns?\s+([A-Za-z_][A-Za-z0-9_]*)",
-                            description,
-                            flags=re.IGNORECASE,
+                        # Explicit step content is authoritative.
+                        # Do not synthesize HTTP/Python acceptance
+                        # content when the planner already supplied
+                        # concrete file content.
+
+                        explicit_content = self._safe_str(
+                            step.get("content")
+                            or step.get("file_content")
+                            or step.get("generated_content")
+                            or payload.get("content")
+                            or payload.get("file_content")
+                            or payload.get("generated_content")
+                            or ""
                         )
 
-                        return_value = (
-                            marker_match.group(1)
-                            if marker_match
-                            else "HTTP_EXECUTION_OK"
-                        )
+                        if explicit_content.strip():
+                            content = explicit_content
 
-                        function_match = re.search(
-                            r"function\s+(?:named\s+)?([A-Za-z_][A-Za-z0-9_]*)",
-                            description,
-                            flags=re.IGNORECASE,
-                        )
+                            escaped_file = target_file.replace(
+                                "'",
+                                "''",
+                            )
 
-                        candidate_function_name = (
-                            function_match.group(1).strip()
-                            if function_match
-                            else ""
-                        )
+                            escaped_content = content.replace(
+                                "'",
+                                "''",
+                            )
 
-                        invalid_function_names = {
-                            "that",
-                            "which",
-                            "to",
-                            "return",
-                            "returns",
-                            "containing",
-                            "called",
-                            "named",
-                        }
+                            command = (
+                                "Set-Content "
+                                f"-LiteralPath '{escaped_file}' "
+                                f"-Value '{escaped_content}' "
+                                "-NoNewline"
+                            )
 
-                        if (
-                            candidate_function_name
-                            and candidate_function_name.lower()
-                            not in invalid_function_names
-                        ):
-                            function_name = candidate_function_name
-                        else:
-                            function_name = Path(
-                                target_file
-                            ).stem
+                            step["target_file"] = target_file
+                            step["generated_content"] = content
 
-                            if function_name.startswith("http_"):
-                                function_name = function_name[
-                                    len("http_"):
-                                ]
-
-                            function_name = re.sub(
-                                r"[^A-Za-z0-9_]+",
-                                "_",
-                                function_name,
-                            ).strip("_")
-
-                            if not function_name:
-                                function_name = (
-                                    "execution_acceptance"
-                                )
-
-                            if function_name[0].isdigit():
-                                function_name = (
-                                    f"generated_{function_name}"
-                                )
-
-                        escaped_file = target_file.replace(
-                            "'",
-                            "''",
-                        )
-
-                        python_content = (
-                            f"def {function_name}():\n"
-                            f"    return "
-                            f"{return_value!r}\n"
-                        )
-
-                        encoded_content = (
-                            python_content.encode("utf-8")
-                        )
-
-                        import base64
-
-                        content_b64 = base64.b64encode(
-                            encoded_content
-                        ).decode("ascii")
-
-                        command = (
-                            "$content = "
-                            f"[Convert]::FromBase64String("
-                            f"'{content_b64}'"
-                            "); "
-                            f"[IO.File]::WriteAllBytes("
-                            f"'{escaped_file}', "
-                            "$content)"
-                        )
-
-                        step["target_file"] = target_file
-                        step["generated_content"] = (
-                            python_content
-                        )
 
                 if command and not payload.get("command"):
                     payload["command"] = command

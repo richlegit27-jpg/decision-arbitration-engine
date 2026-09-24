@@ -845,6 +845,39 @@ class ProjectBuilderService:
                 if not isinstance(canonical_step, dict):
                     continue
 
+                # Preserve task-level execution semantics on every
+                # nested execution step. The planner may describe
+                # the step in prose, but task-level fields are the
+                # authoritative execution contract.
+                canonical_step["target_file"] = str(
+                    canonical_step.get("target_file")
+                    or canonical_target_file
+                    or ""
+                ).strip()
+
+                canonical_step["target_files"] = (
+                    canonical_step.get("target_files")
+                    or canonical_target_files
+                    or (
+                        [canonical_step["target_file"]]
+                        if canonical_step["target_file"]
+                        else []
+                    )
+                )
+
+                canonical_step["content"] = str(
+                    canonical_step.get("content")
+                    or canonical_content
+                    or ""
+                ).strip()
+
+                canonical_step["command"] = str(
+                    canonical_step.get("command")
+                    or canonical_task.get("command")
+                    or task.get("command")
+                    or ""
+                ).strip()
+
                 if is_execution_task:
                     canonical_step["action"] = "execute"
                     canonical_step["execution_mode"] = "hybrid"
@@ -852,11 +885,6 @@ class ProjectBuilderService:
                         canonical_execution_file
                     )
 
-                    canonical_step["command"] = str(
-                        canonical_step.get("command")
-                        or task.get("command")
-                        or ""
-                    ).strip()
                     canonical_step["target_file"] = ""
                     canonical_step["target_files"] = []
 
@@ -865,54 +893,22 @@ class ProjectBuilderService:
                     canonical_step["execution_mode"] = "hybrid"
                     canonical_step["execution_file"] = ""
 
-                    step_text = " ".join(
-                        [
-                            str(
-                                canonical_step.get("title")
-                                or canonical_step.get("name")
-                                or ""
-                            ),
-                            str(
-                                canonical_step.get("description")
-                                or ""
-                            ),
-                            str(
-                                canonical_step.get("content")
-                                or ""
-                            ),
-                            str(
-                                canonical_step.get("expected_output")
-                                or ""
-                            ),
-                            str(
-                                canonical_step.get("target_file")
-                                or ""
-                            ),
-                            " ".join(
-                                str(value or "").strip()
-                                for value in (
-                                    canonical_step.get(
-                                        "target_files"
-                                    )
-                                    or []
-                                )
-                            ),
-                        ]
-                    )
+                elif (
+                    canonical_step.get("command")
+                    or canonical_step.get("content")
+                    or canonical_step.get("target_file")
+                ):
+                    canonical_step["action"] = str(
+                        canonical_step.get("action")
+                        or canonical_task.get("action")
+                        or "execute"
+                    ).strip()
 
-                    step_output_matches = re.findall(
-                        r"\b([A-Za-z0-9_.-]+\.(?:txt|json|csv|md|log|out|xml|yaml|yml))\b",
-                        step_text,
-                        flags=re.IGNORECASE,
-                    )
-
-                    if step_output_matches:
-                        canonical_step["target_file"] = (
-                            step_output_matches[-1]
-                        )
-                        canonical_step["target_files"] = [
-                            step_output_matches[-1]
-                        ]
+                    canonical_step["execution_mode"] = str(
+                        canonical_step.get("execution_mode")
+                        or canonical_task.get("execution_mode")
+                        or "hybrid"
+                    ).strip()
 
             canonical_title_lower = canonical_title.lower()
             canonical_text_lower = canonical_text.lower()
@@ -1415,7 +1411,6 @@ class ProjectBuilderService:
 
                 step["content"] = (
                     step.get("content")
-                    or task_spec.get("content")
                     or ""
                 )
 
@@ -1704,82 +1699,28 @@ class ProjectBuilderService:
             final_task_title_lower = final_task_title.lower()
             final_task_text_lower = final_task_text.lower()
 
+
+
+            print(
+                "[CONTENT TRACE BEFORE EXTRACTION]",
+                {
+                    "action": normalized_action,
+                    "target_file": target_file,
+                    "content": task_spec.get("content"),
+                    "requirements": task_spec.get("requirements"),
+                    "completion_criteria": task_spec.get("completion_criteria"),
+                    "expected_output": task_spec.get("expected_output"),
+                    "description": task_spec.get("description"),
+                    "title": task_spec.get("title"),
+                },
+            )
+
             if (
                 normalized_action == "create"
                 and target_file
                 and not task_spec.get("content")
             ):
-                exact_content_match = None
-
-                exact_content_sources = [
-                    str(
-                        task_spec.get("completion_criteria")
-                        or ""
-                    ).strip(),
-                    str(
-                        task_spec.get("expected_output")
-                        or ""
-                    ).strip(),
-                    str(
-                        task_spec.get("description")
-                        or ""
-                    ).strip(),
-                    str(
-                        task_spec.get("title")
-                        or ""
-                    ).strip(),
-                ]
-
-                exact_content_patterns = [
-                    r"(?is)\bexact\s+(?:text|string)\s+['\"](.+?)['\"]",
-                    r"(?is)\bcontains\s+exactly\s+['\"](.+?)['\"]",
-                    r"(?is)\bcontain(?:s)?\s+the\s+exact\s+(?:text|string)\s+['\"](.+?)['\"]",
-                    r"(?is)\b(?:write|writes|written)\s+the\s+exact\s+(?:text|string)\s+['\"](.+?)['\"]",
-                    r"(?is)\bwith\s+the\s+(?:exact\s+)?content\s+['\"](.+?)['\"]",
-                    r"(?is)\bcontaining\s+the\s+text\s+['\"](.+?)['\"]",
-                    r"(?is)\bcontents?\s+exactly\s+(?:match|equals?)\s+['\"](.+?)['\"]",
-
-                    # Unquoted literal-content forms.
-                    r"(?is)\bcontaining\s+(?:only\s+)?the\s+(?:exact\s+)?text\s+(.+?)\s*[.!]?$",
-                    r"(?is)\bcontains?\s+(?:only\s+)?the\s+(?:exact\s+)?text\s+(.+?)\s*[.!]?$",
-                    r"(?is)\bwrite\s+(?:only\s+)?the\s+(?:exact\s+)?text\s+(.+?)\s+(?:into|to)\b",
-                ]
-
-                for source_text in exact_content_sources:
-                    if not source_text:
-                        continue
-
-                    for pattern in exact_content_patterns:
-                        exact_content_match = re.search(
-                            pattern,
-                            source_text,
-                        )
-
-                        if exact_content_match:
-                            break
-
-                    if exact_content_match:
-                        break
-
-                if exact_content_match:
-                    extracted_content = (
-                        exact_content_match.group(1)
-                        .strip()
-                    )
-
-                    if (
-                        len(extracted_content) >= 2
-                        and extracted_content[0] == extracted_content[-1]
-                        and extracted_content[0] in {"'", '"'}
-                    ):
-                        extracted_content = (
-                            extracted_content[1:-1]
-                            .strip()
-                        )
-
-                    task_spec["content"] = extracted_content
-                else:
-                    task_spec["content"] = ""
+                task_spec["content"] = ""
 
             final_is_execution_task = bool(
                 execution_file
@@ -1880,17 +1821,84 @@ class ProjectBuilderService:
                 ):
                     continue
 
-                step["content"] = (
+                step_content = str(
                     step.get("content")
-                    or task_spec.get("content")
                     or ""
-                )
+                ).strip()
+
+                if step_content:
+                    step["content"] = step_content
+                else:
+                    step["content"] = ""
 
                 step["code"] = (
                     step.get("code")
                     or task_spec.get("code")
                     or ""
                 )
+
+                step_text = " ".join(
+                    [
+                        str(
+                            step.get("title")
+                            or ""
+                        ),
+                        str(
+                            step.get("description")
+                            or ""
+                        ),
+                        str(
+                            step.get("expected_output")
+                            or ""
+                        ),
+                        str(
+                            step.get("completion_criteria")
+                            or ""
+                        ),
+                    ]
+                ).strip()
+
+                step_text_lower = step_text.lower()
+
+                step_target_file = str(
+                    step.get("target_file")
+                    or task_spec.get("target_file")
+                    or ""
+                ).strip()
+
+                if not step_target_file:
+                    target_matches = re.findall(
+                        r"\b([A-Za-z0-9_.-]+\.(?:txt|json|csv|md|log|out|xml|yaml|yml))\b",
+                        step_text,
+                        flags=re.IGNORECASE,
+                    )
+
+                    if target_matches:
+                        step_target_file = target_matches[-1]
+
+                step["target_file"] = step_target_file
+
+                step["target_files"] = (
+                    step.get("target_files")
+                    or task_spec.get("target_files")
+                    or (
+                        [step_target_file]
+                        if step_target_file
+                        else []
+                    )
+                )
+
+                if step.get("command"):
+                    step["command"] = str(
+                        step.get("command")
+                    ).strip()
+
+                if (
+                    step.get("command")
+                    or step.get("content")
+                ):
+                    step["action"] = "execute"
+                    step["execution_mode"] = "hybrid"
 
             approval_text = " ".join(
                 [
@@ -1922,9 +1930,21 @@ class ProjectBuilderService:
             )
 
             approval_text_lower = approval_text.lower()
-
-            approval_text_lower = approval_text.lower()
             request_text_lower = clean_request.lower()
+
+            print(
+                "[NOVA DEBUG REQUEST APPROVAL TEXT]",
+                {
+                    "clean_request": clean_request,
+                    "request_text_lower": request_text_lower,
+                    "contains_require_approval_before": (
+                        "require approval before"
+                        in request_text_lower
+                    ),
+                    "approval_text": approval_text,
+                },
+                flush=True,
+            )
 
             request_requires_approval = any(
                 phrase in request_text_lower
@@ -1934,9 +1954,19 @@ class ProjectBuilderService:
                     "explicit approval before",
                     "require explicit approval",
                     "requires explicit approval",
+                    "require approval before",
+                    "requires approval before",
+                    "approval before",
                     "only after my approval",
                     "only after explicit approval",
                     "wait for my approval",
+                    "approval enforced",
+                    "approval gating",
+                    "approval gate",
+                    "gated by approval",
+                    "before any file mutation",
+                    "before any file operation",
+                    "before execution",
                 )
             )
 
@@ -1951,6 +1981,22 @@ class ProjectBuilderService:
                 is True
                 or request_requires_approval
                 or (
+                    "approval"
+                    in request_text_lower
+                    and (
+                        "before"
+                        in request_text_lower
+                        or "after"
+                        in request_text_lower
+                        or "gating"
+                        in request_text_lower
+                        or "gate"
+                        in request_text_lower
+                        or "enforced"
+                        in request_text_lower
+                    )
+                )
+
                     (
                         "approval"
                         in approval_text_lower
@@ -1974,7 +2020,6 @@ class ProjectBuilderService:
                         in approval_text_lower
                     )
                 )
-            )
 
             for step in task_steps:
                 if not isinstance(
@@ -2324,6 +2369,12 @@ class ProjectBuilderService:
                     request=clean_request,
                     project_context=project_context,
                 )
+            )
+
+            print(
+                "[NOVA DEBUG RAW AI PLAN TASKS]",
+                ai_plan.get("tasks"),
+                flush=True,
             )
 
             if (

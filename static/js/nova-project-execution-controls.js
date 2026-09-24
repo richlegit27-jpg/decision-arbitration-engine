@@ -112,15 +112,6 @@ await runProjectAction(
         /*
          * Left sidebar controls.
          */
-        bindButton(
-            "novaLeftNextStep",
-            "next_step"
-        );
-
-        bindButton(
-            "novaLeftNextTask",
-            "next_task"
-        );
 
         bindButton(
             "novaLeftRunAll",
@@ -144,6 +135,11 @@ await runProjectAction(
         bindButton(
             "desktopContinueProject",
             "continue"
+        );
+
+        bindButton(
+            "desktopApproveProject",
+            "approve"
         );
 
         bindButton(

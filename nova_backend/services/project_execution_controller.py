@@ -56,6 +56,7 @@ class ProjectExecutionController:
         "run_all",
         "pause",
         "stop",
+        "approve",
     }
 
     def __init__(
@@ -689,15 +690,6 @@ class ProjectExecutionController:
             "code",
             "replacement",
             "command",
-            "mutation_mode",
-            "mutation_ready",
-            "next_action",
-            "payload_required",
-            "write_mode",
-            "operation",
-            "path",
-            "file_path",
-            "filename",
         )
 
         for task in tasks:
@@ -714,7 +706,7 @@ class ProjectExecutionController:
             if not task_id:
                 continue
 
-            title = str(
+            task_title = str(
                 task.get(
                     "title",
                     "Project task",
@@ -722,7 +714,7 @@ class ProjectExecutionController:
                 or "Project task"
             ).strip()
 
-            description = str(
+            task_description = str(
                 task.get(
                     "description",
                     "",
@@ -730,65 +722,164 @@ class ProjectExecutionController:
                 or ""
             ).strip()
 
-            action = self._normalize_task_action(
+            task_action = self._normalize_task_action(
                 task.get(
                     "action",
                     "analysis",
                 )
             )
 
-            # Preserve the complete original task so that execution
-            # metadata is not lost during controller normalization.
-            step = dict(task)
-
-            step.update(
-                {
-                    "id": (
-                        f"project_task_{task_id}"
-                    ),
-                    "task_id": str(
-                        task_id
-                    ),
-                    "title": (
-                        title
-                        or "Project task"
-                    ),
-                    "description": description,
-                    "action": action,
-                    "status": (
-                        task.get(
-                            "status",
-                            "pending",
-                        )
-                        or "pending"
-                    ),
-                }
+            nested_steps = task.get(
+                "steps"
             )
 
-            # Preserve known execution fields explicitly, including
-            # direct mutation metadata used by file creation tasks.
-            for field_name in execution_fields:
-                if field_name in task:
-                    step[field_name] = task.get(
-                        field_name
+            # New planner format: execute the real nested steps.
+            # Legacy format: preserve the task itself as one runtime step.
+            if not isinstance(
+                nested_steps,
+                list,
+            ) or not nested_steps:
+                nested_steps = [None]
+
+            for step_index, task_step in enumerate(
+                nested_steps
+            ):
+                if not isinstance(
+                    task_step,
+                    dict,
+                ):
+                    task_step = {}
+
+                nested_step_id = (
+                    task_step.get("id")
+                    or f"{task_id}_step_{step_index + 1}"
+                )
+
+                nested_title = str(
+                    task_step.get(
+                        "title",
+                        "",
                     )
+                    or ""
+                ).strip()
 
-            print(
-                "[DEBUG BUILT EXECUTION STEP]",
-                {
-                    "id": step.get("id"),
-                    "title": step.get("title"),
-                    "action": step.get("action"),
-                    "execution_mode": step.get("execution_mode"),
-                    "execution_file": step.get("execution_file"),
-                    "command": step.get("command"),
-                },
-                flush=True,
-            )
+                nested_description = str(
+                    task_step.get(
+                        "description",
+                        "",
+                    )
+                    or ""
+                ).strip()
 
-            steps.append(
-                step
-            )
+                nested_action = task_step.get(
+                    "action"
+                )
+
+                step_action = self._normalize_step_action(
+                    nested_action
+                    if nested_action
+                    else task_action
+                )
+
+                # Start with the complete task so task-level execution
+                # metadata remains available to the executor.
+                step = dict(task)
+
+                # The runtime step represents ONE concrete nested step,
+                # not the planner's entire nested step list.
+                step.pop(
+                    "steps",
+                    None,
+                )
+
+                step.update(
+                    {
+                        "id": (
+                            f"project_step_{task_id}_"
+                            f"{nested_step_id}"
+                        ),
+                        "task_id": str(
+                            task_id
+                        ),
+                        "step_id": str(
+                            nested_step_id
+                        ),
+                        "task_title": (
+                            task_title
+                        ),
+                        "title": (
+                            nested_title
+                            or task_title
+                            or "Project step"
+                        ),
+                        "description": (
+                            nested_description
+                            or task_description
+                        ),
+                        "action": step_action,
+                        "status": (
+                            task_step.get(
+                                "status",
+                                "pending",
+                            )
+                            or "pending"
+                        ),
+                    }
+                )
+
+                # Inherit task-level execution metadata first.
+                for field_name in execution_fields:
+                    if field_name in task:
+                        step[field_name] = task.get(
+                            field_name
+                        )
+
+                # Nested step metadata overrides inherited task metadata.
+                for field_name in execution_fields:
+                    if field_name in task_step:
+                        step[field_name] = task_step.get(
+                            field_name
+                        )
+
+                # Preserve the planner's step-specific fields even
+                # though they are not execution fields.
+                for field_name in (
+                    "expected_output",
+                    "completion_criteria",
+                ):
+                    if field_name in task_step:
+                        step[field_name] = task_step.get(
+                            field_name
+                        )
+
+                print(
+                    "[DEBUG BUILT EXECUTION STEP]",
+                    {
+                        "id": step.get("id"),
+                        "task_id": step.get("task_id"),
+                        "step_id": step.get("step_id"),
+                        "task_title": step.get("task_title"),
+                        "title": step.get("title"),
+                        "action": step.get("action"),
+                        "execution_mode": step.get(
+                            "execution_mode"
+                        ),
+                        "execution_file": step.get(
+                            "execution_file"
+                        ),
+                        "target_file": step.get(
+                            "target_file"
+                        ),
+                        "command": step.get(
+                            "command"
+                        ),
+                    },
+                    flush=True,
+                )
+
+                steps.append(
+                    step
+                )
 
         return steps
 
@@ -1188,6 +1279,118 @@ class ProjectExecutionController:
                 project
             ),
         }
+
+    def approve_project(
+        self,
+        project_id,
+    ):
+        project = self._get_project(
+            project_id
+        )
+
+        if not project:
+            return None
+
+        tasks = self._get_tasks(
+            project
+        )
+
+        execution_state = (
+            self.project_workspace_service
+            .get_execution_state(
+                project_id
+            )
+            or {}
+        )
+
+        current_task_id = (
+            execution_state.get(
+                "current_task_id"
+            )
+        )
+
+        current_task = None
+
+        for task in tasks:
+            if not isinstance(
+                task,
+                dict,
+            ):
+                continue
+
+            if task.get("id") == current_task_id:
+                current_task = task
+                break
+
+        if current_task is None:
+            return {
+                "project_id": project_id,
+                "action": "approve",
+                "status": "error",
+                "message": (
+                    "No current execution task "
+                    "is available for approval."
+                ),
+            }
+
+        self._materialize_task_files(
+            [current_task]
+        )
+
+        result = (
+            self._execute_with_existing_orchestrator(
+                project_id=project_id,
+                tasks=[current_task],
+                command="approve",
+            )
+        )
+
+        print(
+            "[APPROVE RAW ORCHESTRATOR RESULT]",
+            repr(result),
+            flush=True,
+        )
+
+        self._sync_project_execution(
+            project_id,
+            result,
+            "approve",
+        )
+
+        published_artifacts = (
+            self._publish_completed_artifacts(
+                project_id,
+                [current_task],
+                result,
+            )
+        )
+
+        return {
+            "project_id": project_id,
+            "action": "approve",
+            "artifacts": published_artifacts,
+            "execution": (
+                self.project_workspace_service
+                .get_execution_state(
+                    project_id
+                )
+            ),
+            "message": (
+                result.get(
+                    "assistant_message",
+                    {},
+                ).get(
+                    "text",
+                    "Execution approved.",
+                )
+                if isinstance(
+                    result,
+                    dict,
+                )
+                else "Execution approved."
+            ),
+        }
+
 
     def continue_project(
         self,
@@ -2879,6 +3082,8 @@ class ProjectExecutionController:
             return self.continue_project(
                 project_id
             )
+        if action == "approve":
+            return self.approve_project(project_id)
 
         if action == "run_all":
             return self.run_all(
@@ -4059,6 +4264,9 @@ class ProjectExecutionController:
                 projects
             )
             break
+
+
+
 
 
 

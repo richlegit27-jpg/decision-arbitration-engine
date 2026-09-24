@@ -414,6 +414,71 @@ class ExecutionBridgeService:
 
             steps = []
 
+            # Preserve an existing concrete project execution plan.
+            # Do not replace project-generated execution metadata
+            # with a generic AI planner task list.
+            existing_execution_state = {}
+
+            try:
+                if self.chat_service and hasattr(
+                    self.chat_service,
+                    "_load_execution_state",
+                ):
+                    loaded_state = (
+                        self.chat_service._load_execution_state(
+                            session_id
+                        )
+                    )
+
+                    if isinstance(
+                        loaded_state,
+                        dict,
+                    ):
+                        existing_execution_state = loaded_state
+
+            except Exception as exc:
+                print(
+                    "[EXISTING EXECUTION STATE LOAD ERROR]",
+                    repr(exc),
+                    flush=True,
+                )
+
+            existing_steps = (
+                existing_execution_state.get("steps")
+                if isinstance(
+                    existing_execution_state,
+                    dict,
+                )
+                else []
+            )
+
+            if (
+                isinstance(existing_steps, list)
+                and existing_steps
+                and any(
+                    isinstance(step, dict)
+                    and (
+                        step.get("target_file")
+                        or step.get("target_files")
+                        or step.get("content")
+                        or step.get("file_content")
+                        or step.get("execution_file")
+                    )
+                    for step in existing_steps
+                )
+            ):
+                steps = [
+                    dict(step)
+                    for step in existing_steps
+                    if isinstance(step, dict)
+                ]
+
+                print(
+                    "[PROJECT EXECUTION STEPS PRESERVED]",
+                    steps,
+                    flush=True,
+                )
+
             project_context = (
                 build_project_brain_context()
             )
@@ -537,7 +602,7 @@ class ExecutionBridgeService:
                 )
 
 
-            else:
+            elif not steps:
                 try:
                     plan = (
                         self.project_planning_ai_service.build_plan(
