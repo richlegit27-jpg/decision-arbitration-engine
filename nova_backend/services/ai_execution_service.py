@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 from nova_backend.services import model_gateway_service
 
@@ -521,11 +521,3 @@ class AIExecutionService:
             return output_text
 
         return ""
-
-
-
-
-
-
-
-

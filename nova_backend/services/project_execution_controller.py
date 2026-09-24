@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +22,7 @@ class ProjectExecutionController:
             "implement": "implement",
             "build": "implement",
             "edit": "implement",
-            "write": "implement",
+            "write": "write",
             "modify": "implement",
             "patch": "implement",
             "fix": "implement",
@@ -62,6 +62,7 @@ class ProjectExecutionController:
         self,
         project_workspace_service,
         chat_execution_service=None,
+        execution_orchestrator_service=None,
     ):
         self.project_workspace_service = (
             project_workspace_service
@@ -69,6 +70,10 @@ class ProjectExecutionController:
 
         self.chat_execution_service = (
             chat_execution_service
+        )
+
+        self.execution_orchestrator_service = (
+            execution_orchestrator_service
         )
 
         self.artifact_publisher = (
@@ -786,6 +791,7 @@ class ProjectExecutionController:
             )
 
         return steps
+
     def _execute_with_existing_orchestrator(
         self,
         project_id,
@@ -827,6 +833,7 @@ class ProjectExecutionController:
                 "execution": {},
                 "message": "No runnable project tasks remain.",
             }
+
         task_ids = [
             str(
                 task.get(
@@ -886,51 +893,209 @@ class ProjectExecutionController:
                 flush=True,
             )
 
-            execution_service.start(
-                session_id=session_id,
-                goal=goal,
-                steps=steps,
-                context=context,
+            orchestrator = (
+                self.execution_orchestrator_service
             )
 
-            print(
-                "[PROJECT EXECUTION] start completed",
-                session_id,
-                flush=True,
-            )
-
-            if command == "run_all":
+            if orchestrator is None:
                 print(
-                    "[PROJECT EXECUTION] calling run_all",
-                    session_id,
+                    "[PROJECT EXECUTION] canonical orchestrator unavailable; "
+                    "falling back to legacy execution service",
                     flush=True,
                 )
 
-                execution = execution_service.run_all(
-                    session_id=session_id
-                )
+                if command == "run_all":
+                    execution = execution_service.run_all(
+                        session_id=session_id
+                    )
+                else:
+                    execution = execution_service.advance(
+                        session_id=session_id
+                    )
 
                 print(
-                    "[PROJECT EXECUTION] run_all returned",
+                    "[PROJECT EXECUTION] legacy executor returned",
                     type(execution),
                     flush=True,
                 )
+
             else:
                 print(
-                    "[PROJECT EXECUTION] calling advance",
-                    session_id,
+                    "[PROJECT EXECUTION] routing through canonical orchestrator",
+                    {
+                        "session_id": session_id,
+                        "command": command,
+                    },
                     flush=True,
                 )
 
-                execution = execution_service.advance(
-                    session_id=session_id
+                execution_state_service = (
+                    getattr(
+                        orchestrator,
+                        "execution_state_service",
+                        None,
+                    )
+                )
+
+                if execution_state_service is None:
+                    raise RuntimeError(
+                        "Canonical execution state service is unavailable."
+                    )
+
+                persisted_state = (
+                    execution_state_service.get_execution_state(
+                        session_id
+                    )
+                )
+
+                if not isinstance(
+                    persisted_state,
+                    dict,
+                ):
+                    persisted_state = {}
+
+                print(
+                    "[PROJECT EXECUTION PERSISTED STATE]",
+                    {
+                        "status": persisted_state.get(
+                            "status"
+                        ),
+                        "current_index": persisted_state.get(
+                            "current_index"
+                        ),
+                        "step_count": len(
+                            persisted_state.get(
+                                "steps",
+                                []
+                            )
+                            if isinstance(
+                                persisted_state.get(
+                                    "steps",
+                                    []
+                                ),
+                                list,
+                            )
+                            else []
+                        ),
+                        "waiting": persisted_state.get(
+                            "waiting"
+                        ),
+                        "mission_id": persisted_state.get(
+                            "mission_id"
+                        ),
+                    },
+                    flush=True,
+                )
+
+                if command == "approve":
+                    # Approval must preserve the persisted
+                    # waiting/approval state while replacing
+                    # the step definitions with the freshly
+                    # reconstructed project steps.
+                    execution_state = dict(
+                        persisted_state
+                    )
+
+                    if steps:
+                        execution_state["steps"] = steps
+
+                else:
+                    # run_step and run_all both need a real
+                    # execution state. Never call the legacy
+                    # run_all() without first creating this.
+                    execution_state = {
+                        "steps": steps,
+                        "current_index": 0,
+                        "status": "pending",
+                        "waiting": False,
+                        "complete": False,
+                        "project_id": project_id,
+                        "command": command,
+                    }
+
+                    # Preserve an existing mission identifier
+                    # when one already exists.
+                    if persisted_state.get(
+                        "mission_id"
+                    ):
+                        execution_state[
+                            "mission_id"
+                        ] = persisted_state.get(
+                            "mission_id"
+                        )
+
+                execution_state["project_id"] = (
+                    project_id
+                )
+
+                execution_state["command"] = (
+                    command
+                )
+
+                if command == "run_step":
+                    execution_state[
+                        "continue_request"
+                    ] = True
+
+                if command == "run_all":
+                    execution_state[
+                        "continue_request"
+                    ] = True
+                    execution_state[
+                        "run_all"
+                    ] = True
+
+                execution = (
+                    orchestrator.process_execution(
+                        session_id=session_id,
+                        state=execution_state,
+                        command=command,
+                    )
                 )
 
                 print(
-                    "[PROJECT EXECUTION] advance returned",
+                    "[PROJECT EXECUTION] canonical orchestrator returned",
                     type(execution),
                     flush=True,
                 )
+
+                if isinstance(execution, dict):
+                    canonical_execution = execution
+
+                    for _ in range(3):
+                        if not isinstance(
+                            canonical_execution,
+                            dict,
+                        ):
+                            break
+
+                        if isinstance(
+                            canonical_execution.get("steps"),
+                            list,
+                        ):
+                            break
+
+                        canonical_execution = canonical_execution.get(
+                            "execution"
+                        )
+
+                    if isinstance(
+                        canonical_execution,
+                        dict,
+                    ):
+                        canonical_steps = canonical_execution.get(
+                            "steps"
+                        )
+
+                        if isinstance(
+                            canonical_steps,
+                            list,
+                        ):
+                            self._sync_project_execution(
+                                project_id,
+                                canonical_execution,
+                                command,
+                            )
 
             print(
                 "[PROJECT EXECUTION RAW RESULT]",
@@ -969,17 +1134,32 @@ class ProjectExecutionController:
             execution
         )
 
-        return {
-            "ok": True,
-            "execution": execution,
-            "assistant_message": {
+        assistant_message = (
+            execution.get("assistant_message")
+            if isinstance(
+                execution,
+                dict,
+            )
+            else None
+        )
+
+        if not isinstance(
+            assistant_message,
+            dict,
+        ):
+            assistant_message = {
                 "role": "assistant",
                 "text": (
                     execution_service.format_reply(
                         execution
                     )
                 ),
-            },
+            }
+
+        return {
+            "ok": True,
+            "execution": execution,
+            "assistant_message": assistant_message,
         }
 
     def get_state(
@@ -1481,6 +1661,42 @@ class ProjectExecutionController:
                 status,
                 status,
             )
+
+            # The canonical execution can mark the overall
+            # execution complete while the embedded step remains
+            # pending. When the execution itself is explicitly
+            # complete, promote the corresponding project task.
+            execution_status = str(
+                execution.get(
+                    "status",
+                    "",
+                )
+                or ""
+            ).strip().lower()
+
+            execution_complete = (
+                execution_status
+                in {
+                    "complete",
+                    "completed",
+                    "done",
+                    "success",
+                }
+                or execution.get(
+                    "complete",
+                    False,
+                ) is True
+            )
+
+            if (
+                execution_complete
+                and normalized_status
+                not in {
+                    "failed",
+                    "blocked",
+                }
+            ):
+                normalized_status = "completed"
 
             return {
                 "step_id": step_id,
@@ -3024,6 +3240,26 @@ class ProjectExecutionController:
         action,
         tasks=None,
     ):
+
+        print(
+            "[PROJECT SYNC ENTRY]",
+            {
+                "project_id": project_id,
+                "action": action,
+                "result_keys": (
+                    list(result.keys())
+                    if isinstance(result, dict)
+                    else None
+                ),
+                "result_execution_type": type(
+                    result.get("execution")
+                ).__name__
+                if isinstance(result, dict)
+                else None,
+            },
+            flush=True,
+        )
+
         if not isinstance(
             result,
             dict,
@@ -3040,6 +3276,17 @@ class ProjectExecutionController:
                 "execution_state"
             )
         )
+
+        if (
+            isinstance(execution, dict)
+            and isinstance(
+                execution.get("execution"),
+                dict,
+            )
+        ):
+            execution = execution.get(
+                "execution"
+            )
 
         if not isinstance(
             execution,

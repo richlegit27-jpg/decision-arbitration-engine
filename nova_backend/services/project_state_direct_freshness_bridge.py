@@ -22,7 +22,6 @@ DIRECT_PROJECT_STATE_PROMPTS = {
 }
 
 NEXT_MOVE_PROMPTS = {
-    "next",
     "what should we do next",
     "what do we do next",
     "what should we work on next",

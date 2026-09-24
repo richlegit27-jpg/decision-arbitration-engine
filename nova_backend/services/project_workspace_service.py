@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import uuid
@@ -1261,9 +1261,14 @@ class ProjectWorkspaceService:
 
             return data
 
-        except Exception:
-            return []
-
+        except Exception as e:
+            print(
+                "[PROJECT LOAD ERROR]",
+                type(e).__name__,
+                str(e),
+                flush=True,
+            )
+            raise
     def _save_projects(
         self,
         projects,
@@ -2900,6 +2905,7 @@ class ProjectWorkspaceService:
         code="",
         replacement="",
         command="",
+        requires_approval=False,
     ):
 
         projects = self._load_projects()
@@ -3021,6 +3027,18 @@ class ProjectWorkspaceService:
                 "command": str(
                     command or ""
                 ).strip(),
+
+                "requires_approval": bool(
+                    requires_approval
+                ),
+                "approval_required": bool(
+                    requires_approval
+                ),
+                "approval_status": (
+                    "pending"
+                    if requires_approval
+                    else None
+                ),
 
                 "created_at": datetime.now(
                     timezone.utc
@@ -4028,50 +4046,3 @@ class ProjectWorkspaceService:
 # Shared authoritative project workspace service instance.
 
 project_workspace_service = ProjectWorkspaceService()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import re
@@ -921,7 +921,9 @@ except Exception as _title_guard_install_error:
 working_state_service = WorkingStateService(
     session_service=session_service,
 )
-
+project_workspace_service = ProjectWorkspaceService(
+    data_dir="data"
+)
 chat_service = ChatService(
     session_service=session_service,
     memory_service=memory_service,
@@ -1185,8 +1187,17 @@ project_execution_controller = ProjectExecutionController(
     chat_execution_service=(
         chat_execution_service
     ),
+    execution_orchestrator_service=(
+        chat_service.execution_orchestrator_service
+    ),
 )
+
+chat_service.project_execution_controller = (
+    project_execution_controller
+)
+
 local_auth_route_service.install_routes()
+
 password_reset_service = PasswordResetService(
     app,
     request,
@@ -1878,11 +1889,40 @@ def api_projects_new():
             ).strip()
 
             if session_id:
+                tasks = (
+                    project.get("tasks", [])
+                    if isinstance(project, dict)
+                    else []
+                )
+
+                steps = (
+                    project_execution_controller._build_execution_steps(
+                        tasks
+                    )
+                )
+
+                execution_state = {
+                    "steps": steps,
+                    "current_index": 0,
+                    "status": "pending",
+                    "waiting": False,
+                    "complete": False,
+                    "project_id": project_id,
+                    "command": "run_step",
+                }
+
+                execution_state_service.save_execution_state(
+                    session_id,
+                    execution_state,
+                )
+
                 working_state_service.update_working_state(
                     session_id,
                     {
                         "project": project,
                         "project_id": project_id,
+                        "execution_state": execution_state,
+                        "active_execution": execution_state,
                     },
                 )
 
@@ -5663,32 +5703,3 @@ if __name__ == "__main__":
         "seconds",
         flush=True,
     )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -107,7 +107,6 @@ from nova_backend.services.tool_service import ToolService
 from nova_backend.services.tool_executor import ToolExecutor
 from nova_backend.tools.loader import load_tools
 from nova_backend.services.intent_service import IntentService
-from nova_backend.services.execution_loop_service import ExecutionLoopService
 from nova_backend.services.brain.brain_core import BrainCore
 from nova_backend.services.brain.strategy import StrategyEngine
 from nova_backend.services.memory.memory_core import MemoryCore
@@ -581,12 +580,6 @@ class ChatService:
         )
 
         self.runtime = RuntimeBootstrap.build(chat_service=self)
-
-        self.execution_loop = ExecutionLoopService(
-            execution_handler=self.execution_handler,
-            runtime_service=self.runtime,
-        )
-
         self.execution_service = ExecutionService(self)
 
         self.execution_bridge_service = ExecutionBridgeService(
@@ -975,12 +968,49 @@ class ChatService:
 
                 return execution_result
 
+            # --------------------------------------------------
+            # FRESH TASK EXECUTION BOOTSTRAP
+            # --------------------------------------------------
+
+            if (
+                str(
+                    primary_decision.get("intent") or ""
+                ).strip().lower()
+                == "task_execution"
+                and not current_execution.get("steps")
+            ):
+                project_result = (
+                    self.project_builder_service
+                    .build_project_from_request(
+                        user_text=user_text,
+                        owner_id=get_current_user_id(),
+                    )
+                )
+
+                print(
+                    "[CHAT FRESH TASK EXECUTION BOOTSTRAP]",
+                    {
+                        "project_id": (
+                            project_result.get("project_id")
+                            if isinstance(project_result, dict)
+                            else None
+                        ),
+                        "task_count": len(
+                            (
+                                project_result.get("tasks")
+                                if isinstance(project_result, dict)
+                                else []
+                            )
+                            or []
+                        ),
+                    },
+                    flush=True,
+                )
 
             brain_state = {
                 "decision": primary_decision,
             }
-        # Project/planner routes only
-        # --------------------------------------------------
+
 
         elif primary_route in {
             "project_brain",
@@ -1491,10 +1521,10 @@ class ChatService:
                 "steps"
             )
         ):
-            return self.execution_handler.run_next_move(
-                action="run_step",
+            return self.execution_orchestrator_service.process_execution(
                 session_id=session_id,
-                execution_state=existing_execution,
+                state=existing_execution,
+                command="run_step",
             )
         text = str(
             user_text or ""
@@ -2862,22 +2892,15 @@ Rules:
                         flush=True,
                     )
 
-                    self.chat_execution_service.start(
-                        session_id=session_id,
-                        goal=(
-                            execution_state.get("goal")
-                            or "Untitled mission"
-                        ),
-                        steps=(
-                            execution_state.get("steps")
-                            or []
-                        ),
-                        context={
-                            "task_type": (
-                                execution_state.get("task_type")
-                                or "general"
-                            ),
-                        },
+                    self.chat_execution_service._states[
+                        session_id
+                    ] = dict(
+                        execution_state
+                    )
+
+                    exec_debug(
+                        "CHAT EXECUTION SYNCED:",
+                        execution_state,
                     )
 
             except Exception as e:
@@ -2885,6 +2908,7 @@ Rules:
                     "CHAT EXECUTION STATE SYNC FAILED:",
                     e,
                 )
+
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
         session_id = self.safe_str(session_id).strip()
         key = self.safe_str(key).strip()
@@ -5247,7 +5271,7 @@ Rules:
             exec_debug("FINAL_CLEAN_ERROR:", e)
 
         # ==========================================
-        # EXECUTION STEP — LIVE TOOL-FIRST PIPELINE
+        # EXECUTION STEP   LIVE TOOL-FIRST PIPELINE
         # ==========================================
 
         try:

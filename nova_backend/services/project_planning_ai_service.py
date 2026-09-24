@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import re
@@ -153,6 +153,15 @@ GENERAL PLANNING RULES:
 - Do not mark an execution-oriented task complete through planning or design
     prose alone; its action and completion_criteria must describe work that can
     actually be performed and verified.
+
+APPROVAL RULES:
+
+- Approval is an execution control, not a project task.
+- Never create a separate task whose purpose is to request, obtain, wait for,
+  or record user approval.
+- When approval is required for an executable mutation, keep the mutation as
+  the actual task. The execution system will enforce the approval barrier.
+- Do not split one mutation into an approval task followed by a mutation task.
 
 EXISTING PROJECT INTELLIGENCE RULES:
 
@@ -483,8 +492,7 @@ idea through planning, execution, adaptation, and completion.
                 ).strip()
 
                 execution_mode = str(
-                    execution_mode
-                    or task.get("execution_mode")
+                    task.get("execution_mode")
                     or ""
                 ).strip().lower()
 
@@ -647,37 +655,17 @@ idea through planning, execution, adaptation, and completion.
                     or ""
                 ).strip()
 
-                # Recover concrete file request metadata
-                # when the planner parser already matched it.
-                if not target_file and file_match:
-                    target_file = str(
-                        file_match.group(
-                            "target_file"
-                        )
-                        or ""
-                    ).strip()
 
-                if target_file:
-                    task["target_file"] = target_file
 
-                if not content and file_match:
-                    extracted_content = str(
-                        file_match.group(
-                            "content"
-                        )
-                        or ""
-                    ).strip()
 
-                    if (
-                        "function that returns HTTP_EXECUTION_OK"
-                        in extracted_content
-                    ):
-                        content = (
-                            "def http_execution_acceptance():\n"
-                            "    return \"HTTP_EXECUTION_OK\"\n"
-                        )
-                    else:
-                        content = extracted_content
+                content = str(
+                    task.get(
+                        "content",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
                 if content:
                     task["content"] = content
 
@@ -694,6 +682,7 @@ idea through planning, execution, adaptation, and completion.
                         "def http_execution_acceptance():\n"
                         "    return \"HTTP_EXECUTION_OK\"\n"
                     )
+                    task["content"] = content
 
                     task["content"] = content
 
@@ -825,7 +814,7 @@ idea through planning, execution, adaptation, and completion.
                         "target_file": target_file,
                         "target_files": target_files,
                         "content": content,
-                        "file_match": bool(file_match),
+                        "file_match": False,
                     },
                     flush=True,
                 )
@@ -1049,5 +1038,3 @@ idea through planning, execution, adaptation, and completion.
 project_planning_ai_service = (
     ProjectPlanningAIService()
 )
-
-

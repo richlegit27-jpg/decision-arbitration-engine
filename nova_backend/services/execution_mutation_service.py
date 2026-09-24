@@ -357,7 +357,8 @@
         execution_state["current_index"] = next_index
         execution_state["current_step_index"] = next_index
         execution_state["progress"] = next_index
-
+        execution_state["status"] = "running"
+        execution_state["complete"] = False
         execution_state["waiting"] = False
         execution_state["_execution_processing"] = False
 

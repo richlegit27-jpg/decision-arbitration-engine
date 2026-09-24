@@ -65,9 +65,9 @@ class ProjectBuilderService:
         reference,
     ):
         """
-        Normalize planner task IDs, titles, and dependency references
         into a stable lookup key.
         """
+
         normalized_reference = str(
             reference or ""
         ).strip().lower()
@@ -100,11 +100,11 @@ class ProjectBuilderService:
         1. Generate a planner structure.
         2. Create the project if necessary.
         3. Persist phases before tasks.
+
         4. Assign every task to a persistent phase.
         5. Convert planner task references into persistent task UUIDs.
         6. Persist remapped dependencies.
         """
-
         if owner_id is not None and user_id is None:
             user_id = owner_id
 
@@ -1124,10 +1124,9 @@ class ProjectBuilderService:
                     canonical_step["execution_mode"] = "hybrid"
                     canonical_step["execution_file"] = ""
 
-        planned_tasks = normalized_tasks
-
-        # Persist the normalized task collection.
-        planned_tasks = normalized_tasks
+        # Persist the final canonical task collection after
+        # synthetic approval tasks have been collapsed.
+        planned_tasks = plan.get("tasks") or []
 
         task_id_map = {}
         normalized_task_title_map = {}
@@ -1185,11 +1184,6 @@ class ProjectBuilderService:
             if task_phase_key:
                 persistent_phase_id = phase_id_map.get(
                     task_phase_key
-                )
-
-            if use_phases and not persistent_phase_id:
-                raise RuntimeError(
-                    "Task did not contain a valid phase_id"
                 )
 
             # 2. Resolve by task title and metadata.
@@ -1285,6 +1279,26 @@ class ProjectBuilderService:
                     persistent_phase_id = phase_id_map.get(
                         "phase_documentation"
                     )
+
+            print(
+                "[PHASE RESOLUTION DEBUG]",
+                {
+                    "task_index": task_index,
+                    "task_title": task_title,
+                    "created_phases_count": len(created_phases),
+                    "created_phases": [
+                        {
+                            "id": phase.get("id"),
+                            "title": phase.get("title"),
+                        }
+                        for phase in created_phases
+                    ],
+                    "persistent_phase_id_before_fallback": persistent_phase_id,
+                },
+                flush=True,
+            )
+
+            # Final fallback: assign unresolved tasks to a phase
 
             # Final fallback: assign unresolved tasks to a phase
             # deterministically instead of placing every task in
@@ -1399,6 +1413,18 @@ class ProjectBuilderService:
                     step_spec
                 )
 
+                step["content"] = (
+                    step.get("content")
+                    or task_spec.get("content")
+                    or ""
+                )
+
+                step["code"] = (
+                    step.get("code")
+                    or task_spec.get("code")
+                    or ""
+                )
+
                 step_id = (
                     step.get("id")
                     or step.get("step_id")
@@ -1493,6 +1519,7 @@ class ProjectBuilderService:
                         )
                         or ""
                     ),
+
                     "expected_output": (
                         task_spec.get(
                             "expected_output"
@@ -1674,7 +1701,6 @@ class ProjectBuilderService:
                     str(task_spec.get("completion_criteria") or ""),
                 ]
             )
-
             final_task_title_lower = final_task_title.lower()
             final_task_text_lower = final_task_text.lower()
 
@@ -1683,7 +1709,77 @@ class ProjectBuilderService:
                 and target_file
                 and not task_spec.get("content")
             ):
-                task_spec["content"] = ""
+                exact_content_match = None
+
+                exact_content_sources = [
+                    str(
+                        task_spec.get("completion_criteria")
+                        or ""
+                    ).strip(),
+                    str(
+                        task_spec.get("expected_output")
+                        or ""
+                    ).strip(),
+                    str(
+                        task_spec.get("description")
+                        or ""
+                    ).strip(),
+                    str(
+                        task_spec.get("title")
+                        or ""
+                    ).strip(),
+                ]
+
+                exact_content_patterns = [
+                    r"(?is)\bexact\s+(?:text|string)\s+['\"](.+?)['\"]",
+                    r"(?is)\bcontains\s+exactly\s+['\"](.+?)['\"]",
+                    r"(?is)\bcontain(?:s)?\s+the\s+exact\s+(?:text|string)\s+['\"](.+?)['\"]",
+                    r"(?is)\b(?:write|writes|written)\s+the\s+exact\s+(?:text|string)\s+['\"](.+?)['\"]",
+                    r"(?is)\bwith\s+the\s+(?:exact\s+)?content\s+['\"](.+?)['\"]",
+                    r"(?is)\bcontaining\s+the\s+text\s+['\"](.+?)['\"]",
+                    r"(?is)\bcontents?\s+exactly\s+(?:match|equals?)\s+['\"](.+?)['\"]",
+
+                    # Unquoted literal-content forms.
+                    r"(?is)\bcontaining\s+(?:only\s+)?the\s+(?:exact\s+)?text\s+(.+?)\s*[.!]?$",
+                    r"(?is)\bcontains?\s+(?:only\s+)?the\s+(?:exact\s+)?text\s+(.+?)\s*[.!]?$",
+                    r"(?is)\bwrite\s+(?:only\s+)?the\s+(?:exact\s+)?text\s+(.+?)\s+(?:into|to)\b",
+                ]
+
+                for source_text in exact_content_sources:
+                    if not source_text:
+                        continue
+
+                    for pattern in exact_content_patterns:
+                        exact_content_match = re.search(
+                            pattern,
+                            source_text,
+                        )
+
+                        if exact_content_match:
+                            break
+
+                    if exact_content_match:
+                        break
+
+                if exact_content_match:
+                    extracted_content = (
+                        exact_content_match.group(1)
+                        .strip()
+                    )
+
+                    if (
+                        len(extracted_content) >= 2
+                        and extracted_content[0] == extracted_content[-1]
+                        and extracted_content[0] in {"'", '"'}
+                    ):
+                        extracted_content = (
+                            extracted_content[1:-1]
+                            .strip()
+                        )
+
+                    task_spec["content"] = extracted_content
+                else:
+                    task_spec["content"] = ""
 
             final_is_execution_task = bool(
                 execution_file
@@ -1737,6 +1833,7 @@ class ProjectBuilderService:
 
             # Output-persistence tasks are implementation tasks, not
             # executable tasks.
+
             if (
                 "write captured output" in final_task_title_lower
                 or "persist captured output" in final_task_title_lower
@@ -1776,9 +1873,144 @@ class ProjectBuilderService:
                     or "hybrid"
                 )
 
+            for step in task_steps:
+                if not isinstance(
+                    step,
+                    dict,
+                ):
+                    continue
 
-            # Persist the task.
-            # -----------------------------------------------------
+                step["content"] = (
+                    step.get("content")
+                    or task_spec.get("content")
+                    or ""
+                )
+
+                step["code"] = (
+                    step.get("code")
+                    or task_spec.get("code")
+                    or ""
+                )
+
+            approval_text = " ".join(
+                [
+                    str(
+                        task_spec.get(
+                            "title"
+                        )
+                        or ""
+                    ),
+                    str(
+                        task_spec.get(
+                            "description"
+                        )
+                        or ""
+                    ),
+                    str(
+                        task_spec.get(
+                            "completion_criteria"
+                        )
+                        or ""
+                    ),
+                    str(
+                        task_spec.get(
+                            "expected_output"
+                        )
+                        or ""
+                    ),
+                ]
+            )
+
+            approval_text_lower = approval_text.lower()
+
+            approval_text_lower = approval_text.lower()
+            request_text_lower = clean_request.lower()
+
+            request_requires_approval = any(
+                phrase in request_text_lower
+                for phrase in (
+                    "require my explicit approval",
+                    "requires my explicit approval",
+                    "explicit approval before",
+                    "require explicit approval",
+                    "requires explicit approval",
+                    "only after my approval",
+                    "only after explicit approval",
+                    "wait for my approval",
+                )
+            )
+
+            requires_approval = bool(
+                task_spec.get(
+                    "requires_approval"
+                )
+                is True
+                or task_spec.get(
+                    "approval_required"
+                )
+                is True
+                or request_requires_approval
+                or (
+                    (
+                        "approval"
+                        in approval_text_lower
+                        or "approve"
+                        in approval_text_lower
+                    )
+                    and (
+                        "pending approval"
+                        in approval_text_lower
+                        or "require approval"
+                        in approval_text_lower
+                        or "requires approval"
+                        in approval_text_lower
+                        or "approval required"
+                        in approval_text_lower
+                        or "approval obtained"
+                        in approval_text_lower
+                        or "only after"
+                        in approval_text_lower
+                        or "before"
+                        in approval_text_lower
+                    )
+                )
+            )
+
+            for step in task_steps:
+                if not isinstance(
+                    step,
+                    dict,
+                ):
+                    continue
+
+                step["requires_approval"] = (
+                    requires_approval
+                )
+
+                step["approval_required"] = (
+                    requires_approval
+                )
+
+                step["approval_status"] = (
+                    "pending"
+                    if requires_approval
+                    else None
+                )
+
+            print(
+                "[NOVA DEBUG TASK APPROVAL]",
+                {
+                    "requires_approval": requires_approval,
+                    "approval_text": approval_text,
+                },
+                flush=True,
+            )
+
+            print(
+                "[NOVA DEBUG TASK STEPS BEFORE PERSIST]",
+                task_steps,
+                flush=True,
+            )
 
             created_task = (
 
@@ -1797,7 +2029,6 @@ class ProjectBuilderService:
                         )
                         or ""
                     ),
-
 
                     action=normalized_action,
                     execution_mode=normalized_execution_mode,
@@ -1852,7 +2083,17 @@ class ProjectBuilderService:
                         )
                         or ""
                     ),
+                    requires_approval=requires_approval,
                 )
+            )
+
+            print(
+                "[NOVA DEBUG CREATED TASK RETURN]",
+                {
+                    "type": type(created_task).__name__,
+                    "value": created_task,
+                },
+                flush=True,
             )
 
             if isinstance(
@@ -2057,17 +2298,16 @@ class ProjectBuilderService:
         request: str,
         project_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """
-        Build a project plan.
 
-        Primary path:
-        Use Nova Project Intelligence AI to understand the user's goal
-        and generate project-specific tasks.
-
-        Fallback path:
-        Use the existing deterministic planner if AI planning is
-        unavailable or returns an invalid result.
-        """
+        # Build a project plan.
+        #
+        # Primary path:
+        # Use Nova Project Intelligence AI to understand the user's goal
+        # and generate project-specific tasks.
+        #
+        # Fallback path:
+        # Use the existing deterministic planner if AI planning is
+        # unavailable or returns an invalid result.
 
         clean_request = str(
             request or ""
@@ -2228,7 +2468,152 @@ class ProjectBuilderService:
                         task
                     )
 
-                ai_plan["tasks"] = normalized_tasks
+                # ---------------------------------------------------------
+                # Collapse synthetic approval/preparation tasks into the
+                # concrete mutation task they are preparing.
+                #
+                # Example:
+                #   "Implement user approval prompt for file creation"
+                #   "Create conversation_one.txt containing 'ONE' after approval"
+                #
+                # The first task is not itself the mutation. Approval belongs
+                # on the concrete mutation task so execution cannot run the
+                # synthetic preparation task as step 0.
+                # ---------------------------------------------------------
+
+                collapsed_tasks = []
+                synthetic_approval_tasks = []
+
+                for candidate in normalized_tasks:
+                    if not isinstance(candidate, dict):
+                        continue
+
+                    candidate_title = str(
+                        candidate.get("title")
+                        or candidate.get("name")
+                        or ""
+                    ).strip()
+
+                    candidate_title_lower = candidate_title.lower()
+
+                    candidate_text = " ".join(
+                        [
+                            candidate_title,
+                            str(
+                                candidate.get("description")
+                                or ""
+                            ),
+                        ]
+                    ).lower()
+
+                    candidate_action = str(
+                        candidate.get("action")
+                        or ""
+                    ).strip().lower()
+
+                    is_synthetic_approval_task = (
+                        candidate_action in {
+                            "analyze",
+                            "design",
+                            "implement",
+                        }
+                        and "approval" in candidate_text
+                        and (
+                            "prompt" in candidate_text
+                            or "request" in candidate_text
+                            or "require" in candidate_text
+                            or "design" in candidate_text
+                            or "mechanism" in candidate_text
+                            or "process" in candidate_text
+                            or "obtain" in candidate_text
+                            or "record" in candidate_text
+                            or "wait" in candidate_text
+                        )
+                    )
+                    if is_synthetic_approval_task:
+                        synthetic_approval_tasks.append(candidate)
+                        continue
+
+                    collapsed_tasks.append(candidate)
+
+                if synthetic_approval_tasks:
+                    for approval_task in synthetic_approval_tasks:
+                        for mutation_task in collapsed_tasks:
+                            mutation_action = str(
+                                mutation_task.get("action")
+                                or ""
+                            ).strip().lower()
+
+                            mutation_target = str(
+                                mutation_task.get("target_file")
+                                or ""
+                            ).strip()
+
+                            mutation_targets = mutation_task.get(
+                                "target_files"
+                            ) or []
+
+                            has_mutation_target = bool(
+                                mutation_target
+                                or mutation_targets
+                            )
+
+                            is_mutation_task = (
+                                mutation_action
+                                in {
+                                    "create",
+                                    "write",
+                                    "modify",
+                                    "update",
+                                    "patch",
+                                    "replace",
+                                    "delete",
+                                    "remove",
+                                    "implement",
+                                }
+                                and has_mutation_target
+                            )
+
+                            if not is_mutation_task:
+                                continue
+
+                            mutation_text = " ".join(
+                                [
+                                    str(
+                                        mutation_task.get("title")
+                                        or ""
+                                    ),
+                                    str(
+                                        mutation_task.get("description")
+                                        or ""
+                                    ),
+                                ]
+                            ).lower()
+
+                            if (
+                                "after approval"
+                                in mutation_text
+                                or "approval"
+                                in mutation_text
+                                or "approve"
+                                in mutation_text
+                            ):
+                                mutation_task[
+                                    "requires_approval"
+                                ] = True
+
+                                mutation_task[
+                                    "approval_required"
+                                ] = True
+
+                                mutation_task[
+                                    "approval_status"
+                                ] = "pending"
+
+                                break
+
+
+                ai_plan["tasks"] = collapsed_tasks
 
                 print(
                     "[NOVA PROJECT PLANNER] "
@@ -3184,7 +3569,6 @@ class ProjectBuilderService:
         erasing requirements, assumptions, decisions, blockers, milestones,
         or other accumulated project knowledge.
         """
-
         projects = (
             self.project_workspace_service._load_projects()
         )
@@ -3625,32 +4009,6 @@ class ProjectBuilderService:
             )
 
             return
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

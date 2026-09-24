@@ -1,4 +1,4 @@
-﻿class DecisionService:
+class DecisionService:
 
     def __init__(self, chat_service):
         self.chat_service = chat_service
@@ -205,6 +205,39 @@
                 session_id
             )
 
+            print(
+                "[DECISION APPROVAL STATE]",
+                {
+                    "session_id": session_id,
+                    "status": (
+                        execution_state.get("status")
+                        if isinstance(execution_state, dict)
+                        else None
+                    ),
+                    "current_index": (
+                        execution_state.get("current_index")
+                        if isinstance(execution_state, dict)
+                        else None
+                    ),
+                    "step_count": (
+                        len(execution_state.get("steps") or [])
+                        if isinstance(execution_state, dict)
+                        else 0
+                    ),
+                    "waiting": (
+                        execution_state.get("waiting")
+                        if isinstance(execution_state, dict)
+                        else None
+                    ),
+                    "approval_required": (
+                        execution_state.get("approval_required")
+                        if isinstance(execution_state, dict)
+                        else None
+                    ),
+                },
+                flush=True,
+            )
+
             if isinstance(execution_state, dict):
                 steps = execution_state.get("steps") or []
                 current_index = execution_state.get(
@@ -220,10 +253,62 @@
                 except (TypeError, ValueError):
                     current_index = 0
 
+                current_step = (
+                    steps[current_index]
+                    if (
+                        isinstance(steps, list)
+                        and 0 <= current_index < len(steps)
+                        and isinstance(steps[current_index], dict)
+                    )
+                    else {}
+                )
+
+                approval_waiting = (
+                    isinstance(current_step, dict)
+                    and (
+                        current_step.get("approval_required") is True
+                        or current_step.get("requires_approval") is True
+                        or self.safe_str(
+                            current_step.get("status")
+                        ).lower()
+                        in {
+                            "waiting_approval",
+                            "awaiting_approval",
+                            "approval_required",
+                        }
+                    )
+                )
+
+                if (
+                    approval_waiting
+                    and lower_text.strip()
+                    in {
+                        "yes",
+                        "y",
+                        "yeah",
+                        "yep",
+                        "sure",
+                        "okay",
+                        "ok",
+                        "go ahead",
+                        "do it",
+                        "approve",
+                        "approved",
+                        "approve step",
+                        "approve execution",
+                    }
+                ):
+                    return self._execution_decision(
+                        user_text=user_text,
+                        intent="execution_control",
+                        reason="approval_confirmation",
+                        command="approve",
+                    )
+
                 pending_execution = (
                     isinstance(steps, list)
                     and bool(steps)
-                                        and execution_status in {
+                    and execution_status in {
                         "pending",
                         "running",
                         "in_progress",
@@ -239,7 +324,6 @@
                 "[DECISION PENDING EXECUTION CHECK FAILED]",
                 repr(exc),
             )
-
         project_execution_request = (
             (
                 "create a project" in lower_text
@@ -261,7 +345,10 @@
                 reason="project_creation_with_execution_request",
             )
 
-        if pending_execution:
+        if (
+            pending_execution
+            and not approval_waiting
+        ):
             return self._execution_decision(
                 user_text=user_text,
                 intent="execution_continuation",
@@ -304,7 +391,9 @@
 
         # Explicitly execute the currently selected project step.
         if (
-            "execute the next step" in lower_text
+            lower_text.strip() == "next"
+            or lower_text.strip() == "next step"
+            or "execute the next step" in lower_text
             or "run the next step" in lower_text
             or "proceed with the next step" in lower_text
             or "continue with the next step" in lower_text
@@ -449,6 +538,10 @@
             "advance",
             "stop",
             "cancel",
+            "approve",
+            "approved",
+            "approve step",
+            "approve execution",
         )
 
         if lower_text.strip() in execution_triggers:
@@ -642,11 +735,3 @@
             "use_memory": True,
             "prompt": user_text,
         }
-
-
-
-
-
-
-
-

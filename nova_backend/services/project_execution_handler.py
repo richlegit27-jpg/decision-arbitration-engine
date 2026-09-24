@@ -241,6 +241,13 @@ class ProjectExecutionHandler:
         session_id: str,
         execution_state: Dict[str, Any],
     ) -> Dict[str, Any]:
+
+        print(
+            "[RUN_NEXT_STEP LIVE MARKER]",
+            __file__,
+            flush=True,
+    )
+
         state = (
             dict(execution_state)
             if isinstance(execution_state, dict)
@@ -583,8 +590,29 @@ class ProjectExecutionHandler:
         # BUILD EXECUTION MOVE
         # ---------------------------------------------------------
 
+        print(
+            "[PROJECT MOVE DEBUG BEFORE]",
+            {
+                "step_action": step_action,
+                "action": current_step.get("action"),
+                "target_file": current_step.get("target_file"),
+                "content": current_step.get("content"),
+                "status": current_step.get("status"),
+            },
+            flush=True,
+        )
+
         move = self._make_move(
             current_step
+        )
+
+        print(
+            "[PROJECT MOVE DEBUG AFTER]",
+            {
+                "move": repr(move),
+                "move_type": getattr(move, "type", None),
+            },
+            flush=True,
         )
 
         # ---------------------------------------------------------
@@ -1071,6 +1099,130 @@ class ProjectExecutionHandler:
 
                     steps[current_index] = current_step
 
+                    state["steps"] = steps
+                    state["status"] = "failed"
+                    state["waiting"] = False
+                    state["complete"] = False
+                    state["error"] = current_step["error"]
+                    state["current_step"] = current_step
+
+                    return {
+                        "ok": False,
+                        "error": current_step["error"],
+                        "execution_state": state,
+                    }
+
+        # ---------------------------------------------------------
+        # WRITE FILE
+        # ---------------------------------------------------------
+
+        if move is None and step_action in {
+            "build",
+            "implement",
+            "implementation",
+            "create",
+            "edit",
+            "write",
+            "modify",
+            "patch",
+            "fix",
+        }:
+            target_file = str(
+                current_step.get("target_file")
+                or ""
+            ).strip()
+
+            content = str(
+                current_step.get("content")
+                or current_step.get("code")
+                or current_step.get("replacement")
+                or ""
+            )
+
+            if target_file and content.strip():
+                try:
+                    written_step = (
+                        self.execution_step_service.execute_step_logic(
+                            session_id=session_id,
+                            step=current_step,
+                        )
+                    )
+
+                    if isinstance(written_step, dict):
+                        updated_step = dict(current_step)
+                        updated_step.update(written_step)
+                        current_step = updated_step
+
+                    steps[current_index] = current_step
+                    state["steps"] = steps
+                    state["current_step"] = current_step
+
+                    step_status = str(
+                        current_step.get("status") or ""
+                    ).strip().lower()
+
+                    if step_status in {
+                        "failed",
+                        "error",
+                    }:
+                        state["status"] = "failed"
+                        state["waiting"] = False
+                        state["complete"] = False
+                        state["error"] = (
+                            current_step.get("error")
+                            or "Project file write failed."
+                        )
+
+                        return {
+                            "ok": False,
+                            "error": state["error"],
+                            "execution_state": state,
+                        }
+
+                    if step_status in {
+                        "waiting",
+                        "waiting_approval",
+                    }:
+                        state["status"] = "waiting"
+                        state["waiting"] = True
+                        state["complete"] = False
+
+                        return {
+                            "ok": True,
+                            "execution_state": state,
+                        }
+
+                    if step_status == "completed":
+                        current_step["completion_status"] = "completed"
+                        current_step["next_action"] = None
+                        current_step["mutation_ready"] = False
+                        current_step["payload_required"] = False
+                        current_step["error"] = None
+
+                        steps[current_index] = current_step
+                        state["steps"] = steps
+                        state["current_step"] = current_step
+
+                        state = self._advance_after_success(
+                            state=state,
+                            steps=steps,
+                            current_index=current_index,
+                            current_step=current_step,
+                        )
+
+                        return {
+                            "ok": True,
+                            "execution_state": state,
+                            "result": current_step.get("result"),
+                        }
+
+                except Exception as exc:
+                    current_step["status"] = "failed"
+                    current_step["error"] = (
+                        f"Project file write failed: {exc}"
+                    )
+
+                    steps[current_index] = current_step
                     state["steps"] = steps
                     state["status"] = "failed"
                     state["waiting"] = False

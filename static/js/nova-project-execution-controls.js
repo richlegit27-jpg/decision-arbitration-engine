@@ -91,9 +91,10 @@ async function runProjectAction(
                 button.disabled = true;
 
                 try {
-                    await runProjectAction(
-                        action
-                    );
+await runProjectAction(
+    getActiveProjectId(),
+    action
+);
                 } finally {
                     button.disabled = false;
                 }

@@ -1116,21 +1116,37 @@ class ExecutionStepService:
             ).strip().lower()
 
             if action in {
+                "create",
                 "create_file",
+                "write",
+                "write_file",
+                "modify",
                 "modify_file",
+                "update",
+                "patch",
+                "replace",
             }:
-
-                target_file = (
-                    step.get("target_file")
-                    or step.get("file_path")
-                    or "simple_test_task.txt"
-                )
-
-                content = (
+                content = self._safe_str(
                     step.get("content")
                     or step.get("file_content")
+                    or step.get("generated_content")
                     or ""
-                )
+                ).strip()
+
+                if not content:
+                    description_text = self._safe_str(
+                        step.get("description")
+                        or ""
+                    ).strip()
+
+                    match = re.search(
+                        r"containing\s+(?:the\s+string\s+)?['\"]([^'\"]+)['\"]",
+                        description_text,
+                        re.IGNORECASE,
+                    )
+
+                    if match:
+                        content = match.group(1)
 
             # Normalize natural-language Python requests
             # before direct file write bypasses later pipeline.
@@ -1169,10 +1185,21 @@ class ExecutionStepService:
                     )
 
             if (
-                action in {"create_file", "modify_file"}
+                action in {
+                    "create",
+                    "create_file",
+                    "write",
+                    "write_file",
+                    "modify",
+                    "modify_file",
+                    "update",
+                    "patch",
+                    "replace",
+                }
                 and target_file
                 and content
             ):
+
                 try:
                     with open(
                         target_file,
@@ -1689,6 +1716,47 @@ class ExecutionStepService:
                     "Convert execution artifact to Python first."
                 )
                 return step
+
+            # -------------------------------------------------
+            # VERIFICATION INTENT NORMALIZATION
+            # -------------------------------------------------
+            # Some project builders currently classify verification
+            # tasks as "execute". Do not let those tasks fall into
+            # terminal execution or file mutation.
+            verification_text = self._safe_str(
+                step.get("description")
+                or step.get("text")
+                or step.get("title")
+                or step.get("goal")
+                or ""
+            ).strip().lower()
+
+            verification_intent = (
+                step_action == "execute"
+                and (
+                    "verify" in verification_text
+                    or "verification" in verification_text
+                    or "validate" in verification_text
+                    or "validation" in verification_text
+                    or "check that" in verification_text
+                    or "check whether" in verification_text
+                    or "confirm that" in verification_text
+                    or "confirm whether" in verification_text
+                )
+                and not self._safe_str(
+                    step.get("command")
+                    or step.get("cmd")
+                ).strip()
+                and not self._safe_str(
+                    step.get("content")
+                    or step.get("file_content")
+                    or step.get("generated_content")
+                ).strip()
+            )
+
+            if verification_intent:
+                step["action"] = "verify"
+                step_action = "verify"
 
             elif step_action in {
                 "command",
