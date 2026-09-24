@@ -2326,12 +2326,6 @@ class ExecutionOrchestratorService:
                 )
             )
 
-            execution_state = (
-                self.execution_mutation_service.reset(
-                    execution_state
-                )
-            )
-
             self._save_execution_state(
                 session_id,
                 execution_state,
