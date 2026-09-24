@@ -433,7 +433,6 @@ class ExecutionOrchestratorService:
             "nope",
             "deny",
             "denied",
-            "cancel",
             "stop",
         }:
             command = "deny"
