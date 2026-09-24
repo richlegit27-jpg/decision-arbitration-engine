@@ -185,14 +185,33 @@ class ExecutionTopGuardService:
                 has_active_execution
                 and is_continuation_request
             ):
-                result = chat_execution_service.run_all(
-                    safe_session_id
+                orchestrator = getattr(
+                    getattr(
+                        execution_bridge_service,
+                        "chat_service",
+                        None,
+                    ),
+                    "execution_orchestrator_service",
+                    None,
+                )
+
+                if orchestrator is None:
+                    return {
+                        "handled": False,
+                    }
+
+                result = orchestrator.process_execution(
+                    session_id=safe_session_id,
+                    command="run_step",
                 )
 
                 reply_text = (
-                    chat_execution_service.format_reply(
-                        result
+                    result.get("assistant_message", {}).get(
+                        "text",
+                        "Execution continued.",
                     )
+                    if isinstance(result, dict)
+                    else str(result)
                 )
 
                 return {
@@ -201,7 +220,14 @@ class ExecutionTopGuardService:
                         "ok": True,
                         "session_id": safe_session_id,
                         "execution": result,
-                        "execution_state": result,
+                        "execution_state": (
+                            result.get(
+                                "execution",
+                                {},
+                            )
+                            if isinstance(result, dict)
+                            else {}
+                        ),
                         "text": reply_text,
                         "assistant_message": {
                             "role": "assistant",
