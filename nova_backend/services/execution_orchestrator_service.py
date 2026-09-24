@@ -495,8 +495,134 @@ class ExecutionOrchestratorService:
             execution_state.get("steps")
         )
 
+        steps = (
+            execution_state.get("steps")
+            or []
+        )
+
         if incoming_has_state:
-            execution_state = execution_state
+            if (
+                persisted_state_available
+                and str(
+                    persisted_execution_state.get(
+                        "status",
+                        "",
+                    )
+                ).strip().lower()
+                == "waiting_approval"
+            ):
+                preserved_index = int(
+                    persisted_execution_state.get(
+                        "current_index",
+                        execution_state.get(
+                            "current_index",
+                            0,
+                        ),
+                    )
+                    or 0
+                )
+
+                persisted_steps = (
+                    persisted_execution_state.get(
+                        "steps"
+                    )
+                    or []
+                )
+
+                if (
+                    isinstance(
+                        persisted_steps,
+                        list,
+                    )
+                    and 0 <= preserved_index < len(
+                        persisted_steps
+                    )
+                    and isinstance(
+                        steps,
+                        list,
+                    )
+                    and 0 <= preserved_index < len(
+                        steps
+                    )
+                    and isinstance(
+                        persisted_steps[
+                            preserved_index
+                        ],
+                        dict,
+                    )
+                    and isinstance(
+                        steps[
+                            preserved_index
+                        ],
+                        dict,
+                    )
+                ):
+                    incoming_step = steps[
+                        preserved_index
+                    ]
+
+                    persisted_step = persisted_steps[
+                        preserved_index
+                    ]
+
+                    for key in (
+                        "status",
+                        "waiting",
+                        "approved",
+                        "approval_required",
+                        "approval_status",
+                        "next_action",
+                        "result",
+                        "complete",
+                        "execution_metadata",
+                        "content",
+                        "code",
+                    ):
+                        if key in persisted_step:
+                            incoming_step[key] = (
+                                persisted_step[key]
+                            )
+
+                execution_state["status"] = (
+                    persisted_execution_state.get(
+                        "status"
+                    )
+                )
+                execution_state["waiting"] = (
+                    persisted_execution_state.get(
+                        "waiting",
+                        True,
+                    )
+                )
+                execution_state[
+                    "approval_status"
+                ] = persisted_execution_state.get(
+                    "approval_status",
+                    "pending",
+                )
+                execution_state["current_index"] = (
+                    preserved_index
+                )
+
+                print(
+                    "[CONTINUE APPROVAL STATE PRESERVED]",
+                    {
+                        "status": execution_state.get(
+                            "status"
+                        ),
+                        "waiting": execution_state.get(
+                            "waiting"
+                        ),
+                        "approval_status": execution_state.get(
+                            "approval_status"
+                        ),
+                        "current_index": preserved_index,
+                    },
+                    flush=True,
+                )
+
+            else:
+                execution_state = execution_state
 
             if (
                 execution_state.get(
@@ -504,39 +630,16 @@ class ExecutionOrchestratorService:
                 )
                 is True
             ):
-                execution_state["waiting"] = False
-                execution_state["waiting_for_approval"] = False
-                execution_state["awaiting_approval"] = False
-                execution_state["approval_required"] = False
-                execution_state["approval_status"] = "approved"
-                execution_state["status"] = "ready"
-
-                steps = execution_state.get(
-                    "steps"
-                ) or []
-
-                current_index = int(
-                    execution_state.get(
-                        "current_index",
-                        0,
-                    )
-                    or 0
-                )
-
-                if (
-                    0 <= current_index < len(steps)
-                    and isinstance(
-                        steps[current_index],
-                        dict,
-                    )
-                ):
-                    steps[current_index]["requires_approval"] = False
-                    steps[current_index]["approval_required"] = False
-                    steps[current_index]["approval_status"] = "approved"
-
-                self.execution_state_service.save_execution_state(
-                    session_id,
-                    execution_state,
+                print(
+                    "[CONTINUE REQUEST STATE PRESERVED]",
+                    {
+                        "status": execution_state.get("status"),
+                        "waiting": execution_state.get("waiting"),
+                        "approval_status": execution_state.get(
+                            "approval_status"
+                        ),
+                    },
+                    flush=True,
                 )
 
         elif persisted_state_available:
@@ -643,11 +746,39 @@ class ExecutionOrchestratorService:
             ).lower().strip()
 
             if (
-                state_status != "waiting_approval"
-                and not (
-                    command == "approve"
-                    and isinstance(steps[current_index], dict)
-                    and steps[current_index].get("approved") is True
+                current_index >= len(steps)
+                or not isinstance(
+                    steps[current_index],
+                    dict,
+                )
+                or (
+                    state_status != "waiting_approval"
+                    and not (
+                        command == "approve"
+                        and (
+                            steps[current_index].get("approved")
+                            is True
+                            or steps[current_index].get(
+                                "approval_required"
+                            )
+                            is True
+                            or steps[current_index].get(
+                                "requires_approval"
+                            )
+                            is True
+                            or self._safe_str(
+                                steps[current_index].get(
+                                    "approval_status"
+                                )
+                            ).lower().strip()
+                            in {
+                                "pending",
+                                "waiting_approval",
+                                "awaiting_approval",
+                                "approval_required",
+                            }
+                        )
+                    )
                 )
             ):
                 return {
@@ -716,36 +847,52 @@ class ExecutionOrchestratorService:
                         current_step=approved_step,
                     )
                 )
-                execution_state["command"] = (
-                    "run_step"
+
+                # Approval releases the SAME step.
+                # Do not advance past the approved mutation step.
+                execution_state["current_index"] = (
+                    current_index
+                )
+                execution_state["current_step_index"] = (
+                    current_index
+                )
+                execution_state["command"] = "run_step"
+
+                print(
+                    "[APPROVAL RELEASE SAME STEP]",
+                    {
+                        "approved_index": current_index,
+                        "current_index": execution_state.get(
+                            "current_index"
+                        ),
+                        "step_count": len(
+                            execution_state.get("steps") or []
+                        ),
+                        "step_status": approved_step.get(
+                            "status"
+                        ),
+                        "approval_status": approved_step.get(
+                            "approval_status"
+                        ),
+                        "approval_required": approved_step.get(
+                            "approval_required"
+                        ),
+                    },
+                    flush=True,
                 )
 
-                print("[APPROVAL SAVE TRACE] session_id=", repr(session_id), " status=", repr(execution_state.get("status")), flush=True)
-                print("[APPROVAL SAVE TRACE] session_id=", repr(session_id), " status=", repr(execution_state.get("status")), flush=True)
                 self._save_execution_state(
                     session_id,
                     execution_state,
                 )
 
-            print(
-                "DEBUG APPROVAL BEFORE RUN_STEP RECURSE",
-                {
-                    "status": execution_state.get("status"),
-                    "current_index": current_index,
-                    "step_status": execution_state["steps"][current_index].get("status"),
-                    "step_complete": execution_state["steps"][current_index].get("complete"),
-                    "command": execution_state.get("command"),
-                },
-                flush=True,
-            )
-
-            return (
-                self._process_execution_command(
-                    command="run_step",
-                    session_id=session_id,
-                    execution_state=execution_state,
+                return (
+                    self._process_execution_command(
+                        command="run_step",
+                        session_id=session_id,
+                        execution_state=execution_state,
+                    )
                 )
-            )
 
             denied_step = (
                 self.approval_service.deny_step(
@@ -757,20 +904,6 @@ class ExecutionOrchestratorService:
                 current_index
             ] = denied_step
 
-            execution_state = (
-                self.execution_mutation_service.mark_approval_denied(
-                    execution_state,
-                    error="Execution approval denied.",
-                )
-            )
-
-            execution_state = (
-                self.execution_mutation_service.append_history(
-                    execution_state,
-                    "approval denied",
-                )
-            )
-
             self._save_execution_state(
                 session_id,
                 execution_state,
@@ -781,13 +914,11 @@ class ExecutionOrchestratorService:
                 "assistant_message": {
                     "role": "assistant",
                     "text": (
-                        "Execution approval denied. "
-                        "The protected step was not run."
+                        "Execution step denied."
                     ),
                 },
                 "execution": execution_state,
             }
-
 
         # =========================
         # NEXT AFTER COMPLETION
@@ -941,15 +1072,19 @@ class ExecutionOrchestratorService:
             # state does not contain a usable step list.
             refreshed_execution = execution_state
 
-            refreshed_steps = (
+            incoming_steps = (
                 execution_state.get("steps")
                 or []
             )
 
+            refreshed_steps = incoming_steps
+
             if not isinstance(
                 refreshed_steps,
                 list,
-            ) or current_index >= len(refreshed_steps):
+            ) or current_index >= len(
+                refreshed_steps
+            ):
                 persisted_refresh = (
                     self.execution_state_service.get_execution_state(
                         session_id
@@ -1312,6 +1447,7 @@ class ExecutionOrchestratorService:
                 "replace",
                 "delete",
                 "remove",
+                "execute",
             }
 
             approval_required = (
@@ -1333,15 +1469,32 @@ class ExecutionOrchestratorService:
                 step["approval_status"] = None
 
             if (
-                execution_state.get("continue_request") is True
-                or execution_state.get("command") == "run_step"
-                and execution_state.get("status") == "waiting_approval"
+                str(
+                    execution_state.get("command")
+                    or ""
+                ).strip().lower()
+                == "approve"
             ):
                 approval_required = False
 
                 step["requires_approval"] = False
                 step["approval_required"] = False
                 step["approval_status"] = "approved"
+
+            print(
+                "[APPROVAL GATE FINAL CHECK]",
+                {
+                    "command": execution_state.get("command"),
+                    "step_action": step_action,
+                    "step_status": step_status,
+                    "requires_approval": step.get("requires_approval"),
+                    "approval_required_field": step.get("approval_required"),
+                    "approval_status": step.get("approval_status"),
+                    "approval_required_computed": approval_required,
+                },
+                flush=True,
+            )
+
 
             if approval_required:
                 approval_reason = self._safe_str(
@@ -2254,6 +2407,8 @@ class ExecutionOrchestratorService:
                 session_id=session_id,
                 execution_state=execution_state,
             )
+
+
 
 
 
