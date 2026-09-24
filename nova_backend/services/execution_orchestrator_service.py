@@ -2331,32 +2331,6 @@ class ExecutionOrchestratorService:
                 execution_state,
             )
 
-            try:
-                from nova_backend.services.chat_execution_service import (
-                    chat_execution_service,
-                )
-
-                if hasattr(
-                    chat_execution_service,
-                    "cancel",
-                ):
-                    execution_state = (
-                        chat_execution_service.cancel(
-                            session_id
-                        )
-                    )
-
-                else:
-                    chat_execution_service.reset(
-                        session_id
-                    )
-
-            except Exception as legacy_reset_error:
-                print(
-                    "LEGACY EXECUTION RESET FAILED:",
-                    legacy_reset_error,
-                )
-
             return {
                 "ok": True,
                 "assistant_message": {
