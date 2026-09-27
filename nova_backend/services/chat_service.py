@@ -576,6 +576,9 @@ class ChatService:
                 approval_service=(
                     self.execution_approval_service
                 ),
+                project_workspace_service=(
+                    self.project_workspace_service
+                ),
             )
         )
 

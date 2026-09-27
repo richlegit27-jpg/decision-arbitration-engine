@@ -1,5 +1,8 @@
 ﻿from __future__ import annotations
 
+import mimetypes
+from pathlib import Path
+
 
 class ExecutionOrchestratorService:
 
@@ -12,6 +15,7 @@ class ExecutionOrchestratorService:
         execution_step_service=None,
         approval_service=None,
         execution_bridge=None,
+        project_workspace_service=None,
     ):
 
         self.execution_state_service = (
@@ -38,6 +42,81 @@ class ExecutionOrchestratorService:
 
         self.execution_bridge = (
             execution_bridge
+        )
+        self.project_workspace_service = (
+            project_workspace_service
+        )
+
+    def _register_project_file(
+        self,
+        execution_state,
+        step,
+    ):
+        if self.project_workspace_service is None:
+            return None
+
+        if not isinstance(execution_state, dict):
+            return None
+
+        project_id = execution_state.get("project_id")
+        if not project_id:
+            return None
+
+        if not isinstance(step, dict):
+            return None
+
+        action = str(
+            step.get("action")
+            or ""
+        ).strip().lower()
+
+        if action not in {
+            "create",
+            "create_file",
+            "write",
+            "write_file",
+            "modify",
+            "modify_file",
+            "update",
+            "patch",
+            "replace",
+            "implement",
+            "build",
+            "generate",
+        }:
+            return None
+
+        target_file = (
+            step.get("target_file")
+            or step.get("file_path")
+            or step.get("path")
+        )
+
+        if not target_file:
+            return None
+
+        source = Path(
+            str(target_file)
+        ).expanduser()
+
+        if not source.is_file():
+            return None
+
+        original_name = source.name
+        size = source.stat().st_size
+        mime_type = (
+            mimetypes.guess_type(
+                original_name
+            )[0]
+            or "application/octet-stream"
+        )
+
+        return self.project_workspace_service.add_file(
+            project_id,
+            original_name,
+            str(source),
+            size,
+            mime_type,
         )
 
     def _step_is_complete(self, step):
@@ -1855,6 +1934,18 @@ class ExecutionOrchestratorService:
 
                     step = dict(existing_step)
 
+            try:
+                self._register_project_file(
+                    execution_state,
+                    step,
+                )
+            except Exception as exc:
+                print(
+                    "PROJECT FILE REGISTRATION FAILED:",
+                    exc,
+                    flush=True,
+                )
+
             execution_state = (
                 self.execution_mutation_service.mark_step_completed(
                     execution_state,
@@ -1862,6 +1953,10 @@ class ExecutionOrchestratorService:
                     step=step,
                     result=normalized_result,
                 )
+            )
+
+            step = dict(
+                execution_state["steps"][current_index]
             )
 
             step = dict(
@@ -1900,8 +1995,6 @@ class ExecutionOrchestratorService:
                 )
             )
 
-
-
             steps = execution_state.get("steps") or []
 
             next_index = int(
@@ -1912,18 +2005,13 @@ class ExecutionOrchestratorService:
                 or 0
             )
 
-
-
             if next_index >= len(steps):
-
 
                 execution_state = (
                     self.execution_mutation_service.mark_complete(
                         execution_state
                     )
                 )
-
-
 
             else:
                 next_step = dict(
