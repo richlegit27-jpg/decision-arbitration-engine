@@ -490,6 +490,7 @@ def chat_handle(
                 and decision_intent in {
                     "execution_continuation",
                     "task_execution",
+                    "project_execution",
                 }
             ):
                 decision_intent = (
@@ -499,9 +500,13 @@ def chat_handle(
                 )
 
                 if (
-                    decision_intent == "task_execution"
+                    decision_intent in {
+                        "task_execution",
+                        "project_execution",
+                    }
                     and not execution_state
                 ):
+
                     project_builder = getattr(
                         service,
                         "project_builder_service",
@@ -514,6 +519,15 @@ def chat_handle(
                                 user_text=user_text,
                                 owner_id=get_current_user_id(),
                             )
+                        )
+
+                        project_id = (
+                            project_result.get("project_id")
+                            if isinstance(
+                                project_result,
+                                dict,
+                            )
+                            else None
                         )
 
                         print(
@@ -611,6 +625,8 @@ def chat_handle(
                     "blocked",
                 }:
                     continue
+
+                selected_task = task
 
                 for candidate_step in (
                     task.get("steps") or []
@@ -882,6 +898,14 @@ def chat_handle(
                         or project_step.get(
                             "title"
                         )
+                    ),
+                    "project_id": (
+                        active_project.get("id")
+                        if isinstance(
+                            active_project,
+                            dict,
+                        )
+                        else None
                     ),
                     "steps": [
                         project_step
@@ -1437,7 +1461,7 @@ def chat_handle(
                 None,
             )
 
-            active_project = (
+            refreshed_active_project = (
                 project_workspace.get_active_project()
                 if project_workspace is not None
                 and hasattr(
@@ -1446,6 +1470,14 @@ def chat_handle(
                 )
                 else None
             )
+
+            if isinstance(
+                refreshed_active_project,
+                dict,
+            ):
+                active_project = (
+                    refreshed_active_project
+                )
 
             if not isinstance(
                 active_project,
@@ -2144,6 +2176,47 @@ def chat_handle(
                 )
             )
 
+            print(
+                "[CHAT_HANDLE ORCHESTRATOR RESULT DEBUG]",
+                {
+                    "type": type(
+                        execution_result
+                    ).__name__,
+                    "is_dict": isinstance(
+                        execution_result,
+                        dict,
+                    ),
+                    "keys": (
+                        list(
+                            execution_result.keys()
+                        )
+                        if isinstance(
+                            execution_result,
+                            dict,
+                        )
+                        else None
+                    ),
+                    "project_id": (
+                        execution_result.get(
+                            "execution",
+                            {},
+                        ).get("project_id")
+                        if isinstance(
+                            execution_result,
+                            dict,
+                        )
+                        and isinstance(
+                            execution_result.get(
+                                "execution"
+                            ),
+                            dict,
+                        )
+                        else None
+                    ),
+                },
+                flush=True,
+            )
+
             if execution_result is None:
                 raise RuntimeError(
                     "Execution orchestrator returned "
@@ -2172,6 +2245,17 @@ def chat_handle(
                         returned_execution
                     )
 
+                if (
+                    isinstance(
+                        active_project,
+                        dict,
+                    )
+                    and active_project.get("id")
+                ):
+                    execution_state["project_id"] = (
+                        active_project.get("id")
+                    )
+
                 service._save_execution_state(
                     session_id,
                     execution_state,
@@ -2181,6 +2265,30 @@ def chat_handle(
                     session_id,
                     "active_execution",
                     execution_state,
+                )
+
+                print(
+                    "[CHAT_HANDLE FINAL EXECUTION STATE DEBUG]",
+                    {
+                        "project_id": execution_state.get(
+                            "project_id"
+                        ),
+                        "active_project_id": (
+                            active_project.get("id")
+                            if isinstance(
+                                active_project,
+                                dict,
+                            )
+                            else None
+                        ),
+                        "execution_status": execution_state.get(
+                            "status"
+                        ),
+                        "complete": execution_state.get(
+                            "complete"
+                        ),
+                    },
+                    flush=True,
                 )
 
                 return {
@@ -2215,6 +2323,22 @@ def chat_handle(
                         "step_output",
                         "",
                     ),
+                    "project_id": (
+                        execution_state.get("project_id")
+                        if isinstance(
+                            execution_state,
+                            dict,
+                        )
+                        and execution_state.get("project_id")
+                        else (
+                            active_project.get("id")
+                            if isinstance(
+                                active_project,
+                                dict,
+                            )
+                            else None
+                        )
+                    ),
                     "brain_state": brain_state,
                 }
 
@@ -2229,10 +2353,16 @@ def chat_handle(
                 "session_id": session_id,
                 "execution": execution_result,
                 "execution_state": execution_state,
+                "project_id": (
+                    active_project.get("id")
+                    if isinstance(
+                        active_project,
+                        dict,
+                    )
+                    else None
+                ),
                 "brain_state": brain_state,
             }
-
-
         # ==========================================
         # NORMAL MODEL CHAT
         # ==========================================

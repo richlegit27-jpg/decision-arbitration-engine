@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import re
@@ -162,8 +162,8 @@ GENERAL PLANNING RULES:
   4. Verify API persistence and retrieval behavior.
 - Choose the number of steps based on actual complexity.
 - Simple tasks may have 1 step, but that step must represent the actual work required.
-- Moderate tasks should normally have 2â€“4 steps.
-- Larger tasks may have 4â€“8 or more steps when genuinely required.
+- Moderate tasks should normally have 2–4 steps.
+- Larger tasks may have 4–8 or more steps when genuinely required.
 - Never add steps merely to increase the count.
 - Each step must represent real work, not a restatement of the task title.
 - Steps must be ordered according to their dependencies.
@@ -404,10 +404,20 @@ idea through planning, execution, adaptation, and completion.
             flush=True,
         )
 
+        print(
+            "[NOVA DEBUG PRE NORMALIZE TASK COUNT]",
+            len(plan.get("tasks", []))
+            if isinstance(plan.get("tasks", []), list)
+            else "NOT_LIST",
+            flush=True,
+        )
+
         return self._normalize_plan(
             plan=plan,
             request=clean_request,
+            project_context=project_context,
         )
+
     def _extract_content(
         self,
         response: Any,
@@ -514,6 +524,7 @@ idea through planning, execution, adaptation, and completion.
         self,
         plan: dict[str, Any],
         request: str,
+        project_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
 
         if not isinstance(plan, dict):
@@ -965,6 +976,7 @@ idea through planning, execution, adaptation, and completion.
                                 )
                                 or f"step-{index}"
                             ).strip(),
+                            "project_context": project_context,
                             "title": step_title,
                             "description": str(
                                 step.get(
@@ -1046,6 +1058,13 @@ idea through planning, execution, adaptation, and completion.
                             ).strip(),
                         }
                     )
+
+        print(
+            "[NOVA DEBUG NORMALIZED PLAN TASK COUNT]",
+            len(normalized_tasks),
+            flush=True,
+        )
+
         return {
             "name": str(
                 plan.get(
@@ -1213,4 +1232,3 @@ idea through planning, execution, adaptation, and completion.
 project_planning_ai_service = (
     ProjectPlanningAIService()
 )
-

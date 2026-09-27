@@ -10,9 +10,13 @@ class ExecutionRouteService:
         self,
         working_state_service=None,
         execution_service=None,
+        execution_orchestrator_service=None,
     ):
         self.working_state_service = working_state_service
         self.execution_service = execution_service
+        self.execution_orchestrator_service = (
+            execution_orchestrator_service
+        )
 
     def _load_execution(self, session_id):
         if not self.working_state_service:
@@ -108,6 +112,54 @@ class ExecutionRouteService:
                 }
             ), 503
 
+        if (
+            action in {
+                "approve",
+                "state",
+                "get_state",
+                "status",
+                "run_step",
+                "next",
+                "continue",
+                "go",
+            }
+            and self.execution_orchestrator_service is not None
+        ):
+            execution_state_service = getattr(
+                self.execution_orchestrator_service,
+                "execution_state_service",
+                None,
+            )
+
+            execution_state = (
+                execution_state_service.get_execution_state(
+                    session_id
+                )
+                if execution_state_service is not None
+                else {}
+            )
+
+            if action in {"state", "get_state", "status"}:
+                result = execution_state
+            else:
+                command = (
+                    "approve"
+                    if action == "approve"
+                    else "run_step"
+                )
+
+                result = (
+                    self.execution_orchestrator_service.process_execution(
+                        session_id=session_id,
+                        state=execution_state,
+                        command=command,
+                    )
+                )
+
+            return jsonify(result), (
+                200 if result.get("ok", True) else 400
+            )
+
         try:
             execution = self._load_execution(
                 session_id
@@ -148,11 +200,25 @@ class ExecutionRouteService:
                 "get_state",
                 "status",
             }:
-                execution = (
-                    self.execution_service.normalize_execution(
-                        execution
-                    )
+                execution_state_service = getattr(
+                    self.execution_orchestrator_service,
+                    "execution_state_service",
+                    None,
                 )
+
+                if execution_state_service is not None:
+                    execution = (
+                        execution_state_service.get_execution_state(
+                            session_id
+                        )
+                        or {}
+                    )
+                else:
+                    execution = (
+                        self.execution_service.normalize_execution(
+                            execution
+                        )
+                    )
 
             elif action in {
                 "start",

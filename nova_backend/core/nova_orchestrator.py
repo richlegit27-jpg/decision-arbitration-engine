@@ -250,6 +250,24 @@ class NovaOrchestrator:
             )
         )
 
+        if (
+            isinstance(
+                session_context,
+                dict,
+            )
+            and isinstance(
+                session_context.get(
+                    "working_state"
+                ),
+                dict,
+            )
+        ):
+            state["context"]["working_state"] = (
+                session_context.get(
+                    "working_state"
+                )
+            )
+
         print(
             "[ORCHESTRATOR FUSED PROJECT DEBUG]",
             state["context"].get("project"),
@@ -302,10 +320,165 @@ class NovaOrchestrator:
             ):
                 project = {}
 
-            existing_state = (
-                project.get("execution")
-                or {}
+            context = (
+                state.get("context")
+                if isinstance(
+                    state.get("context"),
+                    dict,
+                )
+                else {}
             )
+
+            working_state = (
+                context.get("working_state")
+                if isinstance(
+                    context.get("working_state"),
+                    dict,
+                )
+                else {}
+            )
+
+            print(
+                "[MISSION CONTROL WORKING STATE DEBUG]",
+                {
+                    "working_state_status": (
+                        working_state.get(
+                            "active_execution",
+                            {},
+                        ).get("status")
+                        if isinstance(
+                            working_state.get(
+                                "active_execution"
+                            ),
+                            dict,
+                        )
+                        else None
+                    ),
+                    "working_state_index": (
+                        working_state.get(
+                            "active_execution",
+                            {},
+                        ).get("current_step_index")
+                        if isinstance(
+                            working_state.get(
+                                "active_execution"
+                            ),
+                            dict,
+                        )
+                        else None
+                    ),
+
+                    "working_state_step_count": len(
+                        working_state.get(
+                            "active_execution",
+                            {},
+                        ).get("steps") or []
+                    )
+                    if isinstance(
+                        working_state.get(
+                            "active_execution"
+                        ),
+                        dict,
+                    )
+                    else 0,
+                },
+                flush=True,
+            )
+
+            existing_state = (
+                working_state.get(
+                    "active_execution"
+                )
+                if isinstance(
+                    working_state,
+                    dict,
+                )
+                and isinstance(
+                    working_state.get(
+                        "active_execution"
+                    ),
+                    dict,
+                )
+                else None
+            )
+
+            if not existing_state:
+                existing_state = (
+                    context.get(
+                        "execution_state"
+                    )
+                    if isinstance(
+                        context,
+                        dict,
+                    )
+                    and isinstance(
+                        context.get(
+                            "execution_state"
+                        ),
+                        dict,
+                    )
+                    else None
+                )
+
+            if not existing_state:
+                existing_state = (
+                    project.get("execution")
+                    if isinstance(
+                        project.get("execution"),
+                        dict,
+                    )
+                    else {}
+                )
+
+            executed_steps = (
+                existing_state.get("steps")
+                if isinstance(
+                    existing_state,
+                    dict,
+                )
+                else []
+            )
+
+            executed_steps = (
+                existing_state.get("steps")
+                if isinstance(
+                    existing_state,
+                    dict,
+                )
+                else []
+            )
+
+            completed_execution_step_titles = {
+                str(
+                    execution_step.get("title")
+                    or ""
+                ).strip()
+                for execution_step in (
+                    executed_steps
+                    if isinstance(
+                        executed_steps,
+                        list,
+                    )
+                    else []
+                )
+                if isinstance(
+                    execution_step,
+                    dict,
+                )
+                and str(
+                    execution_step.get("status")
+                    or ""
+                ).strip().lower()
+                in {
+                    "completed",
+                    "complete",
+                }
+                and str(
+                    execution_step.get("title")
+                    or ""
+                ).strip()
+            }
+
 
             state["execution"] = (
                 existing_state
@@ -317,10 +490,113 @@ class NovaOrchestrator:
 
             next_step = None
 
-            if isinstance(
-                tasks,
-                list,
+            print(
+                "[ORCHESTRATOR EXECUTION STATE BEFORE SELECTOR]",
+                {
+                    "status": (
+                        existing_state.get("status")
+                        if isinstance(
+                            existing_state,
+                            dict,
+                        )
+                        else None
+                    ),
+                    "current_index": (
+                        existing_state.get(
+                            "current_index"
+                        )
+                        if isinstance(
+                            existing_state,
+                            dict,
+                        )
+                        else None
+                    ),
+                    "step_count": len(
+                        existing_state.get("steps") or []
+                    )
+                    if isinstance(
+                        existing_state,
+                        dict,
+                    )
+                    else 0,
+                    "complete": (
+                        existing_state.get("complete")
+                        if isinstance(
+                            existing_state,
+                            dict,
+                        )
+                        else None
+                    ),
+                },
+                flush=True,
+            )
+
+            execution_status = str(
+                existing_state.get("status")
+                or ""
+            ).strip().lower()
+
+            execution_steps = (
+                existing_state.get("steps")
+                if isinstance(
+                    existing_state,
+                    dict,
+                )
+                else []
+            )
+
+            execution_current_index = (
+                existing_state.get(
+                    "current_index"
+                )
+                if isinstance(
+                    existing_state,
+                    dict,
+                )
+                else None
+            )
+
+            if (
+                execution_status
+                not in {
+                    "complete",
+                    "completed",
+                }
+                and isinstance(
+                    execution_steps,
+                    list,
+                )
             ):
+
+                if (
+                    isinstance(
+                        execution_current_index,
+                        int,
+                    )
+                    and execution_current_index < len(
+                        execution_steps
+                    )
+                ):
+                    execution_step = execution_steps[
+                        execution_current_index
+                    ]
+
+                    if isinstance(
+                        execution_step,
+                        dict,
+                    ):
+                        next_step = dict(
+                            execution_step
+                        )
+
+            if (
+                next_step is None
+                and isinstance(
+                    tasks,
+                    list,
+                )
+            ):
+
                 for task in tasks:
 
                     if not isinstance(
@@ -351,93 +627,92 @@ class NovaOrchestrator:
                         )
                     )
 
-                    if isinstance(
+                    if not isinstance(
                         task_steps,
                         list,
                     ):
-                        for step in task_steps:
+                        continue
 
-                            if not isinstance(
-                                step,
-                                dict,
-                            ):
-                                continue
+                    for step in task_steps:
 
-                            step_status = str(
+                        if not isinstance(
+                            step,
+                            dict,
+                        ):
+                            continue
+
+                        step_status = str(
+                            step.get(
+                                "status",
+                                "",
+                            )
+                        ).strip().lower()
+
+                        step_title = str(
+                            step.get(
+                                "title"
+                            )
+                            or ""
+                        ).strip()
+
+                        print(
+                            "[ORCHESTRATOR STEP FILTER DEBUG]",
+                            {
+                                "step_title": step_title,
+                                "completed_titles": sorted(
+                                    completed_execution_step_titles
+                                ),
+                                "step_status": step_status,
+                            },
+                            flush=True,
+                        )
+
+                        print(
+                            "[ORCHESTRATOR STEP FILTER DEBUG]",
+                            {
+                                "step_title": step_title,
+                                "completed_titles": sorted(
+                                    completed_execution_step_titles
+                                ),
+                                "step_status": step_status,
+                            },
+                            flush=True,
+                        )
+
+                        if (
+                            step_title
+                            and step_title
+                            in completed_execution_step_titles
+                        ):
+                            continue
+
+                        if step_status in {
+                            "completed",
+                            "complete",
+                            "failed",
+                            "blocked",
+                        }:
+                            continue
+
+                        next_step = {
+                            **step,
+                            "task_id": (
                                 step.get(
-                                    "status",
-                                    "",
+                                    "task_id"
                                 )
-                            ).strip().lower()
-
-                            if step_status not in {
-                                "completed",
-                                "complete",
-                            }:
-                                next_step = {
-                                    "task_id": task.get(
-                                        "id"
-                                    ),
-                                    "task_title": task.get(
-                                        "title"
-                                    ),
-                                    **step,
-                                    "project_context": (
-                                        step.get(
-                                            "project_context"
-                                        )
-                                        or step.get(
-                                            "context"
-                                        )
-                                        or project.get(
-                                            "description"
-                                        )
-                                        or project.get(
-                                            "request"
-                                        )
-                                        or project.get(
-                                            "title"
-                                        )
-                                        or project.get(
-                                            "name"
-                                        )
-                                        or ""
-                                    ),
-                                    "goal": (
-                                        step.get(
-                                            "goal"
-                                        )
-                                        or project.get(
-                                            "description"
-                                        )
-                                        or project.get(
-                                            "request"
-                                        )
-                                        or project.get(
-                                            "title"
-                                        )
-                                        or project.get(
-                                            "name"
-                                        )
-                                        or ""
-                                    ),
-                                    "content": (
-                                        step.get(
-                                            "content"
-                                        )
-                                        or step.get(
-                                            "file_content"
-                                        )
-                                        or task.get(
-                                            "content"
-                                        )
-                                        or project.get(
-                                            "content"
-                                        )
-                                        or ""
-                                    ),
-                                }
-                                break
+                                or task.get(
+                                    "id"
+                                )
+                                or ""
+                            ),
+                            "task_title": (
+                                task.get(
+                                    "title"
+                                )
+                                or ""
+                            ),
+                        }
+                        break
 
                     if next_step is not None:
                         break

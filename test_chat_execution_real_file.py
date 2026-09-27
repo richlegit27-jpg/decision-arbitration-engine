@@ -1,14 +1,6 @@
 from pathlib import Path
 
-from nova_backend.services.chat_execution_service import (
-    ChatExecutionService,
-)
-from nova_backend.services.project_execution_handler import (
-    ProjectExecutionHandler,
-)
-from nova_backend.services.execution_handler import (
-    default_executor,
-)
+import app
 
 
 test_file = Path(
@@ -19,13 +11,7 @@ if test_file.exists():
     test_file.unlink()
 
 
-execution_service = ChatExecutionService()
-
-execution_service.execution_handler = (
-    ProjectExecutionHandler(
-        default_executor=default_executor
-    )
-)
+execution_service = app.chat_service.chat_execution_service
 
 
 start_state = execution_service.start(
@@ -60,6 +46,16 @@ result = execution_service.advance(
 
 print("\nADVANCE RESULT:")
 print(result)
+
+
+print("\nAPPROVING THROUGH CHAT SERVICE...")
+approval_result = app.chat_service.handle(
+    user_text="approve",
+    session_id="real-chat-execution-test",
+)
+
+print("\nAPPROVAL RESULT:")
+print(approval_result)
 
 
 print("\nFILE EXISTS =", test_file.exists())

@@ -129,6 +129,38 @@ class ProjectArtifactPublisherService:
                 ) and value.strip():
                     return value.strip()
 
+            execution = result.get("execution")
+
+            if isinstance(
+                execution,
+                dict,
+            ):
+                steps = execution.get("steps")
+
+                if isinstance(
+                    steps,
+                    list,
+                ):
+                    for step in steps:
+                        if not isinstance(
+                            step,
+                            dict,
+                        ):
+                            continue
+
+                        for key in (
+                            "file_content",
+                            "generated_content",
+                            "content",
+                        ):
+                            value = step.get(key)
+
+                            if isinstance(
+                                value,
+                                str,
+                            ) and value.strip():
+                                return value.strip()
+
             return ""
 
         return str(

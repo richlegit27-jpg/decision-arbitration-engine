@@ -461,12 +461,30 @@ class ExecutionStateService:
             except Exception:
                 state = {}
 
-        execution = (
-            state.get("execution_state")
-            or state.get("active_execution")
-            or state.get("execution")
-            or state.get("last_execution")
+        candidates = (
+            state.get("execution_state"),
+            state.get("active_execution"),
+            state.get("execution"),
+            state.get("last_execution"),
         )
+
+        execution = {}
+
+        for candidate in candidates:
+            if not isinstance(candidate, dict) or not candidate:
+                continue
+
+            candidate_status = str(
+                candidate.get("status")
+                or ""
+            ).strip().lower()
+
+            if candidate_status == "waiting_approval":
+                execution = candidate
+                break
+
+            if not execution:
+                execution = candidate
 
         if isinstance(execution, dict) and execution:
 

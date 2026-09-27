@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import re
@@ -794,17 +794,6 @@ blog_route_service.install_routes(
 register_planner_routes(app)
 print("[NOVA_PLANNER_ROUTES_20260812] installed")
 
-from nova_backend.routes.project_routes import (
-    register_project_routes,
-)
-
-register_project_routes(
-    app,
-    chat_execution_service=chat_execution_service,
-)
-
-print("[NOVA_PROJECT_ROUTES_20260901] installed")
-
 session_route_service.install_routes(
     app,
     session_service,
@@ -969,6 +958,9 @@ print("[NOVA_TOOL_APPROVAL_ROUTES] installed")
 execution_route_service = ExecutionRouteService(
     working_state_service=working_state_service,
     execution_service=chat_execution_service,
+    execution_orchestrator_service=(
+        chat_service.execution_orchestrator_service
+    ),
 )
 attachment_action_service = AttachmentActionService(
     upload_route_service=upload_route_service,
@@ -1177,10 +1169,8 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
-project_workspace_service = ProjectWorkspaceService(
-    data_dir="data"
-)
 project_execution_controller = ProjectExecutionController(
+
     project_workspace_service=(
         project_workspace_service
     ),
@@ -1195,6 +1185,17 @@ project_execution_controller = ProjectExecutionController(
 chat_service.project_execution_controller = (
     project_execution_controller
 )
+
+register_project_routes(
+    app,
+    chat_execution_service=chat_execution_service,
+    execution_orchestrator_service=(
+        chat_service.execution_orchestrator_service
+    ),
+    project_execution_controller=project_execution_controller,
+)
+
+print("[NOVA_PROJECT_ROUTES_20260901] installed")
 
 local_auth_route_service.install_routes()
 

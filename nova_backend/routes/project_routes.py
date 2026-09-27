@@ -29,6 +29,7 @@ project_builder_service = ProjectBuilderService(
 def register_project_routes(
     app,
     chat_execution_service=None,
+    execution_orchestrator_service=None,
     project_execution_controller=None,
 ):
     if project_execution_controller is None:
@@ -40,6 +41,9 @@ def register_project_routes(
                 chat_execution_service=(
                     chat_execution_service
                 ),
+                execution_orchestrator_service=(
+                    execution_orchestrator_service
+                ),
             )
         )
 
@@ -47,6 +51,7 @@ def register_project_routes(
         "/api/projects/<project_id>/reset",
         methods=["POST"],
     )
+
     def reset_project_execution(project_id):
         result = (
             project_execution_controller
@@ -107,6 +112,7 @@ def register_project_routes(
                 .build_project_from_request(
                     user_text=project_request,
                     owner_id=owner_id,
+                    project_id=project_id,
                 )
             )
 

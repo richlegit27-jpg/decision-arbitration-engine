@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from nova_backend.services.tool_runtime_factory import (
     build_tool_runtime,
@@ -1526,6 +1526,7 @@ class ChatService:
                 state=existing_execution,
                 command="run_step",
             )
+
         text = str(
             user_text or ""
         ).strip()
@@ -7812,11 +7813,45 @@ Rules:
                 0,
             )
 
-        return self.execution_orchestrator_service.process_execution(
+        execution_result = self.execution_orchestrator_service.process_execution(
             session_id=session_id,
             state=execution_state,
             command=command,
         )
+
+        if (
+            isinstance(execution_result, dict)
+            and isinstance(execution_result.get("execution"), dict)
+            and self.chat_execution_service is not None
+        ):
+            self.chat_execution_service._states[
+                session_id
+            ] = dict(
+                execution_result["execution"]
+            )
+
+        if isinstance(execution_result, dict):
+            active_project = (
+                self.project_workspace_service.get_active_project()
+            )
+
+            if (
+                isinstance(active_project, dict)
+                and active_project.get("id")
+            ):
+                execution_result["project_id"] = (
+                    active_project.get("id")
+                )
+
+                if isinstance(
+                    execution_result.get("execution"),
+                    dict,
+                ):
+                    execution_result["execution"]["project_id"] = (
+                        active_project.get("id")
+                    )
+
+        return execution_result
 
     def _looks_like_live_store_hours_request(self, user_text: str) -> bool:
         """

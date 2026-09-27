@@ -119,6 +119,11 @@ await runProjectAction(
         );
 
         bindButton(
+            "novaLeftNextStep",
+            "next_step"
+        );
+
+        bindButton(
             "novaLeftStop",
             "stop"
         );

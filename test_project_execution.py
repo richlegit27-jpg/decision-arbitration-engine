@@ -1,12 +1,7 @@
+
 from pathlib import Path
 
-from nova_backend.services.project_execution_handler import (
-    ProjectExecutionHandler,
-)
-
-from nova_backend.services.execution_handler import (
-    default_executor,
-)
+import app
 
 
 test_file = Path(
@@ -14,10 +9,7 @@ test_file = Path(
 )
 
 
-handler = ProjectExecutionHandler(
-    default_executor=default_executor
-)
-
+handler = app.chat_service.project_execution_handler
 
 result = handler.run_next_step(
     action="run_step",

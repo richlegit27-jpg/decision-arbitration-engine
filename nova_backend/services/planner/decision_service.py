@@ -324,18 +324,12 @@ class DecisionService:
                 "[DECISION PENDING EXECUTION CHECK FAILED]",
                 repr(exc),
             )
+
         project_execution_request = (
-            (
-                "create a project" in lower_text
-                or "create a tiny test project" in lower_text
-                or "build a project" in lower_text
-                or "make a project" in lower_text
-            )
-            and (
-                "execute" in lower_text
-                or "run" in lower_text
-                or "start" in lower_text
-            )
+            "create a project" in lower_text
+            or "create a tiny test project" in lower_text
+            or "build a project" in lower_text
+            or "make a project" in lower_text
         )
 
         if project_execution_request:

@@ -1450,8 +1450,6 @@ input.onchange = handleMainFileInputChange;
 }
 
 function renderMainAttachmentPreview(payload) {
-    console.log("[Nova Main Attach Owner] disabled - upload preview owner handles preview");
-    return;
 
     let preview = document.getElementById("nova-main-visible-attachment-preview");
 

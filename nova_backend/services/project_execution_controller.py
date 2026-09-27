@@ -5,7 +5,9 @@ from pathlib import Path
 from nova_backend.services.project_artifact_publisher_service import (
     ProjectArtifactPublisherService,
 )
-
+from nova_backend.services.execution_approval_service import (
+    ExecutionApprovalService,
+)
 
 class ProjectExecutionController:
 
@@ -53,10 +55,15 @@ class ProjectExecutionController:
 
     VALID_ACTIONS = {
         "continue",
+        "next_step",
         "run_all",
         "pause",
         "stop",
         "approve",
+        "reset",
+        "state",
+        "get_state",
+        "status",
     }
 
     def __init__(
@@ -75,6 +82,9 @@ class ProjectExecutionController:
 
         self.execution_orchestrator_service = (
             execution_orchestrator_service
+        )
+        self.execution_approval_service = (
+            ExecutionApprovalService()
         )
 
         self.artifact_publisher = (
@@ -841,6 +851,12 @@ class ProjectExecutionController:
                             field_name
                         )
 
+                # Preserve project context for downstream execution.
+                if "project_context" in task_step:
+                    step["project_context"] = task_step.get(
+                        "project_context"
+                    )
+
                 # Preserve the planner's step-specific fields even
                 # though they are not execution fields.
                 for field_name in (
@@ -941,14 +957,11 @@ class ProjectExecutionController:
             )
         ]
 
-        task_key = (
-            task_ids[0]
-            if task_ids
-            else command
-        )
-
+        # One canonical execution session per project.
+        # Do not key execution state to the first runnable task because
+        # the task queue changes as execution progresses.
         session_id = (
-            f"project:{project_id}:{task_key}"
+            f"project:{project_id}"
         )
 
         project = self._get_project(
@@ -1079,41 +1092,50 @@ class ProjectExecutionController:
                 )
 
                 if command == "approve":
-                    # Approval must preserve the persisted
-                    # waiting/approval state while replacing
-                    # the step definitions with the freshly
-                    # reconstructed project steps.
+                    # Approval must continue the exact persisted
+                    # execution state. Do not replace its steps
+                    # with freshly reconstructed project-task steps,
+                    # because those project tasks may still be open
+                    # while the canonical execution already has
+                    # completed/running/pending step state.
                     execution_state = dict(
                         persisted_state
                     )
 
-                    if steps:
-                        execution_state["steps"] = steps
-
                 else:
-                    # run_step and run_all both need a real
-                    # execution state. Never call the legacy
-                    # run_all() without first creating this.
-                    execution_state = {
-                        "steps": steps,
-                        "current_index": 0,
-                        "status": "pending",
-                        "waiting": False,
-                        "complete": False,
-                        "project_id": project_id,
-                        "command": command,
-                    }
-
-                    # Preserve an existing mission identifier
-                    # when one already exists.
-                    if persisted_state.get(
-                        "mission_id"
+                    # Continue an existing canonical execution when
+                    # one is already persisted. Only create a fresh
+                    # execution state when no persisted execution exists.
+                    if isinstance(
+                        persisted_state,
+                        dict,
+                    ) and persisted_state.get(
+                        "steps"
                     ):
-                        execution_state[
-                            "mission_id"
-                        ] = persisted_state.get(
-                            "mission_id"
+                        execution_state = dict(
+                            persisted_state
                         )
+                    else:
+                        execution_state = {
+                            "steps": steps,
+                            "current_index": 0,
+                            "status": "pending",
+                            "waiting": False,
+                            "complete": False,
+                            "project_id": project_id,
+                            "command": command,
+                        }
+
+                        # Preserve an existing mission identifier
+                        # when one already exists.
+                        if persisted_state.get(
+                            "mission_id"
+                        ):
+                            execution_state[
+                                "mission_id"
+                            ] = persisted_state.get(
+                                "mission_id"
+                            )
 
                 execution_state["project_id"] = (
                     project_id
@@ -1182,11 +1204,12 @@ class ProjectExecutionController:
                             canonical_steps,
                             list,
                         ):
-                            self._sync_project_execution(
-                                project_id,
-                                canonical_execution,
-                                command,
-                            )
+                                self._sync_project_execution(
+                                    project_id,
+                                    canonical_execution,
+                                    command,
+                                    tasks=tasks,
+                                )
 
             print(
                 "[PROJECT EXECUTION RAW RESULT]",
@@ -1280,6 +1303,38 @@ class ProjectExecutionController:
             ),
         }
 
+    def _pending_approval_step(
+        self,
+        task,
+    ):
+        if not isinstance(task, dict):
+            return None
+
+        nested_steps = (
+            task.get("steps")
+            or task.get("substeps")
+            or task.get("execution_steps")
+            or []
+        )
+
+        if not isinstance(nested_steps, list):
+            return None
+
+        for step in nested_steps:
+            if not isinstance(step, dict):
+                continue
+
+            evaluation = (
+                self.execution_approval_service.evaluate(
+                    step
+                )
+            )
+
+            if evaluation.get("waiting"):
+                return step
+
+        return None
+
     def approve_project(
         self,
         project_id,
@@ -1332,6 +1387,130 @@ class ProjectExecutionController:
                     "is available for approval."
                 ),
             }
+
+        canonical_steps = execution_state.get("steps") or []
+        canonical_index = execution_state.get("current_index", 0)
+
+        try:
+            canonical_index = int(canonical_index)
+        except (TypeError, ValueError):
+            canonical_index = 0
+
+        pending_approval_step = None
+
+        if (
+            isinstance(canonical_steps, list)
+            and 0 <= canonical_index < len(canonical_steps)
+            and isinstance(canonical_steps[canonical_index], dict)
+        ):
+            candidate_step = canonical_steps[canonical_index]
+
+            evaluation = self.execution_approval_service.evaluate(
+                candidate_step
+            )
+
+            if (
+                evaluation.get("waiting")
+                or candidate_step.get("approval_required") is True
+                or candidate_step.get("requires_approval") is True
+                or str(
+                    candidate_step.get("approval_status") or ""
+                ).strip().lower()
+                in {
+                    "pending",
+                    "waiting_approval",
+                    "awaiting_approval",
+                    "approval_required",
+                }
+            ):
+                pending_approval_step = candidate_step
+
+        if pending_approval_step is None:
+            return {
+                "project_id": project_id,
+                "action": "approve",
+                "status": "error",
+                "message": (
+                    "No pending approval is available "
+                    "for the current execution task."
+                ),
+            }
+
+        approved_step = (
+            self.execution_approval_service.approve_step(
+                pending_approval_step
+            )
+        )
+
+        updated_tasks = []
+
+        for task in tasks:
+            if (
+                isinstance(task, dict)
+                and task.get("id") == current_task_id
+            ):
+                task = dict(task)
+                nested_steps = (
+                    task.get("steps")
+                    or task.get("substeps")
+                    or task.get("execution_steps")
+                    or []
+                )
+
+                if isinstance(nested_steps, list):
+                    updated_steps = []
+
+                    for step in nested_steps:
+                        if (
+                            isinstance(step, dict)
+                            and str(
+                                step.get("id")
+                                or step.get("step_id")
+                                or ""
+                            ).strip()
+                            == str(
+                                pending_approval_step.get("id")
+                                or pending_approval_step.get("step_id")
+                                or ""
+                            ).strip()
+                        ):
+                            updated_steps.append(
+                                approved_step
+                            )
+                        else:
+                            updated_steps.append(step)
+
+                    task["steps"] = updated_steps
+
+            updated_tasks.append(task)
+
+        persisted_tasks = (
+            self.project_workspace_service.update_project_tasks(
+                project_id,
+                updated_tasks,
+            )
+        )
+
+        if persisted_tasks is None:
+            return {
+                "project_id": project_id,
+                "action": "approve",
+                "status": "error",
+                "message": (
+                    "Failed to persist execution approval."
+                ),
+            }
+
+        current_task = next(
+            (
+                task
+                for task in persisted_tasks
+                if isinstance(task, dict)
+                and task.get("id") == current_task_id
+            ),
+            current_task,
+        )
+
 
         self._materialize_task_files(
             [current_task]
@@ -1618,6 +1797,9 @@ class ProjectExecutionController:
             current_task_id
         )
 
+
+
+
         if current_task is None:
             current_task = runnable[0]
 
@@ -1667,6 +1849,7 @@ class ProjectExecutionController:
             project_id,
             result,
             "continue",
+            tasks=[current_task],
         )
 
         # The orchestrator may legitimately pause on a task that
@@ -2066,7 +2249,7 @@ class ProjectExecutionController:
                 execution_state.get("status") or ""
             ).strip().lower()
 
-            if execution_status in {"paused", "stopped"}:
+            if execution_status == "stopped":
                 return {
                     "ok": False,
                     "project_id": project_id,
@@ -2112,13 +2295,13 @@ class ProjectExecutionController:
                 flush=True,
             )
 
+            projects = (
+                self.project_workspace_service
+                ._load_projects()
+            )
+
             if not runnable:
                 try:
-                    projects = (
-                        self.project_workspace_service
-                        ._load_projects()
-                    )
-
                     failed_tasks = []
                     unfinished_tasks = []
 
@@ -2450,6 +2633,7 @@ class ProjectExecutionController:
                 # Normalize the task result before synchronization.
                 # The execution service may return ok=True even when the
                 # nested execution is waiting for input or approval.
+
                 result_execution = (
                     result.get("execution")
                     if isinstance(result, dict)
@@ -2458,6 +2642,11 @@ class ProjectExecutionController:
 
                 if not isinstance(result_execution, dict):
                     result_execution = {}
+
+                nested_execution = result_execution.get("execution")
+
+                if isinstance(nested_execution, dict):
+                    result_execution = nested_execution
 
                 execution_status = str(
                     result_execution.get("status")
@@ -2711,6 +2900,26 @@ class ProjectExecutionController:
                     "run_all",
                     tasks=[current_task],
                 )
+
+                if (
+                    execution_waiting
+                    and not execution_failed
+                    and not result_success
+                ):
+                    return {
+                        "ok": True,
+                        "project_id": project_id,
+                        "action": "run_all",
+                        "status": execution_status,
+                        "artifacts": all_published_artifacts,
+                        "execution": result_execution,
+                        "debug_last_result": last_result,
+                        "message": (
+                            "Project execution is waiting for approval."
+                            if execution_status == "waiting_approval"
+                            else "Project execution is waiting."
+                        ),
+                    }
 
                 published_artifacts = (
                     self._publish_completed_artifacts(
@@ -3082,8 +3291,17 @@ class ProjectExecutionController:
             return self.continue_project(
                 project_id
             )
+
+        if action == "next_step":
+            return self.continue_project(
+                project_id
+            )
+
         if action == "approve":
             return self.approve_project(project_id)
+
+        if action == "reset":
+            return self.reset_execution_state(project_id)
 
         if action == "run_all":
             return self.run_all(
@@ -3099,7 +3317,14 @@ class ProjectExecutionController:
             return self.stop_project(
                 project_id
             )
-
+        if action in {
+            "state",
+            "get_state",
+            "status",
+        }:
+            return self.get_state(
+                project_id
+            )
         return None
 
     def _merge_execution_results_into_tasks(
@@ -3228,6 +3453,41 @@ class ProjectExecutionController:
 
         return tasks
 
+    def publish_execution_artifacts(
+        self,
+        project_id,
+        result,
+        tasks=None,
+    ):
+        """
+        Publish artifacts from an already-completed execution result.
+
+        This does not execute or advance anything. It only synchronizes
+        the existing execution result and publishes completed artifacts.
+        """
+        if not isinstance(result, dict):
+            return []
+
+        if tasks is None:
+            project = self._get_project(project_id) or {}
+            tasks = self._get_tasks(project)
+
+        if not isinstance(tasks, list):
+            tasks = []
+
+        self._sync_project_execution(
+            project_id,
+            result,
+            "approve",
+            tasks=tasks,
+        )
+
+        return self._publish_completed_artifacts(
+            project_id,
+            tasks,
+            result,
+        )
+
     def _publish_completed_artifacts(
         self,
         project_id,
@@ -3246,11 +3506,11 @@ class ProjectExecutionController:
             or result.get("execution_state")
         )
 
-        # ChatExecutionService.run_all() returns the
-        # execution state directly. Support both shapes:
+        # Support all execution result shapes:
         #
         # 1. {"execution": {"steps": [...]}}
         # 2. {"steps": [...]}
+        # 3. {"execution": {"execution": {"steps": [...]}}}
         #
         if not isinstance(
             execution,
@@ -3258,7 +3518,26 @@ class ProjectExecutionController:
         ):
             execution = result
 
+        nested_execution = (
+            execution.get("execution")
+            if isinstance(
+                execution,
+                dict,
+            )
+            else None
+        )
 
+        if (
+            isinstance(
+                nested_execution,
+                dict,
+            )
+            and isinstance(
+                nested_execution.get("steps"),
+                list,
+            )
+        ):
+            execution = nested_execution
 
         steps = execution.get(
             "steps",
@@ -3270,7 +3549,7 @@ class ProjectExecutionController:
             list,
         ):
             steps = []
-
+ 
         task_by_id = {
             str(task.get("id")): task
             for task in tasks
@@ -3369,16 +3648,24 @@ class ProjectExecutionController:
                 flush=True,
             )
 
-            artifact_result = (
-                step.get("result")
-                or step.get("output")
-                or step.get("content")
-                or step.get("text")
-                or result.get("result")
-                or result.get("output")
-                or result.get("content")
-                or ""
-            )
+
+            artifact_result = {
+                "result": step.get("result"),
+                "output": step.get("output"),
+                "content": step.get("content"),
+                "text": step.get("text"),
+                "file_content": step.get("file_content"),
+                "target_file": step.get("target_file"),
+                "action": step.get("action"),
+                "execution_metadata": (
+                    step.get("execution_metadata")
+                    if isinstance(
+                        step.get("execution_metadata"),
+                        dict,
+                    )
+                    else {}
+                ),
+            }
 
             print(
                 "[PROJECT ARTIFACT EXTRACTED RESULT]",
@@ -3678,13 +3965,45 @@ class ProjectExecutionController:
                 continue
 
             try:
-                update_result = (
-                    self.project_workspace_service.update_task_status(
-                        project_id,
-                        task_id,
-                        normalized_status,
+                step_id = str(
+                    step.get("step_id")
+                    or step.get("id")
+                    or ""
+                ).strip()
+
+                update_result = None
+
+                if (
+                    step_id
+                    and hasattr(
+                        self.project_workspace_service,
+                        "update_nested_step_status",
                     )
-                )
+                ):
+                    update_result = (
+                        self.project_workspace_service
+                        .update_nested_step_status(
+                            project_id,
+                            task_id,
+                            step_id,
+                            normalized_status,
+                            result=step.get("result"),
+                            error=step.get("error"),
+                        )
+                    )
+
+                if not isinstance(
+                    update_result,
+                    dict,
+                ):
+                    update_result = (
+                        self.project_workspace_service
+                        .update_task_status(
+                            project_id,
+                            task_id,
+                            normalized_status,
+                        )
+                    )
 
                 synced_task_ids.append(
                     task_id
@@ -3763,11 +4082,17 @@ class ProjectExecutionController:
             flush=True,
         )
 
+        projects = (
+            self.project_workspace_service._load_projects()
+        )
+
+
         # A genuine failed/blocked execution stops the project.
         if execution_status in {
             "failed",
             "blocked",
         }:
+
             queue = [
                 task.get("id")
                 for task in remaining_tasks
@@ -3783,6 +4108,17 @@ class ProjectExecutionController:
                 if remaining_tasks
                 else None
             )
+
+            failed_task_ids = [
+                task.get("id")
+                for task in latest_tasks
+                if isinstance(task, dict)
+                and str(
+                    task.get("status") or ""
+                ).strip().lower()
+                in {"failed", "error"}
+                and task.get("id")
+            ]
 
             execution = (
                 self.project_workspace_service.update_execution_state(
@@ -3802,6 +4138,7 @@ class ProjectExecutionController:
                         else ""
                     ),
                     queue=queue,
+                    failed_tasks=failed_task_ids,
                     last_action=action,
                 )
             )
@@ -3810,37 +4147,46 @@ class ProjectExecutionController:
                 self.project_workspace_service._load_projects()
             )
 
-            for project in projects:
-                if (
-                    project.get("id") != project_id
-                    or not self.project_workspace_service._same_project_owner(
-                        project
-                    )
-                ):
-                    continue
+        for project in projects:
+            if project.get("id") != project_id:
+                continue
 
-                project["status"] = execution_status
+            persisted_execution_status = str(
+                execution_state.get(
+                    "status",
+                    "",
+                )
+            ).strip().lower()
+
+            if persisted_execution_status == "completed":
+                project["status"] = "completed"
                 project["active"] = False
-                project["updated_at"] = (
-                    execution.get(
-                        "updated_at"
-                    )
-                    if isinstance(
-                        execution,
-                        dict,
-                    )
-                    else project.get(
-                        "updated_at"
-                    )
-                )
 
-                self.project_workspace_service._save_projects(
-                    projects
-                )
-                break
+            elif persisted_execution_status == "failed":
+                project["status"] = "failed"
+                project["active"] = False
+
+            elif persisted_execution_status == "blocked":
+                project["status"] = "blocked"
+                project["active"] = False
+
+            else:
+                project["status"] = "active"
+                project["active"] = True
+
+            project["updated_at"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+
+            self.project_workspace_service._save_projects(
+                projects
+            )
+            break
 
             return
-        # Approval is a project pause, not completion.
+
+
+        # Approval must remain explicitly waiting for approval.
         if execution_status == "waiting_approval":
             queue = [
                 task.get("id")
@@ -3860,7 +4206,8 @@ class ProjectExecutionController:
 
             self.project_workspace_service.update_execution_state(
                 project_id,
-                status="paused",
+                status="waiting_approval",
+
                 current_task_id=(
                     next_task.get("id")
                     if next_task
@@ -4014,6 +4361,72 @@ class ProjectExecutionController:
                 or ""
             ).strip().lower()
 
+            failure_statuses = {
+                "failed",
+                "failure",
+                "error",
+            }
+
+            is_failed = (
+                result_status in failure_statuses
+                or result_completion_status in failure_statuses
+                or task_status in failure_statuses
+                or task_completion_status in failure_statuses
+            )
+
+            if is_failed:
+                failed_task_ids = [
+                    task.get("id")
+                    for task in latest_tasks
+                    if isinstance(task, dict)
+                    and str(
+                        task.get("status") or ""
+                    ).strip().lower()
+                    in {
+                        "failed",
+                        "error",
+                    }
+                    and task.get("id")
+                ]
+
+                print(
+                    "[PROJECT FAILURE PERSIST DEBUG]",
+                    {
+                        "failed_task_ids": failed_task_ids,
+                        "latest_task_statuses": [
+                            (
+                                task.get("id"),
+                                task.get("status"),
+                            )
+                            for task in latest_tasks
+                            if isinstance(task, dict)
+                        ],
+                    },
+                    flush=True,
+                )
+
+                self.project_workspace_service.update_execution_state(
+                    project_id,
+                    status="failed",
+                    current_task_id=(
+                        current_task.get("id")
+                        if remaining_tasks
+                        else None
+                    ),
+                    current_step=(
+                        current_task.get(
+                            "title",
+                            "",
+                        )
+                        if remaining_tasks
+                        else ""
+                    ),
+                    queue=queue,
+                    failed_tasks=failed_task_ids,
+                    last_action=action,
+                )
+                return
+
             waiting_statuses = {
                 "waiting",
                 "needs_input",
@@ -4033,7 +4446,7 @@ class ProjectExecutionController:
 
             persisted_status = (
                 "waiting"
-                if is_waiting
+                if is_waiting and remaining_tasks
                 else "running"
             )
 
@@ -4052,6 +4465,42 @@ class ProjectExecutionController:
                 flush=True,
             )
 
+            completed_task_ids = [
+                task.get("id")
+                for task in latest_tasks
+                if isinstance(task, dict)
+                and str(
+                    task.get("status") or ""
+                ).strip().lower()
+                in {
+                    "completed",
+                    "complete",
+                    "done",
+                    "success",
+                }
+                and task.get("id")
+            ]
+
+            completed_step_ids = [
+                step.get("id")
+                for task in latest_tasks
+                if isinstance(task, dict)
+                for step in task.get("steps", [])
+                if isinstance(step, dict)
+                and str(
+                    step.get("status")
+                    or step.get("state")
+                    or step.get("completion_status")
+                    or ""
+                ).strip().lower()
+                in {
+                    "completed",
+                    "complete",
+                    "done",
+                }
+                and step.get("id")
+            ]
+
             self.project_workspace_service.update_execution_state(
                 project_id,
                 status=persisted_status,
@@ -4063,6 +4512,8 @@ class ProjectExecutionController:
                     "",
                 ),
                 queue=queue,
+                completed_tasks=completed_task_ids,
+                completed_steps=completed_step_ids,
                 last_action=action,
             )
 
@@ -4142,6 +4593,21 @@ class ProjectExecutionController:
             and step.get("id")
         ]
 
+        print(
+            "[PROJECT FAILED TASK DEBUG]",
+            {
+                "latest_tasks": [
+                    {
+                        "id": task.get("id"),
+                        "status": task.get("status"),
+                    }
+                    for task in latest_tasks
+                    if isinstance(task, dict)
+                ],
+            },
+            flush=True,
+        )
+
         failed_task_ids = [
             task.get("id")
             for task in latest_tasks
@@ -4198,18 +4664,64 @@ class ProjectExecutionController:
                 if status not in terminal_success_statuses
             ]
 
+            final_status = (
+                "failed"
+                if failed_task_ids
+                else "blocked"
+            )
+
             print(
                 "[PROJECT SYNC NOT COMPLETE]",
                 {
                     "project_id": project_id,
                     "unresolved_statuses": unresolved_statuses,
+                    "failed_task_ids": failed_task_ids,
+                    "final_status": final_status,
                 },
                 flush=True,
             )
 
             self.project_workspace_service.update_execution_state(
                 project_id,
-                status="paused",
+                status=final_status,
+                current_task_id=None,
+                current_step=None,
+                queue=[],
+                completed_tasks=completed_task_ids,
+                completed_steps=completed_step_ids,
+                failed_tasks=failed_task_ids,
+                last_action=action,
+            )
+
+            projects = (
+                self.project_workspace_service._load_projects()
+            )
+
+            for project in projects:
+                if project.get("id") != project_id:
+                    continue
+
+                project["status"] = final_status
+                project["active"] = False
+                project["updated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+
+            self.project_workspace_service._save_projects(
+                projects
+            )
+
+        if execution_status not in {
+            "failed",
+            "blocked",
+        }:
+            self.project_workspace_service.update_execution_state(
+                project_id,
+                status=(
+                    "waiting_approval"
+                    if execution_status == "waiting_approval"
+                    else "paused"
+                ),
                 current_task_id=None,
                 current_step="",
                 queue=[],
@@ -4226,18 +4738,8 @@ class ProjectExecutionController:
             if project.get("id") != project_id:
                 continue
 
-            execution_state = (
-                self.project_workspace_service.get_execution_state(
-                    project_id
-                )
-                or {}
-            )
-
             persisted_execution_status = str(
-                execution_state.get(
-                    "status",
-                    "",
-                )
+                execution_status or ""
             ).strip().lower()
 
             if persisted_execution_status == "completed":
@@ -4260,10 +4762,11 @@ class ProjectExecutionController:
                 timezone.utc
             ).isoformat()
 
-            self.project_workspace_service._save_projects(
-                projects
-            )
             break
+
+        self.project_workspace_service._save_projects(
+            projects
+        )
 
 
 

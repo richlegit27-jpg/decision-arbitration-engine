@@ -861,7 +861,12 @@ class ExecutionStepService:
             and target_file
             and not payload.get("path")
         ):
-            payload["path"] = target_file
+            target_path = Path(target_file)
+
+            if target_path.is_absolute():
+                payload["path"] = str(target_path.parent)
+            else:
+                payload["path"] = str(Path.cwd())
 
         step["payload"] = payload
 
@@ -1464,6 +1469,11 @@ class ExecutionStepService:
                 step["mutation_ready"] = True
                 step["payload_required"] = False
 
+            # Refresh action after any file-write normalization.
+            step_action = self._safe_str(
+                step.get("action")
+            ).lower().strip()
+
             mutation_actions = self.IMPLEMENT_ACTIONS
 
             if (
@@ -1958,9 +1968,18 @@ class ExecutionStepService:
                 # authorized for execution.
                 step["confirm"] = True
 
-                self._execute_tool_step(
-                    step=step,
-                )
+                if command:
+                    self._execute_tool_step(
+                        step=step,
+                    )
+                else:
+                    step["action"] = "analyze"
+                    step_action = "analyze"
+
+                    self._execute_ai_step(
+                        session_id=session_id,
+                        step=step,
+                    )
 
             # ---------------------------------
             # REAL NOVA TOOL EXECUTION

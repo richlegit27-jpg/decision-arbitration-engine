@@ -372,6 +372,7 @@ class ChatResponseHandler:
         decision=None,
         saved_artifact=None,
         execution_state=None,
+        project_id=None,
         working_context_payload=None,
         should_inject_working_context=False,
         regenerate=False,
@@ -773,6 +774,7 @@ class ChatResponseHandler:
             },
             "execution_state": execution_state or {},
             "execution": execution_state or {},
+            "project_id": project_id,
         }
 
     def _finalize_assistant_response(

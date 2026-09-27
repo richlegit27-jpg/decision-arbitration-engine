@@ -1765,7 +1765,13 @@ async function loadProjectWorkspace(
             tasks:
                 project.tasks ||
                 summary?.tasks ||
-                []
+                [],
+            execution:
+                summary?.execution ||
+                project?.execution ||
+                summary?.execution_state ||
+                project?.execution_state ||
+                {}
         };
 
         if (!project.id) {
@@ -2353,14 +2359,6 @@ if (activeProject) {
     openProjectWorkspace(
         activeProject
     );
-
-    await loadProjectWorkspace(
-        activeProject.id
-    );
-
-    await loadProjectNotes(
-        activeProject.id
-    );
 }
 
         } catch (error) {
@@ -2571,6 +2569,18 @@ console.log(
 
                 if (data.project?.id) {
                     await activateProject(
+                        data.project.id
+                    );
+
+                    await loadProjectWorkspace(
+                        data.project.id
+                    );
+
+                    await loadProjectNotes(
+                        data.project.id
+                    );
+
+                    await loadProjectIntelligence(
                         data.project.id
                     );
                 }
@@ -2852,10 +2862,13 @@ async function controlProjectExecution(
             `Project execution ${action}.`
         );
 
-        await loadProjectWorkspace(
-            projectId
-        );
+await loadProjectWorkspace(
+    projectId
+);
 
+await loadProjectFiles(
+    projectId
+);
         await loadProjectIntelligence(
             projectId
         );
@@ -3058,97 +3071,6 @@ if (
     );
 }
 
-if (projectFileInput) {
-    projectFileInput.addEventListener(
-        "change",
-        async () => {
-            const file =
-                projectFileInput.files?.[0];
-
-            const projectId =
-                window.__NOVA_PROJECT_STATE
-                    ?.activeProjectId;
-
-            if (
-                !file ||
-                !projectId
-            ) {
-                return;
-            }
-
-            const formData =
-                new FormData();
-
-            formData.append(
-                "file",
-                file
-            );
-
-            formData.append(
-                "project_id",
-                projectId
-            );
-
-            try {
-                setProjectStatus(
-                    "Uploading file..."
-                );
-
-                const response =
-                    await fetch(
-                        "/api/upload",
-                        {
-                            method: "POST",
-                            body: formData,
-                        }
-                    );
-
-                const data =
-                    await response.json();
-
-                if (
-                    !response.ok ||
-                    !data.ok
-                ) {
-                    throw new Error(
-                        data.error ||
-                        "Upload failed"
-                    );
-                }
-
-                await loadProjectFiles(
-                    projectId
-                );
-
-                await loadProjectNotes(
-                    projectId
-                );
-
-                await loadProjectIntelligence(
-                    projectId
-                );
-
-                setProjectStatus(
-                    "File uploaded"
-                );
-
-            } catch (error) {
-                console.error(
-                    "[Nova Projects] file upload failed",
-                    error
-                );
-
-                setProjectStatus(
-                    error.message ||
-                    "File upload failed"
-                );
-
-            } finally {
-                projectFileInput.value = "";
-            }
-        }
-    );
-}
 
 
 const addNoteButton =
@@ -3322,12 +3244,4 @@ document.addEventListener(
 
 
 })();
-
-
-
-
-
-
-
-
 

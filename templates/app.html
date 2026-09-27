@@ -2333,9 +2333,12 @@ async function uploadDesktopAttachment(file) {
 
   console.log("UPLOAD FILE:", file);
 
-  const formData = new FormData();
-  formData.append("file", file);
+const formData = new FormData();
+formData.append("file", file);
 
+if (typeof activeProjectId !== "undefined" && activeProjectId) {
+  formData.append("project_id", activeProjectId);
+}
 
   const response = await fetch("/api/upload", {
     method: "POST",
@@ -4025,13 +4028,18 @@ if (countEl) {
        * Do not let the generic quick-button
        * system intercept them.
        */
-      if (
-        button.id === "desktopContinueProject" ||
-        button.id === "desktopRunAll" ||
-        button.id === "desktopPause" ||
-        button.id === "desktopProjectContinueButton" ||
-        button.id === "desktopProjectRunAllButton"
-      ) {
+if (
+  button.id === "novaLeftNextStep" ||
+  button.id === "novaLeftNextTask" ||
+  button.id === "novaLeftRunAll" ||
+  button.id === "novaLeftStop" ||
+  button.id === "novaLeftReset" ||
+  button.id === "desktopContinueProject" ||
+  button.id === "desktopRunAll" ||
+  button.id === "desktopPause" ||
+  button.id === "desktopProjectContinueButton" ||
+  button.id === "desktopProjectRunAllButton"
+) {
         return;
       }
 
@@ -4413,13 +4421,18 @@ if (label.indexOf("continue") === 0) {
        * The generic Quick Buttons system must
        * never intercept these controls.
        */
-      if (
-        button.id === "desktopContinueProject" ||
-        button.id === "desktopRunAll" ||
-        button.id === "desktopPause" ||
-        button.id === "desktopProjectContinueButton" ||
-        button.id === "desktopProjectRunAllButton"
-      ) {
+if (
+  button.id === "novaLeftNextStep" ||
+  button.id === "novaLeftNextTask" ||
+  button.id === "novaLeftRunAll" ||
+  button.id === "novaLeftStop" ||
+  button.id === "novaLeftReset" ||
+  button.id === "desktopContinueProject" ||
+  button.id === "desktopRunAll" ||
+  button.id === "desktopPause" ||
+  button.id === "desktopProjectContinueButton" ||
+  button.id === "desktopProjectRunAllButton"
+) {
         return;
       }
 

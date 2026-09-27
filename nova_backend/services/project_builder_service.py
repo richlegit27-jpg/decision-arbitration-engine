@@ -30,10 +30,12 @@ class ProjectBuilderService:
 
     def should_use_phases(self, plan):
         """
-        Decide whether a project needs phase structure.
+        Decide whether a project needs
+        phase structure.
 
         Small projects stay task-only.
-        Larger projects get phases + tasks.
+        Projects with explicit structural phases
+        use phases even when task count is small.
         """
 
         if not isinstance(plan, dict):
@@ -52,14 +54,14 @@ class ProjectBuilderService:
         task_count = len(tasks)
         phase_count = len(phases)
 
-        if task_count <= 5:
-            return False
-
+        # Explicit planner phases take priority.
         if phase_count >= 3:
             return True
 
-        return False
+        if task_count <= 5:
+            return False
 
+        return False
     def _normalize_task_reference(
         self,
         reference,
@@ -92,6 +94,7 @@ class ProjectBuilderService:
         user_id=None,
         workspace_id=None,
         owner_id=None,
+        project_id=None,
     ):
         """
         Build a project from a natural-language request.
@@ -113,8 +116,6 @@ class ProjectBuilderService:
 
         clean_request = str(user_text).strip()
 
-        project_id = None
-
         existing_project = None
 
         if project_id:
@@ -122,13 +123,23 @@ class ProjectBuilderService:
                 project_id
             )
 
-        context = {
-            "project_id": project_id,
-            "owner_id": owner_id,
-            "user_id": user_id,
-            "workspace_id": workspace_id,
-            "request_text": clean_request,
-        }
+        context = (
+            self.project_workspace_service.get_project_context(
+                project_id
+            )
+            if project_id
+            else {}
+        )
+
+        context.update(
+            {
+                "project_id": project_id,
+                "owner_id": owner_id,
+                "user_id": user_id,
+                "workspace_id": workspace_id,
+                "request_text": clean_request,
+            }
+        )
 
         plan = self._build_project_plan(
             request=clean_request,
@@ -148,6 +159,14 @@ class ProjectBuilderService:
 
         planned_tasks = plan.get("tasks")
 
+        print(
+            "[NOVA DEBUG BUILDER PLAN TASK COUNT]",
+            len(planned_tasks) if isinstance(planned_tasks, list) else "NOT_LIST",
+            flush=True,
+        )
+
+        if not isinstance(planned_tasks, list):
+            planned_tasks = []
         if not isinstance(planned_tasks, list):
             planned_tasks = []
 
@@ -167,6 +186,7 @@ class ProjectBuilderService:
                 plan.get("description")
                 or clean_request
             )
+
 
             created_project = (
                 self.project_workspace_service.create_project(
@@ -296,8 +316,12 @@ class ProjectBuilderService:
                     phase_key = "phase_documentation"
                     phase_title = "Documentation"
                 else:
-                    phase_key = "phase_1"
-                    phase_title = "Foundation"
+                    phase_key = f"phase_{task_index}"
+                    phase_title = task_spec.get(
+                        "title"
+                    ) or task_spec.get(
+                        "name"
+                    ) or f"Task {task_index}"
 
                 if phase_key not in derived_phase_groups:
                     derived_phase_groups[phase_key] = {
@@ -326,12 +350,11 @@ class ProjectBuilderService:
                 }
             ]
 
-        # ---------------------------------------------------------
+         # ---------------------------------------------------------
         # Persist phases and map planner phase IDs to real UUIDs.
         # ---------------------------------------------------------
 
         phase_id_map = {}
-
 
         def _phase_lookup_key(value):
             if isinstance(value, dict):
@@ -356,6 +379,21 @@ class ProjectBuilderService:
                 .replace(".", " ")
             ).strip()
 
+        # Reuse persisted phases when building into an existing project.
+        # Existing phases use real UUIDs and are identified by title.
+        if existing_project:
+            for existing_phase in existing_project.get("phases", []):
+                if not isinstance(existing_phase, dict):
+                    continue
+
+                existing_phase_id = existing_phase.get("id")
+                existing_phase_title = existing_phase.get("title")
+
+                if existing_phase_id and existing_phase_title:
+                    phase_id_map[
+                        _phase_lookup_key(existing_phase_title)
+                    ] = str(existing_phase_id)
+
         created_phases = []
 
         use_phases = self.should_use_phases(plan)
@@ -363,88 +401,190 @@ class ProjectBuilderService:
         if not use_phases:
             normalized_phases = []
 
-        for phase_spec in normalized_phases:
-            created_phase = (
-                self.project_workspace_service.add_phase(
-                    project_id=project_id,
-                    title=phase_spec["title"],
-                    description=phase_spec["description"],
-                    status="planned",
-                    order=phase_spec["order"],
-                    goal=phase_spec["goal"],
-                    milestone=phase_spec["milestone"],
-                )
-            )
+        if existing_project:
+            # Existing projects reuse their persisted phases.
+            # Never create duplicate phases during a reuse build.
+            existing_phases = [
+                phase
+                for phase in existing_project.get("phases", [])
+                if isinstance(phase, dict)
+            ]
 
-            if isinstance(created_phase, dict):
-                created_phase_id = (
-                    created_phase.get("id")
-                    or created_phase.get("phase_id")
+            # Map each planner phase to the closest existing phase.
+            # Exact normalized title matches are preferred.
+            for phase_spec in normalized_phases:
+                if not isinstance(phase_spec, dict):
+                    continue
+
+                planner_phase_id = str(
+                    phase_spec.get("planner_id")
+                    or phase_spec.get("id")
                     or ""
-                )
-            else:
-                created_phase_id = created_phase
+                ).strip()
 
-            while isinstance(created_phase_id, dict):
-                created_phase_id = (
-                    created_phase_id.get("id")
-                    or created_phase_id.get("phase_id")
+                phase_title = str(
+                    phase_spec.get("title")
+                    or phase_spec.get("name")
                     or ""
+                ).strip()
+
+                normalized_title = _phase_lookup_key(
+                    phase_title
                 )
 
-            created_phase_id = str(
-                created_phase_id or ""
-            ).strip()
+                matched_phase_id = None
 
-            if not created_phase_id:
-                raise RuntimeError(
-                    "Created phase did not contain an id"
+                # Exact normalized title match.
+                if normalized_title:
+                    matched_phase_id = phase_id_map.get(
+                        normalized_title
+                    )
+
+                # Semantic title match when wording differs slightly.
+                if not matched_phase_id and normalized_title:
+                    planner_words = {
+                        word
+                        for word in normalized_title.split()
+                        if len(word) >= 4
+                    }
+
+                    best_match = None
+                    best_score = 0
+
+                    for existing_phase in existing_phases:
+                        existing_id = str(
+                            existing_phase.get("id") or ""
+                        ).strip()
+
+                        existing_title = _phase_lookup_key(
+                            existing_phase.get("title")
+                            or existing_phase.get("name")
+                            or ""
+                        )
+
+                        if not existing_id or not existing_title:
+                            continue
+
+                        existing_words = {
+                            word
+                            for word in existing_title.split()
+                            if len(word) >= 4
+                        }
+
+                        score = len(
+                            planner_words & existing_words
+                        )
+
+                        if score > best_score:
+                            best_score = score
+                            best_match = existing_id
+
+                    if best_match and best_score >= 1:
+                        matched_phase_id = best_match
+
+                if matched_phase_id:
+                    if planner_phase_id:
+                        phase_id_map[
+                            _phase_lookup_key(planner_phase_id)
+                        ] = matched_phase_id
+
+                    if normalized_title:
+                        phase_id_map[
+                            normalized_title
+                        ] = matched_phase_id
+
+                    created_phases.append(
+                        {
+                            "id": matched_phase_id,
+                            "planner_id": (
+                                planner_phase_id
+                                or normalized_title
+                            ),
+                            "title": phase_title,
+                        }
+                    )
+
+        else:
+            # New project: create and persist planner phases.
+            for phase_spec in normalized_phases:
+                created_phase = (
+                    self.project_workspace_service.add_phase(
+                        project_id=project_id,
+                        title=phase_spec["title"],
+                        description=phase_spec["description"],
+                        status="planned",
+                        order=phase_spec["order"],
+                        goal=phase_spec["goal"],
+                        milestone=phase_spec["milestone"],
+                    )
                 )
 
-            planner_phase_id = str(
-                phase_spec.get("planner_id")
-                or phase_spec.get("id")
-                or phase_spec.get("title")
-                or ""
-            ).strip()
+                if isinstance(created_phase, dict):
+                    created_phase_id = (
+                        created_phase.get("id")
+                        or created_phase.get("phase_id")
+                        or ""
+                    )
+                else:
+                    created_phase_id = created_phase
 
-            phase_title_key = str(
-                phase_spec.get("title") or ""
-            ).strip().lower()
+                while isinstance(created_phase_id, dict):
+                    created_phase_id = (
+                        created_phase_id.get("id")
+                        or created_phase_id.get("phase_id")
+                        or ""
+                    )
 
-            if planner_phase_id:
-                phase_id_map[
-                    planner_phase_id
-                ] = created_phase_id
+                created_phase_id = str(
+                    created_phase_id or ""
+                ).strip()
 
-            if phase_title_key:
-                phase_id_map[
-                    phase_title_key
-                ] = created_phase_id
+                if not created_phase_id:
+                    raise RuntimeError(
+                        "Created phase did not contain an id"
+                    )
 
-            created_phases.append(
-                {
-                    "id": created_phase_id,
-                    "planner_id": (
-                        phase_spec.get("planner_id")
-                        or phase_spec.get("id")
-                        or planner_phase_id
-                    ),
-                    "title": phase_spec["title"],
-                    "description": phase_spec["description"],
-                    "status": "planned",
-                    "order": phase_spec["order"],
-                    "goal": phase_spec["goal"],
-                    "milestone": phase_spec["milestone"],
-                }
-            )
+                planner_phase_id = str(
+                    phase_spec.get("planner_id")
+                    or phase_spec.get("id")
+                    or phase_spec.get("title")
+                    or ""
+                ).strip()
 
+                phase_title_key = _phase_lookup_key(
+                    phase_spec.get("title")
+                )
 
+                if planner_phase_id:
+                    phase_id_map[
+                        _phase_lookup_key(planner_phase_id)
+                    ] = created_phase_id
 
+                if phase_title_key:
+                    phase_id_map[
+                        phase_title_key
+                    ] = created_phase_id
+
+                created_phases.append(
+                    {
+                        "id": created_phase_id,
+                        "planner_id": (
+                            phase_spec.get("planner_id")
+                            or phase_spec.get("id")
+                            or planner_phase_id
+                        ),
+                        "title": phase_spec["title"],
+                        "description": phase_spec["description"],
+                        "status": "planned",
+                        "order": phase_spec["order"],
+                        "goal": phase_spec["goal"],
+                        "milestone": phase_spec["milestone"],
+                    }
+                )
 
         # ---------------------------------------------------------
         # Normalize task execution metadata before persistence.
-        # ---------------------------------------------------------
+        # ----------------------------------------------------------
 
         normalized_tasks = []
 
@@ -1116,9 +1256,22 @@ class ProjectBuilderService:
                     canonical_step["execution_file"] = ""
 
                 else:
-                    canonical_step["action"] = "execute"
-                    canonical_step["execution_mode"] = "hybrid"
-                    canonical_step["execution_file"] = ""
+                    canonical_step["action"] = str(
+                        canonical_step.get("action")
+                        or canonical_task.get("action")
+                        or "analyze"
+                    ).strip().lower()
+
+                    canonical_step["execution_mode"] = str(
+                        canonical_step.get("execution_mode")
+                        or canonical_task.get("execution_mode")
+                        or "ai"
+                    ).strip().lower()
+
+                    canonical_step["execution_file"] = str(
+                        canonical_step.get("execution_file")
+                        or ""
+                    ).strip()
 
         # Persist the final canonical task collection after
         # synthetic approval tasks have been collapsed.
@@ -1179,8 +1332,9 @@ class ProjectBuilderService:
             # 1. Resolve an explicit planner phase ID or phase title.
             if task_phase_key:
                 persistent_phase_id = phase_id_map.get(
-                    task_phase_key
+                    _phase_lookup_key(task_phase_key)
                 )
+
 
             # 2. Resolve by task title and metadata.
             searchable_task_text = " ".join(
@@ -1895,7 +2049,10 @@ class ProjectBuilderService:
 
                 if (
                     step.get("command")
-                    or step.get("content")
+                    and not (
+                        step.get("target_file")
+                        and step.get("content")
+                    )
                 ):
                     step["action"] = "execute"
                     step["execution_mode"] = "hybrid"
@@ -1996,7 +2153,7 @@ class ProjectBuilderService:
                         in request_text_lower
                     )
                 )
-
+                or (
                     (
                         "approval"
                         in approval_text_lower
@@ -2020,6 +2177,7 @@ class ProjectBuilderService:
                         in approval_text_lower
                     )
                 )
+            )
 
             for step in task_steps:
                 if not isinstance(
@@ -2175,6 +2333,7 @@ class ProjectBuilderService:
             created_tasks.append(
                 {
                     "id": persistent_task_id,
+                    "steps": created_task.get("steps", []),
                     "planner_id": planner_task_id,
                     "title": task_title,
                     "phase_id": persistent_phase_id,
@@ -2369,6 +2528,42 @@ class ProjectBuilderService:
                     request=clean_request,
                     project_context=project_context,
                 )
+            )
+
+            print(
+                "[NOVA DEBUG AI PLAN PHASES]",
+                {
+                    "has_phases": (
+                        isinstance(ai_plan, dict)
+                        and isinstance(
+                            ai_plan.get("phases"),
+                            list,
+                        )
+                    ),
+                    "phase_count": (
+                        len(ai_plan.get("phases", []))
+                        if (
+                            isinstance(ai_plan, dict)
+                            and isinstance(
+                                ai_plan.get("phases"),
+                                list,
+                            )
+                        )
+                        else 0
+                    ),
+                    "phases": (
+                        ai_plan.get("phases")
+                        if isinstance(ai_plan, dict)
+                        else None
+                    ),
+                },
+                flush=True,
+            )
+
+            print(
+                "[NOVA DEBUG RAW AI PLAN TASKS]",
+                ai_plan.get("tasks"),
+                flush=True,
             )
 
             print(

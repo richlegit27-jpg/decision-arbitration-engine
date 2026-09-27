@@ -3139,9 +3139,24 @@ class ProjectWorkspaceService:
                         else ""
                     )
 
+                command = str(
+                    task.get("command", "")
+                ).strip()
+
                 target_file = str(
                     task.get("target_file", "")
                 ).strip()
+
+                if "command" in values:
+                    nested_steps = task.get("steps") or []
+                    if isinstance(nested_steps, list):
+                        for nested_step in nested_steps:
+                            if not isinstance(nested_step, dict):
+                                continue
+                            nested_step["command"] = command
+                            payload = nested_step.get("payload")
+                            if isinstance(payload, dict):
+                                payload["command"] = command
 
                 target_files = task.get(
                     "target_files",
@@ -3272,6 +3287,160 @@ class ProjectWorkspaceService:
                 return task
 
         return None
+
+    def update_nested_step_status(
+        self,
+        project_id,
+        task_id,
+        step_id,
+        status,
+        result=None,
+        error=None,
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+
+            if (
+                project.get("id") != project_id
+                or not self._same_project_owner(project)
+            ):
+                continue
+
+            tasks = project.get(
+                "tasks",
+                [],
+            )
+
+            if not isinstance(
+                tasks,
+                list,
+            ):
+                return None
+
+            for task in tasks:
+
+                if not isinstance(
+                    task,
+                    dict,
+                ):
+                    continue
+
+                if str(
+                    task.get("id") or ""
+                ).strip() != str(
+                    task_id or ""
+                ).strip():
+                    continue
+
+                nested_steps = (
+                    task.get("steps")
+                    or task.get("substeps")
+                    or task.get("execution_steps")
+                    or []
+                )
+
+                if not isinstance(
+                    nested_steps,
+                    list,
+                ):
+                    return None
+
+                target_step_id = str(
+                    step_id or ""
+                ).strip()
+
+                target_step = None
+
+                for nested_step in nested_steps:
+
+                    if not isinstance(
+                        nested_step,
+                        dict,
+                    ):
+                        continue
+
+                    nested_id = str(
+                        nested_step.get("id")
+                        or nested_step.get("step_id")
+                        or ""
+                    ).strip()
+
+                    if (
+                        target_step_id
+                        and nested_id == target_step_id
+                    ):
+                        target_step = nested_step
+                        break
+
+                if target_step is None:
+                    return None
+
+                normalized_status = str(
+                    status or ""
+                ).strip().lower()
+
+                target_step["status"] = normalized_status
+                target_step["state"] = normalized_status
+                target_step["completion_status"] = normalized_status
+
+                if result is not None:
+                    target_step["result"] = result
+
+                if error is not None:
+                    target_step["error"] = error
+
+                terminal_statuses = {
+                    "completed",
+                    "complete",
+                    "done",
+                    "success",
+                }
+
+                if normalized_status in terminal_statuses:
+
+                    all_steps_complete = all(
+                        isinstance(
+                            nested_step,
+                            dict,
+                        )
+                        and str(
+                            nested_step.get("status")
+                            or nested_step.get("state")
+                            or ""
+                        ).strip().lower()
+                        in terminal_statuses
+                        for nested_step in nested_steps
+                    )
+
+                    if all_steps_complete:
+                        task["status"] = "completed"
+
+                elif normalized_status in {
+                    "failed",
+                    "blocked",
+                }:
+                    task["status"] = normalized_status
+
+                project = self._refresh_project_brain_state(
+                    project
+                )
+
+                project["updated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+
+                self._save_projects(
+                    projects
+                )
+
+                return {
+                    "task": task,
+                    "step": target_step,
+                }
+
+        return None
+
 
     def update_project_tasks(
         self,
