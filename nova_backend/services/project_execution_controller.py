@@ -3549,7 +3549,7 @@ class ProjectExecutionController:
             list,
         ):
             steps = []
- 
+
         task_by_id = {
             str(task.get("id")): task
             for task in tasks
@@ -3624,6 +3624,40 @@ class ProjectExecutionController:
             )
 
             if not task:
+                for candidate_task in tasks:
+                    if not isinstance(
+                        candidate_task,
+                        dict,
+                    ):
+                        continue
+
+                    dependencies = candidate_task.get(
+                        "dependencies",
+                        [],
+                    )
+
+                    if not isinstance(
+                        dependencies,
+                        list,
+                    ):
+                        continue
+
+                    dependency_ids = {
+                        str(dependency).strip()
+                        for dependency in dependencies
+                        if str(dependency).strip()
+                    }
+
+                    if task_id in dependency_ids:
+                        task = candidate_task
+                        task_id = str(
+                            candidate_task.get(
+                                "id"
+                            )
+                        )
+                        break
+
+            if not task:
                 print(
                     "[PROJECT ARTIFACT TASK NOT FOUND]",
                     {
@@ -3647,7 +3681,6 @@ class ProjectExecutionController:
                 },
                 flush=True,
             )
-
 
             artifact_result = {
                 "result": step.get("result"),
@@ -4152,10 +4185,7 @@ class ProjectExecutionController:
                 continue
 
             persisted_execution_status = str(
-                execution_state.get(
-                    "status",
-                    "",
-                )
+                execution_status or ""
             ).strip().lower()
 
             if persisted_execution_status == "completed":
