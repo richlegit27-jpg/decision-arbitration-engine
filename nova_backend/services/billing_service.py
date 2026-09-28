@@ -1,5 +1,7 @@
 ﻿import json
 import os
+import tempfile
+import threading
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +11,17 @@ BILLING_FILE = Path(
     "data/nova_billing.json"
 )
 
+BILLING_LOCK = threading.RLock()
+
+def _billing_mutation_lock(function):
+    def wrapped(*args, **kwargs):
+        with BILLING_LOCK:
+            return function(
+                *args,
+                **kwargs,
+            )
+
+    return wrapped
 
 MODEL_COSTS = {
     "gpt-4o-mini": 1,
@@ -38,13 +51,13 @@ DEFAULT_USER = {
     "subscription_id": "",
 }
 
-
+@_billing_mutation_lock
 def _now():
     return datetime.now(
         timezone.utc
     ).isoformat()
 
-
+@_billing_mutation_lock
 def _normalize_username(
     username,
 ):
@@ -52,7 +65,7 @@ def _normalize_username(
         username or ""
     ).strip().lower()
 
-
+@_billing_mutation_lock
 def _normalize_user_id(
     user_id,
 ):
@@ -60,7 +73,7 @@ def _normalize_user_id(
         user_id or ""
     ).strip()
 
-
+@_billing_mutation_lock
 def _resolve_billing_identity(
     user_id=None,
     username=None,
@@ -81,7 +94,7 @@ def _resolve_billing_identity(
 
     return "unknown"
 
-
+@_billing_mutation_lock
 def _default_account(
     user_id="",
     username="",
@@ -97,7 +110,7 @@ def _default_account(
         ),
     }
 
-
+@_billing_mutation_lock
 def _load():
     if not BILLING_FILE.exists():
 
@@ -142,12 +155,13 @@ def _load():
 
         return data
 
-    except Exception:
+    except Exception as exc:
 
-        return {
-            "users": {},
-        }
+        raise RuntimeError(
+            f"Nova billing ledger could not be loaded: {BILLING_FILE}"
+        ) from exc
 
+@_billing_mutation_lock
 def plan_from_price_id(price_id):
     import os
 
@@ -197,13 +211,37 @@ def _save(
         exist_ok=True,
     )
 
-    BILLING_FILE.write_text(
-        json.dumps(
-            data,
-            indent=2,
-        ),
-        encoding="utf-8",
+    payload = json.dumps(
+        data,
+        indent=2,
     )
+
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=BILLING_FILE.parent,
+        prefix=f".{BILLING_FILE.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as temp_file:
+        temp_file.write(payload)
+        temp_path = Path(
+            temp_file.name
+        )
+
+    try:
+        os.replace(
+            temp_path,
+            BILLING_FILE,
+        )
+    except Exception:
+        try:
+            temp_path.unlink(
+                missing_ok=True
+            )
+        except Exception:
+            pass
+        raise
 
 def _record_transaction(
     data,
@@ -264,7 +302,7 @@ def _record_transaction(
 
     return transaction
 
-
+@_billing_mutation_lock
 def get_account(
     username=None,
     user_id=None,
@@ -337,6 +375,7 @@ def get_account(
 
     return account
 
+@_billing_mutation_lock
 def set_stripe_customer_id(
     username=None,
     user_id=None,
@@ -349,56 +388,37 @@ def set_stripe_customer_id(
 
     data = _load()
 
-    accounts = data.setdefault(
-        "accounts",
-        {}
+    account = data["users"].setdefault(
+        identity,
+        _default_account(
+            user_id=user_id,
+            username=username,
+        ),
     )
-
-    identity_key = identity.get(
-        "key",
-        ""
-    )
-
-    account = accounts.get(
-        identity_key
-    )
-
-    if not isinstance(
-        account,
-        dict,
-    ):
-        account = _default_account(
-            user_id=identity.get(
-                "user_id",
-                ""
-            ),
-            username=identity.get(
-                "username",
-                ""
-            ),
-        )
-
-        accounts[identity_key] = account
 
     account["stripe_customer_id"] = str(
-        customer_id
-        or ""
+        customer_id or ""
     ).strip()
 
-    account["user_id"] = identity.get(
-        "user_id",
-        ""
+    normalized_user_id = _normalize_user_id(
+        user_id
     )
 
-    account["username"] = identity.get(
-        "username",
-        ""
+    normalized_username = _normalize_username(
+        username
     )
+
+    if normalized_user_id:
+        account["user_id"] = normalized_user_id
+
+    if normalized_username:
+        account["username"] = normalized_username
 
     _save(data)
 
     return dict(account)
 
+@_billing_mutation_lock
 def get_account_summary(
     username=None,
     user_id=None,
@@ -493,6 +513,7 @@ def get_account_summary(
         ),
     }
 
+@_billing_mutation_lock
 def get_balance(
     username=None,
     user_id=None,
@@ -509,7 +530,7 @@ def get_balance(
         )
     )
 
-
+@_billing_mutation_lock
 def add_credits(
     username=None,
     amount=0,
@@ -573,7 +594,7 @@ def add_credits(
         "transaction_id": transaction["id"],
     }
 
-
+@_billing_mutation_lock
 def model_cost(
     model,
     input_tokens=0,
@@ -601,6 +622,7 @@ def model_cost(
         token_blocks * base,
     )
 
+@_billing_mutation_lock
 def consume_usage(
     username=None,
     model="unknown",
