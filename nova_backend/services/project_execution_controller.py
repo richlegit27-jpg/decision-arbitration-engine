@@ -3528,6 +3528,7 @@ class ProjectExecutionController:
             )
 
             final_execution = (
+
                 self.project_workspace_service.update_execution_state(
                     project_id,
                     status=final_status,
@@ -4351,6 +4352,38 @@ class ProjectExecutionController:
         ):
             history = []
 
+        completed_steps = execution.get(
+            "completed_steps",
+            [],
+        )
+
+        if (
+            not steps
+            and isinstance(completed_steps, list)
+            and completed_steps
+        ):
+            steps = [
+                {
+                    "task_id": task.get("id"),
+                    "step_id": completed_step_id,
+                    "id": completed_step_id,
+                    "status": "completed",
+                }
+                for task in tasks
+                if isinstance(task, dict)
+                for completed_step_id in completed_steps
+                if completed_step_id
+            ]
+
+            print(
+                "[PROJECT SYNC COMPLETED STEP FALLBACK]",
+                {
+                    "project_id": project_id,
+                    "steps": steps,
+                },
+                flush=True,
+            )
+
         if not steps:
             steps = [
                 item
@@ -5030,6 +5063,10 @@ class ProjectExecutionController:
                 and step.get("id")
             ]
 
+            next_steps = self._build_execution_steps(
+                [next_task]
+            )
+
             self.project_workspace_service.update_execution_state(
                 project_id,
                 status=persisted_status,
@@ -5040,6 +5077,8 @@ class ProjectExecutionController:
                     "title",
                     "",
                 ),
+                steps=next_steps,
+                current_step_index=0,
                 queue=queue,
                 completed_tasks=completed_task_ids,
                 completed_steps=completed_step_ids,
