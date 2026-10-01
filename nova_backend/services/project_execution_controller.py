@@ -3051,6 +3051,42 @@ class ProjectExecutionController:
                     flush=True,
                 )
 
+                if execution_failed:
+                    current_task_id = str(
+                        current_task.get("id") or ""
+                    ).strip()
+
+                    if current_task_id:
+                        self.project_workspace_service.update_task_status(
+                            project_id,
+                            current_task_id,
+                            "failed",
+                        )
+
+                    execution = (
+                        self.project_workspace_service.update_execution_state(
+                            project_id,
+                            status="failed",
+                            current_task_id=None,
+                            current_step=None,
+                            queue=[],
+                            last_action="run_all",
+                        )
+                    )
+
+                    return {
+                        "ok": False,
+                        "project_id": project_id,
+                        "action": "run_all",
+                        "status": "failed",
+                        "execution": execution,
+                        "debug_last_result": result,
+                        "message": (
+                            "Project execution failed while processing "
+                            "a task."
+                        ),
+                    }
+
                 if result_success:
                     current_task_id = str(
                         current_task.get("id") or ""
