@@ -1129,6 +1129,72 @@ class ProjectWorkspaceService:
 
         return project
 
+    def _refresh_phase_status(
+        self,
+        project,
+    ):
+        phases = project.get("phases", [])
+        tasks = project.get("tasks", [])
+
+        if not isinstance(phases, list):
+            return project
+
+        if not isinstance(tasks, list):
+            return project
+
+        for phase in phases:
+            phase_id = phase.get("id")
+
+            phase_tasks = [
+                task
+                for task in tasks
+                if isinstance(task, dict)
+                and task.get("phase_id") == phase_id
+            ]
+
+            if not phase_tasks:
+                continue
+
+            statuses = [
+                str(task.get("status") or "").strip().lower()
+                for task in phase_tasks
+            ]
+
+            if all(
+                status in {
+                    "completed",
+                    "complete",
+                    "done",
+                    "success",
+                }
+                for status in statuses
+            ):
+                phase["status"] = "completed"
+
+            elif any(
+                status in {
+                    "active",
+                    "running",
+                    "in_progress",
+                }
+                for status in statuses
+            ):
+                phase["status"] = "in_progress"
+
+            elif any(
+                status in {
+                    "failed",
+                    "error",
+                }
+                for status in statuses
+            ):
+                phase["status"] = "failed"
+
+            else:
+                phase["status"] = "planned"
+
+        return project
+
     def _ensure_storage(
         self,
     ):
@@ -1317,6 +1383,8 @@ class ProjectWorkspaceService:
                 timezone.utc
             ).isoformat(),
         }
+
+
 
     def create_project(
         self,
@@ -1974,8 +2042,27 @@ class ProjectWorkspaceService:
         except Exception:
             pass
 
-        return brain
+        timeline = project.get("timeline", [])
 
+        if not isinstance(timeline, list):
+            timeline = []
+
+        recent_activity = [
+            item
+            for item in timeline
+            if isinstance(item, dict)
+        ]
+
+        recent_activity.sort(
+            key=lambda item: str(
+                item.get("created_at", "")
+            ),
+            reverse=True,
+        )
+
+        brain["recent_activity"] = recent_activity[:20]
+
+        return brain
 
     def list_notes(
         self,
@@ -2233,7 +2320,8 @@ class ProjectWorkspaceService:
         completed_tasks=_UNSET,
         failed_tasks=_UNSET,
         last_action=_UNSET,
-    ):
+        steps=_UNSET,
+        ):
         projects = self._load_projects()
 
         for project in projects:
@@ -2908,8 +2996,31 @@ class ProjectWorkspaceService:
         requires_approval=False,
     ):
 
-        projects = self._load_projects()
+        if not (
+            str(action or "").strip()
+            or str(execution_mode or "").strip()
+            or str(execution_file or "").strip()
+            or str(target_file or "").strip()
+            or target_files
+            or steps
+            or str(content or "").strip()
+            or str(code or "").strip()
+            or str(replacement or "").strip()
+            or str(command or "").strip()
+            or str(description or "").strip()
+        ):
+            print(
+                "[PROJECT TASK REJECTED: NO EXECUTABLE DETAILS]",
+                {
+                    "title": title,
+                    "action": action,
+                    "description": description,
+                },
+                flush=True,
+            )
+            return None
 
+        projects = self._load_projects()
         for project in projects:
 
             if (
@@ -2947,6 +3058,7 @@ class ProjectWorkspaceService:
                 ),
                 "title": str(
                     title or "New Task"
+
                 ).strip(),
                 "priority": str(
                     priority or "medium"
@@ -3269,6 +3381,10 @@ class ProjectWorkspaceService:
                 task["status"] = str(
                     status
                 ).strip()
+
+                project = self._refresh_phase_status(
+                    project
+                )
 
                 # Recalculate the live Project Brain immediately after
                 # task progress changes.
