@@ -2909,6 +2909,7 @@ class ProjectExecutionController:
                     "exception",
                     "blocked",
                 }
+
                 if (
                     result_ok is False
                     and not (
@@ -3032,7 +3033,10 @@ class ProjectExecutionController:
                 )
 
                 execution_failed = (
-                    result_ok is False
+                    (
+                        result_ok is False
+                        and not execution_complete
+                    )
                     or result_status in failure_statuses
                     or execution_status in {
                         "failed",
