@@ -52,6 +52,33 @@ class ExecutionOrchestratorService:
         execution_state,
         step,
     ):
+        print(
+            "[PROJECT FILE REGISTRATION CHECK]",
+            {
+                "project_id": (
+                    execution_state.get("project_id")
+                    if isinstance(execution_state, dict)
+                    else None
+                ),
+                "action": (
+                    step.get("action")
+                    if isinstance(step, dict)
+                    else None
+                ),
+                "next_action": (
+                    step.get("next_action")
+                    if isinstance(step, dict)
+                    else None
+                ),
+                "target_file": (
+                    step.get("target_file")
+                    if isinstance(step, dict)
+                    else None
+                ),
+            },
+            flush=True,
+        )
+
         if self.project_workspace_service is None:
             return None
 
@@ -167,6 +194,150 @@ class ExecutionOrchestratorService:
 
         return len(steps)
 
+    def _unfinished_project_tasks(self, execution_state):
+        if (
+            isinstance(execution_state, dict)
+            and not execution_state.get("project_id")
+            and self.project_workspace_service is not None
+        ):
+            active_project = (
+                self.project_workspace_service.get_active_project()
+            )
+
+            if (
+                isinstance(active_project, dict)
+                and active_project.get("id")
+            ):
+                execution_state["project_id"] = (
+                    active_project["id"]
+                )
+
+        if self.project_workspace_service is None:
+            return ["Project workspace service unavailable"]
+
+        project_id = (
+            execution_state.get("project_id")
+            if isinstance(execution_state, dict)
+            else None
+        )
+
+        if not project_id:
+            active_project = (
+                self.project_workspace_service.get_active_project()
+        )
+
+            if isinstance(active_project, dict):
+                project_id = active_project.get("id")
+
+        if not project_id:
+            return ["Active project could not be resolved"]
+
+        project = self.project_workspace_service.get_project(
+            project_id
+        )
+
+        if not isinstance(project, dict):
+            return [
+                f"Project could not be loaded: {project_id}"
+            ]
+
+        if hasattr(
+            self.project_workspace_service,
+            "refresh_project",
+        ):
+            project = self.project_workspace_service.refresh_project(
+                project_id
+            )
+        else:
+            project = self.project_workspace_service.get_project(
+                project_id
+            )
+
+        print(
+            "[ORCHESTRATOR FRESH PROJECT TASKS]",
+            [
+                {
+                    "id": task.get("id"),
+                    "title": task.get("title"),
+                    "status": task.get("status"),
+                }
+                for task in project.get("tasks", [])
+                if isinstance(task, dict)
+            ],
+            flush=True,
+        )
+
+        completed_statuses = {
+            "completed",
+            "complete",
+            "done",
+            "success",
+            "succeeded",
+            "finished",
+        }
+
+        unfinished = []
+
+        for task in project.get("tasks", []):
+
+            if not isinstance(task, dict):
+                continue
+
+            status = str(
+                task.get("status") or ""
+            ).strip().lower()
+
+            print(
+                "[ORCHESTRATOR TASK STATUS CHECK]",
+                {
+                    "title": task.get("title"),
+                    "status": status,
+                },
+                flush=True,
+            )
+
+            if status in completed_statuses:
+                continue
+
+            title = str(
+                task.get("title")
+                or task.get("id")
+                or "Untitled task"
+            ).strip()
+
+            action = str(
+                task.get("action") or ""
+            ).strip().lower()
+
+            execution_mode = str(
+                task.get("execution_mode") or ""
+            ).strip().lower()
+
+            has_execution_payload = bool(
+                task.get("steps")
+                or task.get("content")
+                or task.get("code")
+                or task.get("replacement")
+                or task.get("command")
+                or task.get("target_file")
+                or task.get("target_files")
+            )
+
+            if not has_execution_payload:
+                print(
+                    "[IGNORING NON-EXECUTABLE PROJECT TASK]",
+                    {
+                        "title": title,
+                        "status": status,
+                    },
+                    flush=True,
+                )
+                continue
+
+            unfinished.append(title)
+
+        return unfinished
+
     def process_execution(
         self,
         session_id="",
@@ -186,6 +357,38 @@ class ExecutionOrchestratorService:
             if isinstance(state, dict)
             else {}
         )
+
+        if (
+            not execution_state.get("project_id")
+            and self.project_workspace_service is not None
+        ):
+            active_project = (
+                self.project_workspace_service.get_active_project()
+            )
+
+            if (
+                isinstance(active_project, dict)
+                and active_project.get("id")
+            ):
+                execution_state["project_id"] = (
+                    active_project["id"]
+                )
+
+        if (
+            not execution_state.get("project_id")
+            and self.project_workspace_service is not None
+        ):
+            active_project = (
+                self.project_workspace_service.get_active_project()
+            )
+
+            if (
+                isinstance(active_project, dict)
+                and active_project.get("id")
+            ):
+                execution_state["project_id"] = (
+                    active_project["id"]
+                )
 
         selected_command = (
             command
@@ -210,6 +413,7 @@ class ExecutionOrchestratorService:
             if isinstance(execution_state, dict)
             else {}
         )
+
 
         steps = execution_state.get("steps") or []
 
@@ -564,6 +768,11 @@ class ExecutionOrchestratorService:
         if incoming_has_state:
             if (
                 persisted_state_available
+                and command in {
+                    "run_step",
+                    "run step",
+                    "approve",
+                }
                 and str(
                     persisted_execution_state.get(
                         "status",
@@ -626,23 +835,64 @@ class ExecutionOrchestratorService:
                         preserved_index
                     ]
 
-                    for key in (
-                        "status",
-                        "waiting",
-                        "approved",
-                        "approval_required",
-                        "approval_status",
-                        "next_action",
-                        "result",
-                        "complete",
-                        "execution_metadata",
-                        "content",
-                        "code",
-                    ):
-                        if key in persisted_step:
-                            incoming_step[key] = (
-                                persisted_step[key]
-                            )
+                    persisted_status = str(
+                        persisted_step.get("status", "")
+                    ).strip().lower()
+
+                    persisted_complete = (
+                        persisted_status in {
+                            "completed",
+                            "complete",
+                            "success",
+                        }
+                        or persisted_step.get("complete") is True
+                    )
+
+                    if persisted_complete:
+                        # Preserve completed work; never restore
+                        # stale approval state over it.
+                        for key in (
+                            "status",
+                            "waiting",
+                            "next_action",
+                            "result",
+                            "complete",
+                            "execution_metadata",
+                            "content",
+                            "code",
+                        ):
+                            if key in persisted_step:
+                                incoming_step[key] = (
+                                    persisted_step[key]
+                                )
+
+                        incoming_step["status"] = "completed"
+                        incoming_step["complete"] = True
+                        incoming_step["waiting"] = False
+                        incoming_step["approved"] = True
+                        incoming_step["approval_required"] = False
+                        incoming_step["approval_status"] = None
+                        incoming_step["requires_approval"] = False
+                        incoming_step.pop("error", None)
+
+                    else:
+                        for key in (
+                            "status",
+                            "waiting",
+                            "approved",
+                            "approval_required",
+                            "approval_status",
+                            "next_action",
+                            "result",
+                            "complete",
+                            "execution_metadata",
+                            "content",
+                            "code",
+                        ):
+                            if key in persisted_step:
+                                incoming_step[key] = (
+                                    persisted_step[key]
+                                )
 
                 execution_state["status"] = (
                     persisted_execution_state.get(
@@ -1099,8 +1349,26 @@ class ExecutionOrchestratorService:
                 )
 
             execution_state["current_index"] = current_index
-
             if self._all_steps_complete(steps):
+                unfinished_tasks = self._unfinished_project_tasks(
+                    execution_state
+                )
+
+                if unfinished_tasks:
+                    return {
+                        "ok": False,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": (
+                                "Execution steps are complete, but "
+                                "project tasks remain unfinished: "
+                                + ", ".join(unfinished_tasks)
+                                + ". Add executable steps or complete "
+                                "the tasks before finishing."
+                            ),
+                        },
+                        "execution": execution_state,
+                    }
 
                 execution_state = (
                     self.execution_mutation_service.mark_complete(
@@ -1120,7 +1388,6 @@ class ExecutionOrchestratorService:
                     },
                     "execution": execution_state,
                 }
-
             # Preserve the execution state supplied by the caller.
             # Persisted state is only a fallback when the incoming
             # state does not contain a usable step list.
@@ -1156,7 +1423,7 @@ class ExecutionOrchestratorService:
                 if isinstance(
                     persisted_refresh_steps,
                     list,
-                ) and current_index < len(
+                 ) and current_index < len(
                     persisted_refresh_steps
                 ):
                     refreshed_execution = persisted_refresh
@@ -1165,6 +1432,26 @@ class ExecutionOrchestratorService:
             execution_state["current_index"] = current_index
 
             if self._all_steps_complete(refreshed_steps):
+                unfinished_tasks = self._unfinished_project_tasks(
+                    execution_state
+                )
+
+                if unfinished_tasks:
+                    return {
+                        "ok": False,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": (
+                                "Execution steps are complete, but "
+                                "project tasks remain unfinished: "
+                                + ", ".join(unfinished_tasks)
+                                + ". Add executable steps or complete "
+                                "the tasks before finishing."
+                            ),
+                        },
+                        "execution": execution_state,
+                    }
+
                 execution_state = (
                     self.execution_mutation_service.mark_complete(
                         execution_state,
@@ -1206,11 +1493,9 @@ class ExecutionOrchestratorService:
                 else {}
             )
 
-
-
             step = {
-                **original_step,
                 **refreshed_step,
+                **original_step,
             }
 
             # Preserve caller-supplied execution context
@@ -1298,6 +1583,47 @@ class ExecutionOrchestratorService:
                     step = dict(
                         execution_state["steps"][current_index]
                     )
+
+            step_action = str(
+                step.get("action") or ""
+            ).strip()
+
+            step_target = str(
+                step.get("target_file")
+                or step.get("execution_file")
+                or ""
+            ).strip()
+
+            step_command = str(
+                step.get("command") or ""
+            ).strip()
+
+            if not (
+                step_action
+                or step_target
+                or step_command
+            ):
+                print(
+                    "[ORCHESTRATOR SKIP INVALID STEP]",
+                    {
+                        "id": step.get("id"),
+                        "title": step.get("title"),
+                        "action": step_action,
+                    },
+                    flush=True,
+                )
+
+                current_index += 1
+                execution_state["current_index"] = current_index
+
+                return {
+                    "ok": False,
+                    "status": "blocked",
+                    "message": (
+                        "Step blocked: missing execution contract."
+                    ),
+                    "execution": execution_state,
+                }
 
                 execution_event = (
                     self._build_execution_event(
@@ -1458,13 +1784,59 @@ class ExecutionOrchestratorService:
             # =========================
             # PRE-EXECUTION APPROVAL GATE
             # =========================
-            step_status = self._safe_str(
-                step.get("status")
-            ).lower().strip()
 
             step_action = self._safe_str(
                 step.get("action")
             ).lower().strip()
+
+            # Explicit file mutations with a concrete target and
+            # content do not inherit stale approval flags.
+            explicit_file_mutation_ready = bool(
+                step_action in {
+                    "implement",
+                    "create",
+                    "write",
+                    "create_file",
+                    "write_file",
+                }
+                and self._safe_str(
+                    step.get("target_file")
+                ).strip()
+                and self._safe_str(
+                    step.get("content")
+                    or step.get("generated_content")
+                    or step.get("file_content")
+                ).strip()
+                and (
+                    step.get("mutation_ready") is True
+                    or step.get("mutation_mode") == "create"
+                    or step.get("payload_required") is False
+                    or (
+                        step.get("target_file")
+                        and (
+                            step.get("content")
+                            or step.get("generated_content")
+                            or step.get("file_content")
+                        )
+                    )
+                )
+            )
+
+            step_status = self._safe_str(
+                step.get("status")
+            ).lower().strip()
+
+            if explicit_file_mutation_ready:
+                step["requires_approval"] = False
+                step["approval_required"] = False
+                step["approval_status"] = None
+                if step_status in {
+                    "waiting_approval",
+                    "awaiting_approval",
+                    "approval_required",
+                }:
+                    step["status"] = "pending"
+                    step_status = "pending"
 
             mutation_actions = {
                 "implement",
@@ -1560,30 +1932,56 @@ class ExecutionOrchestratorService:
                     "step_output": "",
                 }
 
-
-
-
-
             result = self.execution_step_service.execute_step_logic(
                 session_id=session_id,
                 step=step,
             )
 
+            # A successful executor result takes precedence over
+            # stale approval state left on the original step.
+            if (
+                isinstance(result, dict)
+                and str(
+                    result.get("status") or ""
+                ).lower().strip() == "completed"
+            ):
+                completed_step = dict(step)
+                completed_step.update(result)
 
+                for preserved_key in (
+                    "action",
+                    "description",
+                    "execution_file",
+                    "target_file",
+                    "target_files",
+                    "command",
+                    "content",
+                    "code",
+                    "replacement",
+                    "tool_name",
+                ):
+                    original_value = step.get(preserved_key)
+                    result_value = result.get(preserved_key)
 
+                    if original_value and not result_value:
+                        completed_step[preserved_key] = original_value
 
+                completed_step["status"] = "completed"
+                completed_step["complete"] = True
+                completed_step["waiting"] = False
+                completed_step["requires_approval"] = False
+                completed_step["approval_required"] = False
+                completed_step["approval_status"] = None
+                completed_step.pop("error", None)
 
-
-
-
+                step = completed_step
 
             # ---------------------------------
             # WAITING / CLARIFICATION STOP GATE
             # ---------------------------------
             # Executor waiting states are not
-            # completed steps. Preserve them and
+            # completed steps. Preserve themand
             # return control to the user.
-
 
 
             if (
@@ -1877,13 +2275,102 @@ class ExecutionOrchestratorService:
                 and str(result.get("status") or "").lower().strip()
                 == "completed"
             ):
-                step = dict(result)
+                completed_step = dict(step)
+                completed_step.update(result)
+
+                for preserved_key in (
+                    "action",
+                    "description",
+                    "execution_file",
+                    "target_file",
+                    "target_files",
+                    "command",
+                    "content",
+                    "code",
+                    "replacement",
+                    "tool_name",
+                ):
+                    original_value = step.get(preserved_key)
+                    result_value = result.get(preserved_key)
+
+                    if original_value and not result_value:
+                        completed_step[preserved_key] = original_value
+
+                completed_step["status"] = "completed"
+                completed_step["complete"] = True
+                completed_step["waiting"] = False
+                completed_step["requires_approval"] = False
+                completed_step["approval_required"] = False
+                completed_step["approval_status"] = None
+                completed_step.pop("error", None)
+
+                step = completed_step
 
             normalized_result = (
                 result.get("result")
                 if isinstance(result, dict)
                 else result
             )
+
+
+            # ---------------------------------
+            # BLOCK TASKS WITH NO EXECUTABLE INSTRUCTIONS
+            # ---------------------------------
+            if isinstance(step, dict):
+                executable_fields = (
+                    "action",
+                    "execution_file",
+                    "target_file",
+                    "target_files",
+                    "command",
+                    "content",
+                    "code",
+                    "replacement",
+                    "tool_name",
+                )
+
+                has_executable_instructions = any(
+                    step.get(field)
+                    for field in executable_fields
+                )
+
+                if not has_executable_instructions:
+                    waiting_step = dict(step)
+                    waiting_step["status"] = "waiting"
+                    waiting_step["waiting"] = True
+                    waiting_step["complete"] = False
+                    waiting_step["needs_clarification"] = True
+                    waiting_step["clarification"] = (
+                        "I’m ready to continue, but I need a few more "
+                        "details before I can complete this task.\n\n"
+                        f"Current task: {step.get('title') or 'Untitled task'}\n\n"
+                        "Please tell me what action you want me to take "
+                        "and include any required details "
+                        "(files, content, or expected result)."
+                    )
+
+                    execution_state["steps"][current_index] = (
+                        waiting_step
+                    )
+                    execution_state["status"] = "waiting"
+                    execution_state["waiting"] = True
+                    execution_state["complete"] = False
+                    execution_state["current_step"] = waiting_step
+
+                    self._save_execution_state(
+                        session_id,
+                        execution_state,
+                    )
+
+                    return {
+                        "ok": True,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": waiting_step["clarification"],
+                        },
+                        "execution": execution_state,
+                        "step_output": "",
+                    }
 
             # ---------------------------------
             # PREVENT STATE DOWNGRADE
@@ -2006,6 +2493,43 @@ class ExecutionOrchestratorService:
             )
 
             if next_index >= len(steps):
+                if (
+                    isinstance(
+                        execution_state,
+                        dict,
+                    )
+                    and self.project_workspace_service is not None
+                ):
+                    project_id = execution_state.get(
+                        "project_id"
+                    )
+
+                    if project_id:
+                        self.project_workspace_service.get_project(
+                            project_id
+                        )
+
+                unfinished_tasks = self._unfinished_project_tasks(
+                    execution_state
+                )
+                if unfinished_tasks:
+                    execution_state["status"] = "in_progress"
+                    execution_state["complete"] = False
+
+                    return {
+                        "ok": False,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": (
+                                "Execution steps are exhausted, but "
+                                "project tasks remain unfinished: "
+                                + ", ".join(unfinished_tasks)
+                                + ". Add executable steps or complete "
+                                "the remaining tasks."
+                            ),
+                        },
+                        "execution": execution_state,
+                    }
 
                 execution_state = (
                     self.execution_mutation_service.mark_complete(
@@ -2192,6 +2716,14 @@ class ExecutionOrchestratorService:
                 )
 
                 if waiting_for_approval:
+                    break
+
+                if (
+                    current_state.get("waiting") is True
+                    or current_state.get("needs_clarification") is True
+                    or step_status == "waiting"
+                    or current_step.get("needs_clarification") is True
+                ):
                     break
 
                 if step_status in {
