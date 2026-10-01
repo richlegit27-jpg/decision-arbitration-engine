@@ -699,11 +699,30 @@ class ProjectExecutionController:
                     )
                 )
 
+                has_executable_task_action = (
+                    str(
+                        task.get("action") or ""
+                    ).strip().lower()
+                    in {
+                        "implement",
+                        "create",
+                        "write",
+                        "edit",
+                        "modify",
+                        "delete",
+                        "test",
+                        "run",
+                        "execute",
+                    }
+                )
+
                 if (
                     has_task_instructions
                     or has_executable_nested_step
+                    or has_executable_task_action
                 ):
                     runnable.append(task)
+
                 else:
                     print(
                         "[PROJECT TASK SKIPPED: NO EXECUTABLE INSTRUCTIONS]",
@@ -1291,6 +1310,28 @@ class ProjectExecutionController:
                 )
 
                 print(
+                    "[POST ORCHESTRATOR TASK REFRESH BEFORE]",
+                    tasks,
+                    flush=True,
+                )
+
+                tasks = self.project_workspace_service.get_tasks(
+                    project_id
+                )
+
+                print(
+                    "[POST ORCHESTRATOR TASK REFRESH AFTER]",
+                    tasks,
+                    flush=True,
+                )
+
+                print(
+                    "[EXECUTOR RETURN DEBUG]",
+                    execution,
+                    flush=True,
+                )
+
+                print(
                     "[PROJECT EXECUTION] canonical orchestrator returned",
                     type(execution),
                     flush=True,
@@ -1335,11 +1376,27 @@ class ProjectExecutionController:
                                 tasks=tasks,
                             )
 
-            print(
-                "[PROJECT EXECUTION RAW RESULT]",
-                execution,
-                flush=True,
-            )
+                result = (
+                    self._execute_with_existing_orchestrator(
+                        project_id=project_id,
+                        tasks=tasks,
+                        command="run_all",
+                    )
+                )
+
+                print(
+                    "[PROJECT EXECUTION RAW RESULT]",
+                    result,
+                    flush=True,
+                )
+
+                result_execution = (
+                    result.get("execution")
+                    or result.get("execution_state")
+                    or {}
+                ) if isinstance(result, dict) else {}
+
+
 
         except Exception as exc:
             print(
@@ -2794,6 +2851,32 @@ class ProjectExecutionController:
 
             current_task = runnable[0]
 
+            # Refresh task from persistent storage before execution.
+            # Previous task syncs may have changed dependency/status state.
+            fresh_project = self._get_project(
+                project_id
+            )
+
+            if isinstance(fresh_project, dict):
+                fresh_tasks = fresh_project.get(
+                    "tasks",
+                    [],
+                )
+
+                if isinstance(fresh_tasks, list):
+                    fresh_task = next(
+                        (
+                            task
+                            for task in fresh_tasks
+                            if isinstance(task, dict)
+                            and task.get("id") == current_task.get("id")
+                        ),
+                        None,
+                    )
+
+                    if isinstance(fresh_task, dict):
+                        current_task = fresh_task
+
             if not isinstance(
                 current_task,
                 dict,
@@ -2993,13 +3076,14 @@ class ProjectExecutionController:
                 ).strip().lower()
 
                 print(
-                    "[EXECUTION COMPLETE DEBUG]",
+                    "[EXECUTION STATUS DETAILS]",
                     {
-                        "task_id": current_task.get("id"),
-                        "task_title": current_task.get("title"),
-                        "result_execution": result_execution,
+                        "result_ok": result_ok,
                         "result_status": result_status,
                         "execution_status": execution_status,
+                        "complete": result_execution.get("complete"),
+                        "completed": result_execution.get("completed"),
+                        "steps": result_execution.get("steps"),
                     },
                     flush=True,
                 )
@@ -4538,6 +4622,16 @@ class ProjectExecutionController:
 
                 update_result = None
 
+                print(
+                    "[NESTED STEP ID MATCH DEBUG]",
+                    {
+                        "task_id": task_id,
+                        "incoming_step_id": step_id,
+                        "available_nested_steps": [],
+                    },
+                    flush=True,
+                )
+
                 if (
                     step_id
                     and hasattr(
@@ -4545,6 +4639,7 @@ class ProjectExecutionController:
                         "update_nested_step_status",
                     )
                 ):
+
                     update_result = (
                         self.project_workspace_service
                         .update_nested_step_status(
