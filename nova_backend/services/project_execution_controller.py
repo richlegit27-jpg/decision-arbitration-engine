@@ -1315,8 +1315,20 @@ class ProjectExecutionController:
                     flush=True,
                 )
 
-                tasks = self.project_workspace_service.get_tasks(
-                    project_id
+                project = (
+                    self.project_workspace_service
+                    .get_project(
+                        project_id
+                    )
+                )
+
+                tasks = (
+                    project.get("tasks", [])
+                    if isinstance(
+                        project,
+                        dict,
+                    )
+                    else []
                 )
 
                 print(
