@@ -2911,8 +2911,22 @@ class ProjectExecutionController:
                 }
                 if (
                     result_ok is False
+                    and not (
+                        isinstance(result, dict)
+                        and (
+                            result.get("complete") is True
+                            or (
+                                isinstance(result.get("execution"), dict)
+                                and (
+                                    result["execution"].get("complete") is True
+                                    or result["execution"].get("completed") is True
+                                )
+                            )
+                        )
+                    )
                     or result_status in failure_statuses
                 ):
+
                     failure_error = (
                         (
                             result_execution.get("error")
