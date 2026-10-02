@@ -82,3 +82,9 @@ uploads/*readiness*
 uploads/*no-web*
 uploads/*summary*
 uploads/*canonical*
+
+# Local cleanup archive
+cleanup_archive/
+
+# Local cleanup archive
+cleanup_archive/
