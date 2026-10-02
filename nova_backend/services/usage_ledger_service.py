@@ -21,6 +21,93 @@ from typing import Any, Dict, List, Optional
 
 _USAGE_LOCK = threading.Lock()
 
+# ============================================================
+# NOVA_PROVIDER_COST_ESTIMATOR
+# Provider costs are USD per million tokens.
+# Configure verified rates using NOVA_MODEL_PRICING_USD_PER_MILLION.
+# Unknown models deliberately return no cost estimate.
+# ============================================================
+
+def _nova_provider_cost_estimate(
+    model,
+    input_tokens,
+    output_tokens,
+    estimated_tokens,
+):
+    import json
+
+    raw_rates = os.environ.get(
+        "NOVA_MODEL_PRICING_USD_PER_MILLION",
+        "",
+    ).strip()
+
+    if not raw_rates:
+        return {
+            "provider_cost_usd": None,
+            "provider_cost_estimated": None,
+            "provider_cost_currency": "USD",
+            "provider_pricing_source": None,
+        }
+
+    try:
+        pricing = json.loads(raw_rates)
+    except (TypeError, ValueError):
+        return {
+            "provider_cost_usd": None,
+            "provider_cost_estimated": None,
+            "provider_cost_currency": "USD",
+            "provider_pricing_source": None,
+        }
+
+    model_key = str(model or "unknown").strip().casefold()
+    rate = next(
+        (
+            value
+            for key, value in pricing.items()
+            if str(key).strip().casefold() == model_key
+        ),
+        None,
+    )
+
+    if not isinstance(rate, dict):
+        return {
+            "provider_cost_usd": None,
+            "provider_cost_estimated": None,
+            "provider_cost_currency": "USD",
+            "provider_pricing_source": None,
+        }
+
+    try:
+        input_rate = float(rate["input"])
+        output_rate = float(rate["output"])
+
+        if (
+            input_rate < 0
+            or output_rate < 0
+            or not math.isfinite(input_rate)
+            or not math.isfinite(output_rate)
+        ):
+            raise ValueError("Invalid provider pricing")
+
+        cost = (
+            max(0, int(input_tokens)) * input_rate
+            + max(0, int(output_tokens)) * output_rate
+        ) / 1_000_000
+
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return {
+            "provider_cost_usd": None,
+            "provider_cost_estimated": None,
+            "provider_cost_currency": "USD",
+            "provider_pricing_source": None,
+        }
+
+    return {
+        "provider_cost_usd": round(cost, 10),
+        "provider_cost_estimated": bool(estimated_tokens),
+        "provider_cost_currency": "USD",
+        "provider_pricing_source": rate.get("source"),
+    }
 
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -175,6 +262,10 @@ def record_model_usage(
     final_output = int(output_tokens if output_tokens is not None else (official_output or estimate_tokens(output_text)))
     final_total = int(total_tokens if total_tokens is not None else (official_total or (final_input + final_output)))
 
+    token_counts_estimated = not bool(
+        official_total or official_input or official_output
+    )
+
     event = {
         "timestamp": utc_now_iso(),
         "session_id": session_id or "",
@@ -184,14 +275,22 @@ def record_model_usage(
         "input_tokens": final_input,
         "output_tokens": final_output,
         "total_tokens": final_total,
-        "estimated": not bool(official_total or official_input or official_output),
+        "estimated": token_counts_estimated,
         "provider_usage": provider_usage,
         "meta": meta,
     }
 
+    event.update(
+        _nova_provider_cost_estimate(
+            model=model,
+            input_tokens=final_input,
+            output_tokens=final_output,
+            estimated_tokens=token_counts_estimated,
+        )
+    )
+
     with _USAGE_LOCK:
         ledger = load_usage_ledger()
-
         ledger["events"].append(event)
 
         totals = ledger.setdefault("totals", {})
@@ -234,34 +333,60 @@ def record_model_usage(
     return event
 
 
-def usage_summary(session_id: Optional[str] = None) -> Dict[str, Any]:
+def usage_summary(
+    session_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    username: Optional[str] = None,
+) -> Dict[str, Any]:
     ledger = load_usage_ledger()
+    events = ledger.get("events", [])
+
+    if user_id or username:
+        user_id = str(user_id or "").strip()
+        username = str(username or "").strip().casefold()
+
+        events = [
+            event for event in events
+            if (
+                user_id
+                and str(event.get("user_id") or "").strip() == user_id
+            ) or (
+                username
+                and str(event.get("username") or "").strip().casefold()
+                == username
+            )
+        ]
 
     if session_id:
-        session_totals = ledger.get("by_session", {}).get(session_id, {
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "total_tokens": 0,
-            "calls": 0,
-        })
-
-        recent_events = [
-            event for event in ledger.get("events", [])
+        events = [
+            event for event in events
             if event.get("session_id") == session_id
-        ][-50:]
+        ]
 
-        return {
-            "ok": True,
-            "session_id": session_id,
-            "totals": session_totals,
-            "recent_events": recent_events,
-        }
+    totals = {
+        "input_tokens": sum(
+            int(event.get("input_tokens") or 0) for event in events
+        ),
+        "output_tokens": sum(
+            int(event.get("output_tokens") or 0) for event in events
+        ),
+        "total_tokens": sum(
+            int(event.get("total_tokens") or 0) for event in events
+        ),
+        "calls": len(events),
+    }
 
-    return {
+    result = {
         "ok": True,
-        "totals": ledger.get("totals", {}),
-        "by_session": ledger.get("by_session", {}),
-        "by_model": ledger.get("by_model", {}),
-        "recent_events": ledger.get("events", [])[-50:],
+        "totals": totals,
+        "recent_events": events[-50:],
         "updated_at": ledger.get("updated_at"),
     }
+
+    if session_id:
+        result["session_id"] = session_id
+
+    if user_id:
+        result["user_id"] = user_id
+
+    return result

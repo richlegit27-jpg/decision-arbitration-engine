@@ -115,11 +115,13 @@ class ProjectArtifactPublisherService:
             dict,
         ):
             for key in (
-                "result",
-                "output",
+                "file_content",
                 "content",
-                "message",
+                "generated_content",
+                "output",
                 "text",
+                "message",
+                "result",
             ):
                 value = result.get(key)
 
@@ -532,13 +534,61 @@ class ProjectArtifactPublisherService:
 
             return None
 
-        execution_source = (
-            self._resolve_execution_file(
-                result,
-                target_file,
-            )
-        )
+        # NOVA_ARTIFACT_EXPLICIT_CONTENT_REPAIR
+        # Prefer explicit file content over a stale file or status message.
+        explicit_content = ""
 
+        if isinstance(result, dict):
+            for content_key in (
+                "file_content",
+                "content",
+                "generated_content",
+            ):
+                candidate = result.get(content_key)
+
+                if (
+                    isinstance(candidate, str)
+                    and candidate.strip()
+                ):
+                    explicit_content = candidate
+                    break
+
+        if explicit_content:
+
+            repair_target = self._resolve_sandbox_file(
+                target_file
+            )
+
+            if repair_target is not None:
+                repair_target.parent.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
+
+                repair_target.write_text(
+                    explicit_content,
+                    encoding="utf-8",
+                )
+
+                print(
+                    "[PROJECT ARTIFACT EXPLICIT CONTENT REPAIRED]",
+                    {
+                        "project_id": project_id,
+                        "target_file": target_file,
+                        "content_length": len(explicit_content),
+                    },
+                    flush=True,
+                )
+
+            # Do not republish a stale execution-result file.
+            execution_source = None
+        else:
+            execution_source = (
+                self._resolve_execution_file(
+                    result,
+                    target_file,
+                )
+            )
         if execution_source is not None:
             file_artifact = (
                 self._publish_existing_file(

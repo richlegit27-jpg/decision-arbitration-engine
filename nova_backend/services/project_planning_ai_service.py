@@ -619,6 +619,13 @@ idea through planning, execution, adaptation, and completion.
                         "fix",
                         "execute",
                         "run",
+                        "make",
+                        "video",
+                        "app",
+                        "project",
+                        "website",
+                        "document",
+                        "file",
                     ]
                 )
 
@@ -628,8 +635,8 @@ idea through planning, execution, adaptation, and completion.
                     "plan",
                     "design",
                 }:
-                    action = "execute"
-                    execution_mode = "hybrid"
+                    action = "create"
+                    execution_mode = "ai"
 
 
                 allowed_actions = {
@@ -712,8 +719,23 @@ idea through planning, execution, adaptation, and completion.
                     or ""
                 ).strip()
 
+                if (
+                    action in {
+                        "create",
+                        "write",
+                    }
+                    and execution_mode == "ai"
+                    and not target_file
+                    and not task.get("target_files")
+                ):
+                    title_slug = (
+                        str(task.get("title") or "artifact")
+                        .strip()
+                        .lower()
+                        .replace(" ", "_")
+                    )
 
-
+                    target_file = f"{title_slug}.md"
 
                 content = str(
                     task.get(
@@ -831,6 +853,34 @@ idea through planning, execution, adaptation, and completion.
                     or ""
                 ).strip()
 
+                if (
+                    action == "analyze"
+                    and execution_mode == "ai"
+                    and expected_output
+                    and any(
+                        word in expected_output.lower()
+                        for word in [
+                            "brief",
+                            "document",
+                            "plan",
+                            "script",
+                            "outline",
+                            "report",
+                        ]
+                    )
+                ):
+                    action = "write"
+
+                    if not target_file:
+                        title_slug = (
+                            str(task.get("title") or "artifact")
+                            .strip()
+                            .lower()
+                            .replace(" ", "_")
+                        )
+
+                        target_file = f"{title_slug}.md"
+
                 if not expected_output:
                     expected_output = (
                         f"Concrete result for: {title}"
@@ -920,6 +970,14 @@ idea through planning, execution, adaptation, and completion.
                         )
                         or action
                     ).strip().lower()
+
+
+                    if (
+                        action == "create"
+                        and normalized_step_action == "analyze"
+                    ):
+                        normalized_step_action = "write"
+
 
                     normalized_step_target_file = str(
                         step.get(

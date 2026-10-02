@@ -574,6 +574,8 @@ class ExecutionStepService:
             )
 
         step["content"] = content
+        step["file_content"] = content
+        step["generated_content"] = content
         step["code"] = content
 
         step["next_action"] = "write_file"
@@ -1441,11 +1443,27 @@ class ExecutionStepService:
             explicit_file_write = (
                 step.get("mutation_requested") is True
                 or step.get("mutation_mode") == "create"
-                or step.get("action") in {
-                    "create_file",
-                    "modify_file",
-                }
+                or (
+                    self._safe_str(
+                        step.get("execution_mode")
+                    ).lower().strip()
+                    != "ai"
+                    and str(
+                        step.get("action") or ""
+                    ).strip().lower() in {
+                        "write",
+                        "implement",
+                        "create",
+                        "modify",
+                        "update",
+                        "patch",
+                        "replace",
+                        "create_file",
+                        "modify_file",
+                    }
+                )
             )
+
 
             if (
                 explicit_file_write
@@ -1474,10 +1492,122 @@ class ExecutionStepService:
                 step.get("action")
             ).lower().strip()
 
-            mutation_actions = self.IMPLEMENT_ACTIONS
+            # Explicit file writes with a concrete target and content
+            # are ready for the mutation pipeline.
 
             if (
+                not step.get("content")
+                and step.get("generated_content")
+            ):
+                step["content"] = step.get(
+                    "generated_content"
+                )
+
+            if (
+                not step.get("file_content")
+                and step.get("generated_content")
+            ):
+                step["file_content"] = step.get(
+                    "generated_content"
+                )
+
+            explicit_write_ready = bool(
+                explicit_file_write
+                and step_action in self.IMPLEMENT_ACTIONS
+                and (
+                    (
+                        self._safe_str(
+                            step.get("target_file")
+                        ).strip()
+                        and (
+                            self._safe_str(
+                                step.get("content")
+                            ).strip()
+                            or self._safe_str(
+                                step.get("file_content")
+                            ).strip()
+                            or self._safe_str(
+                                step.get("generated_content")
+                            ).strip()
+                        )
+                    )
+                    or (
+                        natural_target_file
+                        and natural_content
+                    )
+                )
+            )
+
+            content = self._implementation_content(
+                step
+            )
+
+            next_action = self._safe_str(
+                step.get("next_action")
+            ).strip().lower()
+
+            payload = step.get("payload")
+
+            if not isinstance(payload, dict):
+                payload = {}
+
+            content = self._safe_str(
+                step.get("content")
+                or step.get("file_content")
+                or payload.get("content")
+                or payload.get("file_content")
+                or payload.get("generated_content")
+                or ""
+            ).strip()
+
+            mutation_actions = {
+                action
+                for action in self.IMPLEMENT_ACTIONS
+                if action not in {
+                    "implement",
+                }
+            }
+
+            if (
+                step_action == "implement"
+                and (
+                    self._safe_str(
+                        step.get("execution_mode")
+                    ).lower().strip()
+                    in {
+                        "ai",
+                        "hybrid",
+                    }
+                )
+                and not explicit_write_ready
+            ):
+                mutation_actions = mutation_actions
+
+            print(
+                "[NOVA EXPLICIT WRITE READINESS]",
+                {
+                    "action": step.get("action"),
+                    "step_action": step_action,
+                    "explicit_file_write": explicit_file_write,
+                    "natural_target_file": natural_target_file,
+                    "natural_content_present": bool(natural_content),
+                    "natural_content": natural_content,
+                    "explicit_write_ready": explicit_write_ready,
+                    "approval_required_before_gate": step.get("approval_required"),
+                    "approval_status_before_gate": step.get("approval_status"),
+                },
+                flush=True,
+            )
+            if (
                 step_action in mutation_actions
+                and not explicit_write_ready
+                and self._safe_str(
+                    step.get("execution_mode")
+                ).lower().strip()
+                not in {
+                    "ai",
+                    "hybrid",
+                }
                 and step.get("approval_status") != "approved"
             ):
                 step["requires_approval"] = True
@@ -1486,6 +1616,9 @@ class ExecutionStepService:
             else:
                 step["requires_approval"] = False
                 step["approval_required"] = False
+
+                if explicit_write_ready:
+                    step["approval_status"] = None
 
             if (
                 step_action in mutation_actions
@@ -1512,30 +1645,7 @@ class ExecutionStepService:
                 step.get("execution_file")
             ).strip()
 
-            content = self._implementation_content(
-                step
-            )
 
-            next_action = self._safe_str(
-                step.get("next_action")
-            ).strip().lower()
-
-            # ---------------------------------
-            # RESOLVE EXPLICIT FILE CONTENT
-            # ---------------------------------
-            payload = step.get("payload")
-
-            if not isinstance(payload, dict):
-                payload = {}
-
-            content = self._safe_str(
-                step.get("content")
-                or step.get("file_content")
-                or payload.get("content")
-                or payload.get("file_content")
-                or payload.get("generated_content")
-                or ""
-            ).strip()
 
             # ---------------------------------
             # NORMALIZE NATURAL LANGUAGE PYTHON
@@ -1575,30 +1685,38 @@ class ExecutionStepService:
                         flush=True,
                     )
             # ---------------------------------
-            # ---------------------------------
             # GENERATE MISSING IMPLEMENTATION CONTENT
             # ---------------------------------
             if (
                 step_action in self.IMPLEMENT_ACTIONS
-                and target_file
+                and (
+                    target_file
+                    or step.get("expected_output")
+                    or step.get("completion_criteria")
+                )
                 and not content.strip()
                 and (
                     step.get("description")
                     or step.get("text")
                     or step.get("title")
                     or step.get("goal")
+                    or step.get("expected_output")
+                    or step.get("completion_criteria")
                 )
             ):
                 step = self._generate_file_replacement(
                     session_id=session_id,
                     step=step,
                 )
+
                 content = self._safe_str(
                     step.get("content")
                 ).strip()
 
-            # DIRECT EXPLICIT FILE IMPLEMENTATION
-            # ---------------------------------
+                step["file_content"] = content
+                step["generated_content"] = content
+
+
             # Explicit target_file + content must
             # always write the requested content directly.
             # This branch must execute before any
@@ -2014,9 +2132,24 @@ class ExecutionStepService:
             # ---------------------------------
 
             elif step_action in self.IMPLEMENT_ACTIONS:
-                self._execute_ai_step(
-                    session_id=session_id,
-                    step=step,
+                target_file = self._safe_str(
+                    step.get("target_file")
+                    or step.get("file_path")
+                    or step.get("path")
+                    or ""
+                ).strip()
+
+                if not target_file:
+                    raise RuntimeError(
+                        "Implementation failed: no target file "
+                        "was provided. AI-generated explanatory "
+                        "text is not a completed file operation."
+                    )
+
+                raise RuntimeError(
+                    "Implementation could not be completed through "
+                    "the AI fallback. Use the explicit file-writing "
+                    "path to create or modify the target file."
                 )
 
             # ---------------------------------
@@ -2030,14 +2163,15 @@ class ExecutionStepService:
                 )
 
             # ---------------------------------
-            # UNKNOWN ACTION
+            # UNKNOWN ACTION — FAIL EXPLICITLY
             # ---------------------------------
 
             else:
-
-                self._execute_ai_step(
-                    session_id=session_id,
-                    step=step,
+                raise RuntimeError(
+                    "Unsupported execution action: "
+                    f"{step_action or '<empty>'}. "
+                    "Map the task to a supported action "
+                    "before execution."
                 )
 
             result_status = self._safe_str(

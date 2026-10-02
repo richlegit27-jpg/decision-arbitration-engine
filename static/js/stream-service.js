@@ -7,6 +7,7 @@ function createStreamService(options = {}){
   const {
     endpoint = "/api/chat/stream",
     fetchImpl = window.fetch.bind(window),
+    state = {},
   } = options
 
   let controller = null
@@ -469,6 +470,12 @@ const attachmentList = Array.isArray(payload.attachments)
 const requestBody = {
   user_text: userText,
   session_id: sessionId,
+  model: String(
+    payload.model ||
+    state.selectedModel ||
+    state.defaultModel ||
+    ""
+  ).trim(),
   attachments: attachmentList,
 
   // Compatibility aliases for older Nova code.

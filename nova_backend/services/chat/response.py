@@ -429,6 +429,14 @@ class ChatResponseHandler:
 
         if isinstance(assistant_msg, dict):
             assistant_attachments = assistant_msg.get("attachments")
+
+            if (
+                isinstance(assistant_attachments, list)
+                and assistant_attachments
+                and not attachments
+            ):
+                attachments = assistant_attachments
+
             if not isinstance(assistant_attachments, list) or not assistant_attachments:
                 assistant_msg["attachments"] = attachments
 
@@ -819,6 +827,7 @@ class ChatResponseHandler:
 
     def safe_str(self, value):
         return self.chat_service.safe_str(value)
+
 
 
 

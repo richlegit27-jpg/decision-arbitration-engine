@@ -467,34 +467,6 @@ function renderMessages(messages = []) {
       .map((message, index) => {
         const role = messageRoleClass(message?.role);
         const content = extractMessageText(message);
-
-        const imageHtml = message?.image_url
-          ? `<div style="margin-top:10px;">
-               <img src="${escapeHtml(message.image_url)}"
-                    style="max-width:100%;border-radius:14px;">
-             </div>`
-          : "";
-
-        return `
-          <div class="message ${role}">
-            <div class="message-content">${content}</div>
-            ${imageHtml}
-          </div>
-        `;
-      })
-      .join("");
-
-    setSending(false);
-
-  } finally {
-    renderMessages.__lock = false;
-  }
-}
-
-    root.innerHTML = state.messages
-      .map((message, index) => {
-        const role = messageRoleClass(message?.role);
-        const content = extractMessageText(message);
         const imageHtml = message?.image_url
           ? `<div style="margin-top:10px;"><img src="${escapeHtml(message.image_url)}" style="max-width:100%;border-radius:14px;"></div>`
           : "";
@@ -519,34 +491,11 @@ function renderMessages(messages = []) {
     bindMessageActions(root);
     scrollToBottom(true);
     setSending(false);
+
+  } finally {
+    renderMessages.__lock = false;
   }
-
-function getOrCreateStreamingBubble(root) {
-  let last = root.lastElementChild;
-
-  // if no messages yet or last isn't assistant, create one
-  if (!last || !last.classList.contains("assistant")) {
-    const div = document.createElement("div");
-    div.className = "message assistant";
-
-    div.innerHTML = `<div class="message-content"></div>`;
-    root.appendChild(div);
-    return div.querySelector(".message-content");
-  }
-
-  return last.querySelector(".message-content");
 }
-
-function appendStreamToken(token) {
-  const root = getMessagesRoot();
-  if (!root) return;
-
-  const target = getOrCreateStreamingBubble(root);
-  target.textContent += token;
-
-  root.scrollTop = root.scrollHeight;
-}
-
 function finalizeStream() {
   const root = getMessagesRoot();
   if (!root) return;
@@ -623,6 +572,7 @@ function finalizeStream() {
 requestAnimationFrame(() => {
   renderMessages(state.messages);
 });
+  }
 
   function upsertStreamingAssistant(content = "") {
     const last = state.messages[state.messages.length - 1];
@@ -867,9 +817,21 @@ async function readStreamResponse(res) {
             payload.message ||
             {};
 
+          const imageAttachment = safeArray(
+            payload.attachments ||
+            imageAssistant.attachments ||
+            payload.files ||
+            imageAssistant.files ||
+            []
+          ).find((item) =>
+            String(item?.mime_type || item?.type || "").startsWith("image/") &&
+            item?.url
+          );
+
           const imageUrl =
             payload.image_url ||
             imageAssistant.image_url ||
+            imageAttachment?.url ||
             "";
 
           if (imageUrl) {
@@ -886,6 +848,7 @@ async function readStreamResponse(res) {
               mode: "image",
               text: imageFinalText,
               image_url: imageUrl,
+              attachments: imageAttachment ? [imageAttachment] : [],
             };
           }
 
@@ -1102,7 +1065,8 @@ if (result.mode === "image" && result.image_url) {
   state.messages.push({
     role: "assistant",
     content: result.text || "Generated image",
-    image_url: result.image_url
+    image_url: result.image_url,
+    attachments: result.attachments || []
   });
 
   requestAnimationFrame(() => renderMessages(state.messages));

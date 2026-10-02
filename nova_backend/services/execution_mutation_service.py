@@ -51,11 +51,42 @@
 
         steps = execution_state.get("steps") or []
 
+        failed_steps = [
+            step
+            for step in steps
+            if isinstance(step, dict)
+            and (
+                step.get("status") == "failed"
+                or step.get("error")
+                or (
+                    isinstance(step.get("runtime_result"), dict)
+                    and step["runtime_result"].get("ok") is False
+                )
+            )
+        ]
+
+        if failed_steps:
+            execution_state["status"] = "failed"
+            execution_state["complete"] = False
+            execution_state["waiting"] = False
+            execution_state["failed_steps"] = failed_steps
+
+            return execution_state
+
         execution_state["status"] = "complete"
         execution_state["complete"] = True
         execution_state["waiting"] = False
         execution_state["lock"] = False
         execution_state["_execution_processing"] = False
+
+        # Clear stale approval state after successful completion.
+        execution_state["approval_required"] = False
+        execution_state["approval_status"] = None
+        execution_state["waiting_for_approval"] = False
+        execution_state["awaiting_approval"] = False
+
+        # A successful execution must not retain an obsolete error.
+        execution_state.pop("error", None)
 
         execution_state["next_moves"] = []
 
@@ -67,7 +98,6 @@
         execution_state["progress"] = len(steps)
 
         return execution_state
-
     def update_step(
         self,
         execution_state,
@@ -185,8 +215,17 @@
         if isinstance(step, dict):
             existing_step.update(step)
 
+        # Successful completion must not retain stale approval state.
         existing_step["status"] = "completed"
+        existing_step["complete"] = True
         existing_step["waiting"] = False
+        existing_step["needs_clarification"] = False
+        existing_step["requires_approval"] = False
+        existing_step["approval_required"] = False
+        existing_step["approval_status"] = None
+
+        # Remove errors left by a previous blocked attempt.
+        existing_step.pop("error", None)
         existing_step["needs_clarification"] = False
 
         if result is not None:
@@ -263,6 +302,8 @@
 
         execution_state["approval_required"] = False
         execution_state["approval_status"] = "approved"
+        execution_state["waiting_for_approval"] = False
+        execution_state["awaiting_approval"] = False
         execution_state["error"] = ""
 
         execution_state["status"] = "running"
@@ -299,6 +340,8 @@
 
         execution_state["approval_required"] = False
         execution_state["approval_status"] = "denied"
+        execution_state["waiting_for_approval"] = False
+        execution_state["awaiting_approval"] = False
 
         execution_state["status"] = "cancelled"
         execution_state["complete"] = False
@@ -344,6 +387,21 @@
         )
 
         next_index = int(completed_index) + 1
+
+        steps = execution_state.get("steps") or []
+
+        if 0 <= int(completed_index) < len(steps):
+            completed_step = steps[int(completed_index)]
+
+            if isinstance(completed_step, dict):
+                completed_step["status"] = "completed"
+                completed_step["complete"] = True
+
+                completed_step["completed"] = True
+
+                steps[int(completed_index)] = completed_step
+
+        execution_state["steps"] = steps
 
         print(
             "[DEBUG ADVANCE CALCULATED]",
@@ -448,6 +506,8 @@
 
         execution_state["approval_required"] = True
         execution_state["approval_status"] = "pending"
+        execution_state["waiting_for_approval"] = True
+        execution_state["awaiting_approval"] = True
 
         execution_state["error"] = str(
             reason
@@ -576,6 +636,13 @@
         execution_state["complete"] = False
         execution_state["active"] = False
         execution_state["_execution_processing"] = False
+        execution_state["lock"] = False
+
+        execution_state["approval_required"] = False
+        execution_state["approval_status"] = None
+        execution_state["waiting_for_approval"] = False
+        execution_state["awaiting_approval"] = False
+        execution_state.pop("error", None)
 
         execution_state["steps"] = []
         execution_state["plan"] = []

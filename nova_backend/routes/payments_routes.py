@@ -24,10 +24,7 @@ def register_payments_routes(app):
                     None,
                 )
 
-                if isinstance(
-                    auth_user,
-                    dict,
-                ):
+                if isinstance(auth_user, dict):
                     user_id = str(
                         auth_user.get("id")
                         or auth_user.get("user_id")
@@ -47,47 +44,39 @@ def register_payments_routes(app):
 
                 user_id = str(
                     session.get("nova_user_id")
+                    or session.get("user_id")
+                    or ""
+                ).strip()
+
+                username = str(
+                    session.get("username")
                     or ""
                 ).strip()
 
                 if user_id:
-                    try:
-                        from nova_backend.services.session_auth_scope_service import (
-                            current_auth_user,
-                        )
-
-                        user = current_auth_user()
-
-                        if isinstance(
-                            user,
-                            dict,
-                        ):
-                            return {
-                                "user_id": str(
-                                    user.get("id")
-                                    or user_id
-                                ).strip(),
-                                "username": str(
-                                    user.get("username")
-                                    or ""
-                                ).strip(),
-                            }
-
-                    except Exception:
-                        pass
-
                     return {
                         "user_id": user_id,
-                        "username": "",
+                        "username": username,
                     }
 
-            except Exception:
-                pass
+                from nova_backend.services.auth_context import (
+                    get_current_user_id,
+                )
 
-            return {
-                "user_id": "",
-                "username": "",
-            }
+                user_id = str(
+                    get_current_user_id() or ""
+                ).strip()
+
+                return {
+                    "user_id": user_id,
+                    "username": username,
+                }
+
+            except Exception:
+                return {
+                    "user_id": "",
+                    "username": "",
+                }
 
         def _nova_payments_current_username():
             current_user = (
@@ -624,7 +613,11 @@ def register_payments_routes(app):
                         price_id
                     )
 
-                    if username and plan != "free":
+                    if (
+                        username
+                        and subscription_id
+                        and plan in ("plus", "pro")
+                    ):
 
                         set_subscription(
                             username,
@@ -654,7 +647,8 @@ def register_payments_routes(app):
                     if username:
 
                         cancel_subscription(
-                            username
+                            username,
+                            subscription_id=subscription_id,
                         )
 
                         print(

@@ -5,13 +5,23 @@
         "[NOVA EXECUTION CONTROLS] script loaded"
     );
 
-    function getActiveProjectId() {
-        return (
-            window.__NOVA_PROJECT_STATE &&
-            window.__NOVA_PROJECT_STATE.activeProjectId
-        ) || null;
+function getActiveProjectId() {
+    const state = window.__NOVA_PROJECT_STATE;
+
+    if (state?.activeProjectId) {
+        return state.activeProjectId;
     }
 
+    // Safe fallback only when exactly one project exists.
+    const projects = state?.projects || [];
+
+    if (projects.length === 1 && projects[0]?.id) {
+        state.activeProjectId = projects[0].id;
+        return state.activeProjectId;
+    }
+
+    return null;
+}
 async function runProjectAction(
     projectId,
     action
@@ -108,55 +118,36 @@ await runProjectAction(
         );
     }
 
-    function wireExecutionButtons() {
-        /*
-         * Left sidebar controls.
-         */
+function wireExecutionButtons() {
+    /*
+     * Left sidebar controls.
+     */
 
-        bindButton(
-            "novaLeftRunAll",
-            "run_all"
-        );
+    bindButton(
+        "novaLeftRunAll",
+        "run_all"
+    );
 
-        bindButton(
-            "novaLeftNextStep",
-            "next_step"
-        );
+    bindButton(
+        "novaLeftContinue",
+        "continue"
+    );
 
-        bindButton(
-            "novaLeftStop",
-            "stop"
-        );
+    bindButton(
+        "novaLeftNextTask",
+        "next_task"
+    );
 
-        bindButton(
-            "novaLeftReset",
-            "reset"
-        );
+    bindButton(
+        "novaLeftStop",
+        "stop"
+    );
 
-        /*
-         * Existing right-panel controls.
-         * These remain supported.
-         */
-        bindButton(
-            "desktopContinueProject",
-            "continue"
-        );
-
-        bindButton(
-            "desktopApproveProject",
-            "approve"
-        );
-
-        bindButton(
-            "desktopRunAll",
-            "run_all"
-        );
-
-        bindButton(
-            "desktopPause",
-            "pause"
-        );
-    }
+    bindButton(
+        "novaLeftReset",
+        "reset"
+    );
+}
 
     function initialize() {
         wireExecutionButtons();

@@ -75,13 +75,20 @@
           </option>
         </select>
 
+        <div
+          id="tokenUsageDisplay"
+          class="token-usage-display"
+          role="status"
+          aria-live="polite"
+        >
+          Tokens: loading...
+        </div>
 
         <input
           type="file"
           id="fileInput"
           style="display:none;"
         >
-
 
         <button
           id="attachBtn"
@@ -146,12 +153,19 @@
 
     </div>
 
+    <div
+      id="memoryStats"
+      class="memory-stats"
+      role="status"
+      aria-live="polite"
+    >
+      Loading token usage...
+    </div>
 
     <div
       id="memoryList"
       class="memory-list"
     ></div>
-
   </aside>
 
 </div>
@@ -159,9 +173,10 @@
 
 <script src="{{ url_for('static', path='js/app.js') }}"></script>
 <script src="{{ url_for('static', path='js/app-api.js') }}"></script>
-<script src="{{ url_for('static', path='js/composer.js') }}"></script>
+<script src="{{ url_for('static', path='js/composer.js?v=20260927-2') }}"></script>
 <script src="{{ url_for('static', path='js/memory-panel.js') }}"></script>
-<script src="{{ url_for('static', path='js/glassmorphism-final.js') }}"></script>
+<script src="{{ url_for('static', path='js/composer_dashboard_ai_tools.js?v=20260928-1') }}"></script>
 
 </body>
 </html>
+

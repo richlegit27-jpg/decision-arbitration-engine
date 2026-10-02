@@ -31,12 +31,42 @@ def _fake_model_response(*args: Any, **kwargs: Any) -> dict[str, Any]:
         },
     }
 
+    # Patch the exact gateway object used by ChatService.
+    try:
+        chat_service_module = importlib.import_module(
+            "nova_backend.services.chat_service"
+        )
+
+        gateway = getattr(
+            chat_service_module,
+            "model_gateway_service",
+            None,
+        )
+
+        if gateway is not None and hasattr(
+            gateway,
+            "responses_create",
+        ):
+            monkeypatch.setattr(
+                gateway,
+                "responses_create",
+                fake_chat_completions_create,
+            )
+            patched_any = True
+
+    except Exception:
+        pass
+
+    assert patched_any, "No model-call entrypoint was available to patch."
 
 def _install_model_call_captures(monkeypatch, captured: dict[str, Any]) -> None:
     def fake_chat_completions_create(*args: Any, **kwargs: Any) -> dict[str, Any]:
         captured["args"] = args
         captured["kwargs"] = kwargs
-        captured["messages"] = kwargs.get("messages")
+        captured["messages"] = kwargs.get(
+            "messages",
+            kwargs.get("input"),
+        )
 
         if captured["messages"] is None and args:
             for value in args:
@@ -47,6 +77,7 @@ def _install_model_call_captures(monkeypatch, captured: dict[str, Any]) -> None:
         return _fake_model_response(*args, **kwargs)
 
     candidates = [
+        ("nova_backend.services.model_gateway_service", "responses_create"),
         ("nova_backend.services.model_gateway_service", "chat_completions_create"),
         ("nova_backend.services.chat_turn_pipeline", "chat_completions_create"),
         ("nova_backend.services.chat_turn_pipeline", "_chat_completions_create"),

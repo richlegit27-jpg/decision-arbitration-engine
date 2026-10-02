@@ -1,0 +1,717 @@
+
+===== LINES 264-650 =====
+  264:     def _runnable_tasks(
+  265:         self,
+  266:         tasks,
+  267:     ):
+  268:         """
+  269:         Return tasks that are eligible for execution.
+  270: 
+  271:         A task is runnable when:
+  272: 
+  273:         - it is not already terminal
+  274:         - all declared dependencies resolve to completed tasks
+  275: 
+  276:         Dependencies may reference tasks by:
+  277:         - UUID
+  278:         - exact title
+  279:         - normalized title
+  280:         - planner-generated slug
+  281:         """
+  282: 
+  283:         import re
+  284: 
+  285:         if not isinstance(
+  286:             tasks,
+  287:             list,
+  288:         ):
+  289:             return []
+  290: 
+  291:         terminal_statuses = {
+  292:             "completed",
+  293:             "complete",
+  294:             "done",
+  295:             "success",
+  296:         }
+  297: 
+  298:         non_runnable_statuses = {
+  299:             "completed",
+  300:             "complete",
+  301:             "done",
+  302:             "success",
+  303:             "cancelled",
+  304:             "canceled",
+  305:             "blocked",
+  306:             "failed",
+  307:             "waiting",
+  308:             "waiting_approval",
+  309:             "paused",
+  310:         }
+  311: 
+  312:         def normalize_reference(
+  313:             value,
+  314:         ):
+  315:             value = str(
+  316:                 value or ""
+  317:             ).strip().lower()
+  318: 
+  319:             if not value:
+  320:                 return ""
+  321: 
+  322:             value = re.sub(
+  323:                 r"[^a-z0-9]+",
+  324:                 "_",
+  325:                 value,
+  326:             )
+  327: 
+  328:             return value.strip("_")
+  329: 
+  330:         def dependency_variants(
+  331:             value,
+  332:         ):
+  333:             normalized = normalize_reference(
+  334:                 value
+  335:             )
+  336: 
+  337:             if not normalized:
+  338:                 return set()
+  339: 
+  340:             variants = {
+  341:                 normalized,
+  342:             }
+  343: 
+  344:             # Planner slugs sometimes omit articles such as
+  345:             # "the" from task titles.
+  346:             without_articles = re.sub(
+  347:                 r"(^|_)the(?=_|$)",
+  348:                 "_",
+  349:                 normalized,
+  350:             )
+  351: 
+  352:             without_articles = re.sub(
+  353:                 r"_+",
+  354:                 "_",
+  355:                 without_articles,
+  356:             ).strip("_")
+  357: 
+  358:             if without_articles:
+  359:                 variants.add(
+  360:                     without_articles
+  361:                 )
+  362: 
+  363:             return variants
+  364: 
+  365:         completed_references = set()
+  366: 
+  367:         # Build all valid references for completed tasks.
+  368:         for task in tasks:
+  369:             if not isinstance(
+  370:                 task,
+  371:                 dict,
+  372:             ):
+  373:                 continue
+  374: 
+  375:             status = str(
+  376:                 task.get(
+  377:                     "status",
+  378:                     "open",
+  379:                 )
+  380:             ).strip().lower()
+  381: 
+  382:             if status not in terminal_statuses:
+  383:                 continue
+  384: 
+  385:             task_id = str(
+  386:                 task.get(
+  387:                     "id",
+  388:                     "",
+  389:                 )
+  390:             ).strip()
+  391: 
+  392:             title = str(
+  393:                 task.get(
+  394:                     "title",
+  395:                     "",
+  396:                 )
+  397:             ).strip()
+  398: 
+  399:             if task_id:
+  400:                 completed_references.add(
+  401:                     task_id
+  402:                 )
+  403:                 completed_references.add(
+  404:                     task_id.lower()
+  405:                 )
+  406: 
+  407:             if title:
+  408:                 completed_references.update(
+  409:                     dependency_variants(
+  410:                         title
+  411:                     )
+  412:                 )
+  413: 
+  414:         runnable = []
+  415: 
+  416:         for task in tasks:
+  417:             if not isinstance(
+  418:                 task,
+  419:                 dict,
+  420:             ):
+  421:                 continue
+  422: 
+  423:             status = str(
+  424:                 task.get(
+  425:                     "status",
+  426:                     "open",
+  427:                 )
+  428:             ).strip().lower()
+  429: 
+  430:             nested_steps = task.get(
+  431:                 "steps",
+  432:                 [],
+  433:             )
+  434: 
+  435:             if not isinstance(
+  436:                 nested_steps,
+  437:                 list,
+  438:             ):
+  439:                 nested_steps = []
+  440: 
+  441:             nested_terminal_statuses = {
+  442:                 "completed",
+  443:                 "complete",
+  444:                 "done",
+  445:                 "success",
+  446:                 "cancelled",
+  447:                 "canceled",
+  448:             }
+  449: 
+  450:             nested_unfinished = False
+  451:             nested_real_failure = False
+  452: 
+  453:             for nested_step in nested_steps:
+  454:                 if not isinstance(nested_step, dict):
+  455:                     continue
+  456: 
+  457:                 nested_status = str(
+  458:                     nested_step.get("status", "pending")
+  459:                 ).strip().lower()
+  460: 
+  461:                 nested_error = (
+  462:                     nested_step.get("error")
+  463:                     or nested_step.get("exception")
+  464:                     or nested_step.get("failure")
+  465:                 )
+  466: 
+  467:                 if nested_status == "failed" or nested_error:
+  468:                     nested_real_failure = True
+  469: 
+  470:                 if nested_status not in nested_terminal_statuses:
+  471:                     nested_unfinished = True
+  472: 
+  473:             has_resumable_nested_work = (
+  474:                 nested_unfinished
+  475:                 and not nested_real_failure
+  476:             )
+  477: 
+  478:             # A terminal parent task must never be selected again.
+  479:             # Nested state cannot override a completed parent status.
+  480:             if status in {
+  481:                 "completed",
+  482:                 "complete",
+  483:                 "done",
+  484:                 "success",
+  485:                 "succeeded",
+  486:                 "failed",
+  487:                 "cancelled",
+  488:                 "canceled",
+  489:             }:
+  490:                 continue
+  491: 
+  492:             task_status = str(
+  493:                 task.get("status") or ""
+  494:             ).strip().lower()
+  495: 
+  496:             if task_status in {
+  497:                 "failed",
+  498:                 "failure",
+  499:                 "error",
+  500:                 "errored",
+  501:                 "exception",
+  502:                 "blocked",
+  503:             }:
+  504:                 task_error = str(
+  505:                     task.get("error")
+  506:                     or "Task execution failed."
+  507:                 )
+  508: 
+  509:                 task_steps = (
+  510:                     task.get("steps")
+  511:                     or task.get("substeps")
+  512:                     or task.get("execution_steps")
+  513:                     or []
+  514:                 )
+  515: 
+  516:                 if isinstance(task_steps, list):
+  517:                     for task_step in task_steps:
+  518:                         if not isinstance(task_step, dict):
+  519:                             continue
+  520: 
+  521: 
+  522:                         task_step_status = str(
+  523:                             task_step.get("status")
+  524:                             or task_step.get("state")
+  525:                             or task_step.get("completion_status")
+  526:                             or ""
+  527:                         ).strip().lower()
+  528: 
+  529:                         if task_step_status in {
+  530:                             "failed",
+  531:                             "failure",
+  532:                             "error",
+  533:                             "errored",
+  534:                             "exception",
+  535:                             "blocked",
+  536:                         }:
+  537:                             task_step["status"] = "failed"
+  538:                             task_step["state"] = "failed"
+  539:                             task_step["completion_status"] = "failed"
+  540: 
+  541:                             task_step["error"] = str(
+  542:                                 task_step.get("error")
+  543:                                 or task_error
+  544:                             )
+  545: 
+  546:                             task_step["next_action"] = None
+  547:                             task_step["mutation_ready"] = False
+  548: 
+  549:             print(
+  550:                 "[PROJECT RUNNABLE TASK DIAGNOSTIC]",
+  551:                 {
+  552:                     "task_id": task.get("id"),
+  553:                     "task_title": task.get("title"),
+  554:                     "parent_status": status,
+  555:                     "task_keys": sorted(
+  556:                         str(key)
+  557:                         for key in task.keys()
+  558:                     ),
+  559:                     "steps_type": type(
+  560:                         task.get("steps")
+  561:                     ).__name__,
+  562:                     "steps_count": len(
+  563:                         task.get("steps") or []
+  564:                     )
+  565:                     if isinstance(
+  566:                         task.get("steps"),
+  567:                         list,
+  568:                     )
+  569:                     else None,
+  570:                     "nested_unfinished": nested_unfinished,
+  571:                     "nested_real_failure": nested_real_failure,
+  572:                     "has_resumable_nested_work": has_resumable_nested_work,
+  573:                 },
+  574:                 flush=True,
+  575:             )
+  576: 
+  577:             if (
+  578:                 status in non_runnable_statuses
+  579:                 and not has_resumable_nested_work
+  580:             ):
+  581:                 continue
+  582: 
+  583: 
+  584:             dependencies = task.get(
+  585:                 "dependencies",
+  586:                 [],
+  587:             )
+  588: 
+  589:             if not isinstance(
+  590:                 dependencies,
+  591:                 list,
+  592:             ):
+  593:                 dependencies = []
+  594: 
+  595:             dependencies_satisfied = True
+  596: 
+  597:             for dependency in dependencies:
+  598:                 dependency_value = str(
+  599:                     dependency or ""
+  600:                 ).strip()
+  601: 
+  602:                 if not dependency_value:
+  603:                     continue
+  604: 
+  605:                 dependency_lower = (
+  606:                     dependency_value.lower()
+  607:                 )
+  608: 
+  609:                 variants = dependency_variants(
+  610:                     dependency_value
+  611:                 )
+  612: 
+  613:                 resolved = (
+  614:                     dependency_value
+  615:                     in completed_references
+  616:                     or dependency_lower
+  617:                     in completed_references
+  618:                     or bool(
+  619:                         variants
+  620:                         & completed_references
+  621:                     )
+  622:                 )
+  623: 
+  624:                 if not resolved:
+  625:                     dependencies_satisfied = False
+  626: 
+  627:                     print(
+  628:                         "[PROJECT DEPENDENCY BLOCKED]",
+  629:                         {
+  630:                             "task_id": task.get(
+  631:                                 "id"
+  632:                             ),
+  633:                             "task_title": task.get(
+  634:                                 "title"
+  635:                             ),
+  636:                             "dependency": dependency_value,
+  637:                             "variants": sorted(
+  638:                                 variants
+  639:                             ),
+  640:                         },
+  641:                         flush=True,
+  642:                     )
+  643: 
+  644:                     break
+  645: 
+  646:             if dependencies_satisfied:
+  647:                 nested_steps = (
+  648:                     task.get("steps")
+  649:                     or task.get("substeps")
+  650:                     or task.get("execution_steps")
+
+===== LINES 2450-2775 =====
+ 2450:                     step.get("action")
+ 2451:                     or existing_entry.get(
+ 2452:                         "action"
+ 2453:                     )
+ 2454:                 ),
+ 2455:                 "result": (
+ 2456:                     result
+ 2457:                     if result not in (
+ 2458:                         None,
+ 2459:                         "",
+ 2460:                     )
+ 2461:                     else existing_entry.get(
+ 2462:                         "result"
+ 2463:                     )
+ 2464:                 ),
+ 2465:             }
+ 2466: 
+ 2467:             repaired_history.append(
+ 2468:                 repaired_entry
+ 2469:             )
+ 2470: 
+ 2471:         execution["history"] = (
+ 2472:             non_structured_history
+ 2473:             + repaired_history
+ 2474:         )
+ 2475: 
+ 2476:         return execution
+ 2477: 
+ 2478: 
+ 2479:     def run_all(
+ 2480:         self,
+ 2481:         project_id,
+ 2482:     ):
+ 2483:         project = self._get_project(
+ 2484:             project_id
+ 2485:         )
+ 2486: 
+ 2487:         if not project:
+ 2488:             return None
+ 2489: 
+ 2490:         all_published_artifacts = []
+ 2491:         last_result = None
+ 2492:         loop_guard = 0
+ 2493:         max_loops = 100
+ 2494: 
+ 2495:         while loop_guard < max_loops:
+ 2496:             loop_guard += 1
+ 2497: 
+ 2498:             execution_state = (
+ 2499:                 self.project_workspace_service.get_execution_state(project_id)
+ 2500:                 or {}
+ 2501:             )
+ 2502: 
+ 2503:             execution_status = str(
+ 2504:                 execution_state.get("status") or ""
+ 2505:             ).strip().lower()
+ 2506: 
+ 2507:             if execution_status == "stopped":
+ 2508:                 return {
+ 2509:                     "ok": False,
+ 2510:                     "project_id": project_id,
+ 2511:                     "action": "run_all",
+ 2512:                     "status": execution_status,
+ 2513:                     "execution": execution_state,
+ 2514:                     "artifacts": all_published_artifacts,
+ 2515:                     "debug_last_result": last_result,
+ 2516:                     "message": (
+ 2517:                         "Project execution is paused."
+ 2518:                         if execution_status == "paused"
+ 2519:                         else "Project execution was stopped."
+ 2520:                     ),
+ 2521:                 }
+ 2522: 
+ 2523: 
+ 2524:             project = self._get_project(
+ 2525:                 project_id
+ 2526:             )
+ 2527: 
+ 2528:             if not project:
+ 2529:                 break
+ 2530: 
+ 2531:             tasks = self._get_tasks(
+ 2532:                 project
+ 2533:             )
+ 2534: 
+ 2535:             if not isinstance(tasks, list):
+ 2536:                 tasks = []
+ 2537: 
+ 2538:             runnable = self._runnable_tasks(
+ 2539:                 tasks
+ 2540:             )
+ 2541: 
+ 2542:             if not isinstance(runnable, list):
+ 2543:                 runnable = []
+ 2544: 
+ 2545:             print(
+ 2546:                 "[PROJECT RUN-ALL LOOP]",
+ 2547:                 loop_guard,
+ 2548:                 "RUNNABLE:",
+ 2549:                 len(runnable),
+ 2550:                 flush=True,
+ 2551:             )
+ 2552: 
+ 2553:             projects = (
+ 2554:                 self.project_workspace_service
+ 2555:                 ._load_projects()
+ 2556:             )
+ 2557: 
+ 2558:             if not runnable:
+ 2559:                 try:
+ 2560:                     failed_tasks = []
+ 2561:                     unfinished_tasks = []
+ 2562: 
+ 2563:                     if isinstance(projects, list):
+ 2564:                         for stored_project in projects:
+ 2565: 
+ 2566:                             if not isinstance(
+ 2567:                                 stored_project,
+ 2568:                                 dict,
+ 2569:                             ):
+ 2570:                                 continue
+ 2571: 
+ 2572:                             if (
+ 2573:                                 stored_project.get("id")
+ 2574:                                 != project_id
+ 2575:                             ):
+ 2576:                                 continue
+ 2577: 
+ 2578:                             stored_tasks = (
+ 2579:                                 stored_project.get("tasks")
+ 2580:                                 or []
+ 2581:                             )
+ 2582: 
+ 2583:                             for task in stored_tasks:
+ 2584:                                 if not isinstance(task, dict):
+ 2585:                                     continue
+ 2586: 
+ 2587: 
+ 2588:                                 task_has_execution = bool(
+ 2589:                                     task.get("steps")
+ 2590:                                     or task.get("command")
+ 2591:                                     or task.get("target_file")
+ 2592:                                     or task.get("target_files")
+ 2593:                                     or task.get("content")
+ 2594:                                     or task.get("code")
+ 2595:                                     or task.get("replacement")
+ 2596:                                     or task.get("execution_file")
+ 2597:                                 )
+ 2598: 
+ 2599:                             if not task_has_execution:
+ 2600:                                 print(
+ 2601:                                     "[PROJECT CONTINUE IGNORE NON EXECUTABLE]",
+ 2602:                                     {
+ 2603:                                         "title": task.get("title"),
+ 2604:                                         "status": task_status,
+ 2605:                                     },
+ 2606:                                     flush=True,
+ 2607:                                 )
+ 2608:                                 continue
+ 2609: 
+ 2610:                             if task_status not in {
+ 2611:                                 "completed",
+ 2612:                                 "complete",
+ 2613:                                 "done",
+ 2614:                                 "success",
+ 2615:                                 "cancelled",
+ 2616:                                 "canceled",
+ 2617:                             }:
+ 2618:                                 unfinished_tasks.append(task)
+ 2619: 
+ 2620: 
+ 2621:                             if failed_tasks:
+ 2622:                                 final_status = "failed"
+ 2623:                             elif unfinished_tasks:
+ 2624:                                 final_status = "blocked"
+ 2625:                             else:
+ 2626:                                 final_status = "completed"
+ 2627: 
+ 2628:                             stored_project["status"] = (
+ 2629:                                 final_status
+ 2630:                             )
+ 2631:                             stored_project["active"] = False
+ 2632:                             stored_project["updated_at"] = (
+ 2633:                                 datetime.now(
+ 2634:                                     timezone.utc
+ 2635:                                 ).isoformat()
+ 2636:                             )
+ 2637: 
+ 2638:                             self.project_workspace_service._save_projects(
+ 2639:                                 projects
+ 2640:                             )
+ 2641: 
+ 2642:                             completed_task_ids = [
+ 2643:                                 task.get("id")
+ 2644:                                 for task in stored_tasks
+ 2645:                                 if isinstance(task, dict)
+ 2646:                                 and str(
+ 2647:                                     task.get("status") or ""
+ 2648:                                 ).strip().lower()
+ 2649:                                 in {
+ 2650:                                     "completed",
+ 2651:                                     "complete",
+ 2652:                                     "done",
+ 2653:                                     "success",
+ 2654:                                 }
+ 2655:                                 and task.get("id")
+ 2656:                             ]
+ 2657: 
+ 2658:                             completed_step_ids = [
+ 2659:                                 step.get("id")
+ 2660:                                 for task in stored_tasks
+ 2661:                                 if isinstance(task, dict)
+ 2662:                                 for step in task.get("steps", [])
+ 2663:                                 if isinstance(step, dict)
+ 2664:                                 and str(
+ 2665:                                     step.get("status")
+ 2666:                                     or step.get("state")
+ 2667:                                     or step.get("completion_status")
+ 2668:                                     or ""
+ 2669:                                 ).strip().lower()
+ 2670:                                 in {
+ 2671:                                     "completed",
+ 2672:                                     "complete",
+ 2673:                                     "done",
+ 2674:                                     "success",
+ 2675:                                 }
+ 2676:                                 and step.get("id")
+ 2677:                             ]
+ 2678: 
+ 2679:                             failed_task_ids = [
+ 2680:                                 task.get("id")
+ 2681:                                 for task in stored_tasks
+ 2682:                                 if isinstance(task, dict)
+ 2683:                                 and str(
+ 2684:                                     task.get("status") or ""
+ 2685:                                 ).strip().lower()
+ 2686:                                 in {
+ 2687:                                     "failed",
+ 2688:                                     "error",
+ 2689:                                 }
+ 2690:                                 and task.get("id")
+ 2691:                             ]
+ 2692: 
+ 2693:                             execution = (
+ 2694:                                 self.project_workspace_service
+ 2695:                                 .update_execution_state(
+ 2696:                                     project_id,
+ 2697:                                     status=final_status,
+ 2698:                                     current_task_id=None,
+ 2699:                                     current_step=None,
+ 2700:                                     queue=[],
+ 2701:                                     completed_steps=completed_step_ids,
+ 2702:                                     completed_tasks=completed_task_ids,
+ 2703:                                     failed_tasks=failed_task_ids,
+ 2704:                                     last_action="run_all",
+ 2705:                                 )
+ 2706:                             )
+ 2707: 
+ 2708:                             return {
+ 2709:                                 "ok": final_status == "completed",
+ 2710:                                 "project_id": project_id,
+ 2711:                                 "status": final_status,
+ 2712:                                 "message": (
+ 2713:                                     "Project execution completed. "
+ 2714:                                     "No runnable tasks remain."
+ 2715:                                     if final_status == "completed"
+ 2716:                                     else (
+ 2717:                                         "Project execution stopped. "
+ 2718:                                         "Failed tasks remain."
+ 2719:                                         if final_status == "failed"
+ 2720:                                         else (
+ 2721:                                             "Project execution stopped. "
+ 2722:                                             "Unfinished tasks are blocked."
+ 2723:                                         )
+ 2724:                                     )
+ 2725:                                 ),
+ 2726:                                 "execution": execution,
+ 2727:                             }
+ 2728: 
+ 2729:                 except Exception as exc:
+ 2730:                     print(
+ 2731:                         "[PROJECT RUN-ALL PROJECT STATUS SYNC ERROR]",
+ 2732:                         repr(exc),
+ 2733:                         flush=True,
+ 2734:                     )
+ 2735: 
+ 2736:                 execution = (
+ 2737:                     self.project_workspace_service
+ 2738:                     .update_execution_state(
+ 2739:                         project_id,
+ 2740:                         status="blocked",
+ 2741:                         current_task_id=None,
+ 2742:                         current_step=None,
+ 2743:                         queue=[],
+ 2744:                         last_action="run_all",
+ 2745:                     )
+ 2746:                 )
+ 2747: 
+ 2748:                 return {
+ 2749:                     "ok": False,
+ 2750:                     "project_id": project_id,
+ 2751:                     "status": "blocked",
+ 2752:                     "message": (
+ 2753:                         "Project execution stopped. "
+ 2754:                         "No runnable tasks remain."
+ 2755:                     ),
+ 2756:                     "execution": execution,
+ 2757:                 }
+ 2758: 
+ 2759:                 return {
+ 2760:                     "ok": final_status == "completed",
+ 2761:                     "project_id": project_id,
+ 2762:                     "action": "run_all",
+ 2763:                     "status": final_status,
+ 2764:                     "artifacts": all_published_artifacts,
+ 2765:                     "execution": execution,
+ 2766:                     "debug_last_result": last_result,
+ 2767:                     "message": (
+ 2768:                         "Project execution completed. "
+ 2769:                         "No runnable tasks remain."
+ 2770:                     ),
+ 2771:                 }
+ 2772: 
+ 2773:             current_task = runnable[0]
+ 2774: 
+ 2775:             if not isinstance(

@@ -773,7 +773,7 @@ app.secret_key = os.environ.get(
     "NOVA_SECRET_KEY"
 )
 
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.config["SESSION_COOKIE_SECURE"] = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_NAME"] = "nova_session"
@@ -1632,6 +1632,17 @@ def api_chat_route():
                 )
             ),
             requested_model=resolved_model or None,
+        )
+
+        print(
+            "[POST CHAT SERVICE RESULT]",
+            {
+                "route": result.get("route") if isinstance(result, dict) else None,
+                "decision": result.get("decision") if isinstance(result, dict) else None,
+                "strategy": result.get("strategy") if isinstance(result, dict) else None,
+                "url": result.get("url") if isinstance(result, dict) else None,
+            },
+            flush=True,
         )
 
         print(

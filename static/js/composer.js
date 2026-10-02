@@ -86,54 +86,128 @@
         );
       }
 
-      const payload = {
-        content: text,
-        model: window.NovaApp.state?.selectedModel || "nova-default",
-      };
-
-      const response = await window.NovaApp.apiFetch(`/api/chats/${chat.id}/messages`, {
+      const response = await fetch("/api/chat/stream", {
         method: "POST",
-        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          chat_id: chat.id,
+          message: text,
+        }),
       });
 
-      const serverMessages = Array.isArray(response?.messages)
-        ? response.messages
-        : Array.isArray(response?.items)
-        ? response.items
-        : Array.isArray(response)
-        ? response
-        : [];
-
-      // ðŸ”¹ sync state
-      window.NovaApp.state.messagesByChatId[chat.id] = serverMessages;
-
-      // ðŸ”¥ THIS IS THE FIX
-      window.dispatchEvent(new Event("nova:messages-changed"));
-
-      if (Array.isArray(window.NovaApp.state.chats)) {
-        const index = window.NovaApp.state.chats.findIndex(
-          (item) => Number(item.id) === Number(chat.id)
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `HTTP ${response.status}${errorText ? ` - ${errorText}` : ""}`
         );
+      }
 
-        if (index >= 0) {
-          window.NovaApp.state.chats[index] = {
-            ...window.NovaApp.state.chats[index],
-            message_count: serverMessages.length,
-            updated_at: new Date().toISOString(),
-          };
+      if (!response.body) {
+        throw new Error("Streaming response body is unavailable.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      let buffer = "";
+      let assistantText = "";
+      let imageUrl = "";
+      let attachments = [];
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
+
+        for (const eventBlock of events) {
+          const dataLine = eventBlock
+            .split("\n")
+            .find((line) => line.startsWith("data:"));
+
+          if (!dataLine) continue;
+
+          const rawData = dataLine.slice(5).trim();
+          if (!rawData) continue;
+
+          let payload;
+
+          try {
+            payload = JSON.parse(rawData);
+          } catch {
+            continue;
+          }
+
+          if (payload.assistant_message) {
+            assistantText =
+              payload.assistant_message.text ||
+              assistantText;
+
+            imageUrl =
+              payload.assistant_message.image_url ||
+              imageUrl;
+
+            attachments =
+              Array.isArray(payload.assistant_message.attachments)
+                ? payload.assistant_message.attachments
+                : attachments;
+          }
+
+          if (payload.image_url) {
+            imageUrl = payload.image_url;
+          }
+
+          if (Array.isArray(payload.attachments)) {
+            attachments = payload.attachments;
+          }
+
+          if (payload.type === "message" && payload.content) {
+            assistantText = payload.content;
+          }
+
+          if (payload.type === "error") {
+            throw new Error(
+              payload.content || "Chat stream failed."
+            );
+          }
         }
       }
+
+      const finalMessage = {
+        role: "assistant",
+        content: assistantText || "Generated image",
+        created_at: new Date().toISOString(),
+      };
+
+      if (imageUrl) {
+        finalMessage.image_url = imageUrl;
+      }
+
+      if (attachments.length) {
+        finalMessage.attachments = attachments;
+      }
+
+      window.NovaApp.state.messagesByChatId[chat.id] = [
+        ...(window.NovaApp.state.messagesByChatId[chat.id] || []),
+        finalMessage,
+      ];
+
+      window.dispatchEvent(
+        new Event("nova:messages-changed")
+      );
 
       window.NovaApp.renderChatList?.();
       window.NovaApp.renderActiveChatCard?.();
 
       input.value = "";
-      autosizeInput();
 
-      if (fileInput) {
-        fileInput.value = "";
-      }
-      renderAttachedFiles();
     } catch (error) {
       console.error(error);
       if (window.NovaToast && typeof window.NovaToast.error === "function") {
@@ -141,8 +215,21 @@
       } else {
         alert(error.message || "Send failed.");
       }
+
     } finally {
       setSendingState(false);
+
+      if (window.NovaApp?.state) {
+        window.NovaApp.state.attachedFiles = [];
+      }
+      if (fileInput) {
+        fileInput.value = "";
+      }
+      if (window.NovaApp?.renderAttachedFiles) {
+        window.NovaApp.renderAttachedFiles();
+      } else {
+        renderAttachedFiles();
+      }
       input.focus();
     }
   }

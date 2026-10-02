@@ -1316,90 +1316,11 @@ observer.observe(document.documentElement, {
 
   <div class="project-workspace-card">
 
-    <h3>Project Intelligence</h3>
+    <h3>Project Workspace</h3>
 
     <p id="desktopProjectStatus">
       Workspace ready
     </p>
-
-    <div
-      id="desktopProjectMission"
-      class="project-panel-card"
-    >
-      <h3>Mission</h3>
-      <p>Build something amazing.</p>
-    </div>
-
-    <div
-      id="desktopProjectProgress"
-      class="project-panel-card"
-    >
-      <h3>Progress</h3>
-      <p>0%</p>
-    </div>
-
-    <div
-      id="desktopProjectHealth"
-      class="project-panel-card"
-    >
-      <h3>Health</h3>
-      <p>Healthy</p>
-    </div>
-
-    <div
-      id="desktopProjectFocus"
-      class="project-panel-card"
-    >
-      <h3>Current Focus</h3>
-      <p>No active work.</p>
-    </div>
-
-    <div
-      id="desktopProjectNextAction"
-      class="project-panel-card"
-    >
-      <h3>Next Action</h3>
-      <p>Create your first task.</p>
-    </div>
-
-    <div
-      id="desktopProjectRecommendation"
-      class="project-panel-card"
-    >
-      <h3>AI Recommendation</h3>
-      <p>Start organizing this project.</p>
-    </div>
-
-
-    <h3>Execution &amp; Planning</h3>
-
-    <div
-      id="desktopProjectToday"
-      class="project-panel-card"
-    >
-      <h3>Today's Plan</h3>
-
-      <ol id="desktopTodayPlan">
-        <li>Loading...</li>
-      </ol>
-    </div>
-
-    <div
-      id="desktopProjectResume"
-      class="project-panel-card"
-    >
-      <h3>Resume Summary</h3>
-      <p>No active execution context.</p>
-    </div>
-
-    <div
-      id="desktopProjectEstimatedTime"
-      class="project-panel-card"
-    >
-      <h3>Estimated Time</h3>
-      <p>Not estimated.</p>
-    </div>
-
 <div
   id="desktopProjectExecutionTree"
   class="project-panel-card nova-project-execution-tree"
@@ -1420,6 +1341,8 @@ observer.observe(document.documentElement, {
     </button>
   </div>
 
+
+
   <div
     id="nova-project-tree-controls"
     class="nova-project-tree-controls"
@@ -1432,19 +1355,19 @@ observer.observe(document.documentElement, {
       Run All
     </button>
 
-    <button
-      id="novaLeftNextTask"
-      type="button"
-    >
-      Continue
-    </button>
+<button
+  id="novaLeftContinue"
+  type="button"
+>
+  Continue
+</button>
 
-    <button
-      id="novaLeftNextStep"
-      type="button"
-    >
-      Next Step
-    </button>
+<button
+  id="novaLeftNextTask"
+  type="button"
+>
+  Next Task
+</button>
 
     <button
       id="novaLeftStop"
@@ -1651,12 +1574,32 @@ observer.observe(document.documentElement, {
           <div id="meta">No summary yet.</div>
         </div>
 
-        <div id="nova-desktop-model-selector" class="nova-desktop-model-selector">
-          <label for="modelSelect">Model</label>
+<div id="nova-desktop-model-selector" class="nova-desktop-model-selector">
+  <label for="modelSelect">Model</label>
 
-          <select id="modelSelect"></select>
-        </div>
+  <select id="modelSelect"></select>
 
+
+  <div
+    id="tokenUsageDisplay"
+    class="token-usage-display"
+    role="status"
+    aria-live="polite"
+  >
+    Estimated tokens: loading...
+  </div>
+
+  <div
+    id="nova-credit-indicator"
+    class="nova-credit-indicator"
+    role="status"
+    aria-live="polite"
+    title="Your remaining Nova usage credits"
+  >
+    <span class="nova-credit-indicator-label">Credits</span>
+    <strong id="nova-credit-balance">Loading...</strong>
+  </div>
+</div>
       </header>
 
       <section id="chat" class="messages chat-messages desktop-rescue-messages" data-messages="true">
@@ -2296,16 +2239,21 @@ function showDesktopAttachmentChip(text) {
   console.log("&#128206; CHIP SHOWN", chip);
 }
 
-function clearDesktopAttachments() {
+window.clearDesktopAttachments = function clearDesktopAttachments() {
   pendingDesktopAttachments = [];
 
-const chip = document.getElementById("desktopAttachmentChip") || desktopAttachmentChip;
+  if (window.NovaChatState?.state) {
+    window.NovaChatState.state.pendingAttachments = [];
+  }
 
-if (chip) {
-  chip.hidden = true;
-  chip.style.display = "none";
-  chip.innerHTML = "";
-}
+  const chip = document.getElementById("desktopAttachmentChip") ||
+    desktopAttachmentChip;
+
+  if (chip) {
+    chip.hidden = true;
+    chip.style.display = "none";
+    chip.innerHTML = "";
+  }
 
   if (desktopFileInput) {
     desktopFileInput.value = "";
@@ -2374,8 +2322,8 @@ console.log("&#128206; NORMALIZED ATTACHMENT", attachment);
 pendingDesktopAttachments = pendingDesktopAttachments || [];
 pendingDesktopAttachments.push(attachment);
 
-if (window.Nova && window.Nova.chat && window.Nova.chat.state) {
-    window.Nova.chat.state.pendingAttachments =
+if (window.NovaChatState?.state) {
+    window.NovaChatState.state.pendingAttachments =
         pendingDesktopAttachments.slice();
 }
 
@@ -2451,6 +2399,10 @@ clearDesktopAttachments?.();
 
 function resetDesktopUIState() {
     pendingDesktopAttachments = [];
+
+  if (window.NovaChatState?.state) {
+    window.NovaChatState.state.pendingAttachments = [];
+  }
     clearDesktopAttachments?.();
 
     const chip = document.getElementById("desktopAttachmentChip");
@@ -3080,6 +3032,51 @@ function getDesktopMessagesContainerRescue() {
     if (data.session && Array.isArray(data.session.messages)) return data.session.messages;
     return [];
   }
+
+async function novaRefreshCreditIndicator() {
+    const balanceElement = document.getElementById(
+        "nova-credit-balance"
+    );
+
+    if (!balanceElement) {
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/billing/account", {
+            credentials: "same-origin",
+            headers: {
+                "Accept": "application/json"
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error("Billing account unavailable");
+        }
+
+        const data = await response.json();
+        const account = data.account || data;
+
+        if (!data.ok || !Number.isFinite(Number(account.credits))) {
+            throw new Error("Invalid billing account response");
+        }
+
+        balanceElement.textContent =
+            Number(account.credits).toLocaleString();
+    } catch (error) {
+        balanceElement.textContent = "Unavailable";
+        console.warn(
+            "[Nova Credits] Could not refresh balance:",
+            error
+        );
+    }
+}
+
+novaRefreshCreditIndicator();
+
+window.addEventListener("nova:usage-updated", () => {
+    novaRefreshCreditIndicator();
+});
 
 </script>
 
@@ -4029,8 +4026,7 @@ if (countEl) {
        * system intercept them.
        */
 if (
-  button.id === "novaLeftNextStep" ||
-  button.id === "novaLeftNextTask" ||
+button.id === "novaLeftNextTask" ||
   button.id === "novaLeftRunAll" ||
   button.id === "novaLeftStop" ||
   button.id === "novaLeftReset" ||
@@ -4422,7 +4418,7 @@ if (label.indexOf("continue") === 0) {
        * never intercept these controls.
        */
 if (
-  button.id === "novaLeftNextStep" ||
+  button.id === "novaLeftContinue" ||
   button.id === "novaLeftNextTask" ||
   button.id === "novaLeftRunAll" ||
   button.id === "novaLeftStop" ||
@@ -4433,8 +4429,8 @@ if (
   button.id === "desktopProjectContinueButton" ||
   button.id === "desktopProjectRunAllButton"
 ) {
-        return;
-      }
+    return;
+}
 
       var prompt = promptFor(button);
 
@@ -6763,6 +6759,7 @@ console.log(
 <script src="/static/js/nova-api.js"></script>
 <script src="/static/js/nova-execution.js"></script>
 <script src="/static/js/app-api.js"></script>
+<script src="/static/js/composer_dashboard_ai_tools.js?v=20260929-1"></script>
 <script src="/static/js/nova-desktop-projects.js"></script>
 <script src="/static/js/nova-project-execution-controls.js"></script>
 <script src="/static/js/app.js"></script>
@@ -11665,8 +11662,8 @@ aside.panel.tools > .quick-actions-section {
 #desktopProjectWorkspace .project-workspace-card {
     display: flex !important;
     flex-direction: column !important;
-    max-height: 600px !important;
-    overflow-y: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
 }
 
 
@@ -11779,6 +11776,29 @@ aside.panel.tools > .quick-actions-section {
     width: fit-content !important;
 }
 
+.nova-credit-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    background: rgba(34, 197, 94, 0.10);
+    color: inherit;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.nova-credit-indicator-label {
+    opacity: 0.75;
+}
+
+#nova-credit-balance {
+    color: #4ade80;
+    font-variant-numeric: tabular-nums;
+}
+
 </style>
 <script>
 (function () {
@@ -11820,6 +11840,7 @@ aside.panel.tools > .quick-actions-section {
 
 </body>
 </html>
+
 
 
 

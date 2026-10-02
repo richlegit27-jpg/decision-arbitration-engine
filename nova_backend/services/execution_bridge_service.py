@@ -797,9 +797,14 @@ class ExecutionBridgeService:
 
                 if step.get("action") not in {
                     "implement",
+                    "create",
                     "create_file",
+                    "write_file",
                 }:
                     continue
+
+                if step.get("action") == "create":
+                    step["action"] = "create_file"
 
                 target_file = str(
                     step.get("target_file")

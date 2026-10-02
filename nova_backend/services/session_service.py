@@ -723,12 +723,15 @@ class SessionService:
         if not current_user_id:
             return True
 
+        # Unowned local sessions can be claimed by the current user.
+        # get_session() persists the owner immediately after this check.
+        if not session_user_id:
+            return True
+
         # Authenticated users can only access sessions explicitly
         # assigned to their user ID.
-        if not session_user_id:
-            return False
-
         return session_user_id == current_user_id
+
     def load(self):
         """
         Compatibility bridge for older ChatService code that expects

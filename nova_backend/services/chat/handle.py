@@ -113,6 +113,18 @@ def chat_handle(
         )
 
         print(
+            "[ATTACHMENT ROUTE PROBE]",
+            {
+                "route": route,
+                "intent": intent,
+                "mode": mode,
+                "attachment_count": len(attachments or []),
+                "attachments": attachments or [],
+            },
+            flush=True,
+        )
+
+        print(
             "[CHAT_HANDLE CODE LOCATION]",
             {
                 "filename": chat_handle.__code__.co_filename,
@@ -1310,6 +1322,16 @@ def chat_handle(
                 }
 
         # ==========================================
+        # ATTACHMENT ANALYSIS ROUTE
+        # ==========================================
+        if route == "attachment_analysis":
+            return service._handle_attachment(
+                user_text=user_text,
+                attachments=attachments,
+                session_id=session_id,
+            )
+
+        # ==========================================
         # WEB FETCH ROUTE
         # ==========================================
         if route == "web_fetch":
@@ -2364,6 +2386,29 @@ def chat_handle(
                 "brain_state": brain_state,
             }
         # ==========================================
+        # IMAGE GENERATION ROUTE
+        # ==========================================
+
+        if route == "image_generation":
+            print(
+                "[CHAT_HANDLE IMAGE GENERATION]",
+                {
+                    "session_id": session_id,
+                    "prompt": user_text,
+                },
+                flush=True,
+            )
+
+            image_prompt = service._image_prompt_from_text(user_text)
+
+            return service._handle_image_generation(
+                prompt=image_prompt,
+                session_id=session_id,
+                parent_artifact_id="",
+                source_type="generated",
+            )
+
+        # ==========================================
         # NORMAL MODEL CHAT
         # ==========================================
 
@@ -2384,6 +2429,7 @@ def chat_handle(
                 requested_model=decision.get(
                     "model"
                 ),
+                attachments=attachments,
             )
         )
 

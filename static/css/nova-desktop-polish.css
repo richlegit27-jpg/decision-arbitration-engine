@@ -2807,3 +2807,27 @@ textarea#input::placeholder,
     color: #e5e7eb !important;
 }
 
+
+/* NOVA_EXECUTION_CONTROLS_CLICK_LAYER_FIX_20260930 */
+.panel.tools > .quick-actions-section {
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+.panel.tools .nova-desktop-execution-native-actions {
+    position: relative !important;
+    z-index: 20 !important;
+}
+
+/* NOVA_CONTINUE_BUTTON_OVERLAP_FIX_20260930 */
+aside.panel.tools > .nova-desktop-execution-native-actions,
+.panel.tools .nova-desktop-execution-native-actions {
+    position: relative !important;
+    z-index: 99999 !important;
+}
+
+aside.panel.tools > .quick-actions-section,
+.panel.tools .quick-actions-section {
+    position: relative !important;
+    z-index: 1 !important;
+}

@@ -2683,13 +2683,24 @@ class ProjectExecutionController:
 
                                 if not task_has_execution:
                                     print(
-                                        "[PROJECT CONTINUE IGNORE NON EXECUTABLE]",
+                                        "[PROJECT CONTINUE NON EXECUTABLE]",
                                         {
                                             "title": task.get("title"),
                                             "status": task_status,
                                         },
                                         flush=True,
                                     )
+
+                                    if task_status not in {
+                                        "completed",
+                                        "complete",
+                                        "done",
+                                        "success",
+                                        "cancelled",
+                                        "canceled",
+                                    }:
+                                        unfinished_tasks.append(task)
+
                                     continue
 
                                 if task_status in {

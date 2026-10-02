@@ -852,6 +852,24 @@ class ChatService:
                 "intent": "conversation",
             }
 
+        # --------------------------------------------------
+        # Explicit live market / web-news requests
+        # --------------------------------------------------
+
+        if (
+            self._looks_like_live_market_request(user_text)
+            or self._nova_is_web_news_intent_20260609(user_text)
+        ):
+            primary_decision = {
+                "route": "web_fetch",
+                "mode": "web_fetch",
+                "intent": (
+                    "live_market"
+                    if self._looks_like_live_market_request(user_text)
+                    else "web_news"
+                ),
+            }
+
         primary_route = str(
             primary_decision.get("route") or "general_chat"
         ).lower()
@@ -866,26 +884,32 @@ class ChatService:
         )
 
         # --------------------------------------------------
-        # Explicit live market requests
+        # Explicit live market / web-news requests
         # --------------------------------------------------
 
-        if self._looks_like_live_market_request(user_text):
-            brain_state = {
-                "decision": {
-                    "route": "web_fetch",
-                    "mode": "web_fetch",
-                    "intent": "live_market",
-                }
+        if (
+            self._looks_like_live_market_request(user_text)
+            or self._nova_is_web_news_intent_20260609(user_text)
+        ):
+            primary_decision = {
+                "route": "web_fetch",
+                "mode": "web_fetch",
+                "intent": (
+                    "live_market"
+                    if self._looks_like_live_market_request(user_text)
+                    else "web_news"
+                ),
             }
 
-            primary_decision = brain_state["decision"]
-            primary_route = "web_fetch"
+        primary_route = str(
+            primary_decision.get("route") or "general_chat"
+        ).lower()
 
         # --------------------------------------------------
         # Explicit execution routes
         # --------------------------------------------------
 
-        elif (
+        if (
             (
                 primary_route == "execution"
                 and str(primary_decision.get("intent") or "").lower()
@@ -1390,6 +1414,7 @@ class ChatService:
 
 
     # NOVA_WEB_NEWS_BLOCKS_IMAGE_GENERATION_BRANCHES_20260609
+
     def _nova_is_web_news_intent_20260609(self, value) -> bool:
         probe = " ".join(str(value or "").split("\n", 1)[0].lower().split())
         terms = (
@@ -1405,6 +1430,16 @@ class ChatService:
             "weather",
             "forecast",
             "current events",
+            "latest developments",
+            "recent developments",
+            "latest information",
+            "recent information",
+            "current information",
+            "latest updates",
+            "recent updates",
+            "current updates",
+            "what's happening",
+            "what is happening",
         )
         return any(term in probe for term in terms)
 
@@ -5592,18 +5627,42 @@ Rules:
                 "image/png",
                 "image/webp",
                 "image/gif",
-                "/api/uploads/",
-                "attachment analysis failed:",
-                "session attachment memory:",
             ))
 
             if _nova_has_image_attachment:
                 user_msg = self._build_user_message(user_text, attachments=attachments)
                 result = self._handle_attachment_analysis(user_text, attachments)
 
+                # NOVA_IMAGE_BOUNCE_RESULT_WIRING_20260929
+                _nova_image_result_text = ""
+
+                if isinstance(result, dict):
+                    _nova_image_result_text = self.safe_str(
+                        result.get("text")
+                        or (
+                            result.get("assistant_message", {}).get("text")
+                            if isinstance(
+                                result.get("assistant_message"),
+                                dict,
+                            )
+                            else ""
+                        )
+                    ).strip()
+
+                if not _nova_image_result_text:
+                    _nova_image_result_text = (
+                        "I couldn't analyze the image successfully. "
+                        "Please try uploading it again."
+                    )
+
                 assistant_msg = self._build_assistant_message(
+                    text=_nova_image_result_text,
                     meta={
                         "attachment_analysis": True,
+                        "vision_used": bool(
+                            isinstance(result, dict)
+                            and result.get("vision_used")
+                        ),
                         "web_fetch_blocked_for_image": True,
                         "source_urls": [],
                         "sources": [],
@@ -6073,16 +6132,20 @@ Rules:
         direct_url_reasons = (
             direct_url_reasons if isinstance(direct_url_reasons, list) else []
         )
-
         if (
             (not attachments)
-            and ("direct_url" in direct_url_reasons)
+            and (
+                "direct_url" in direct_url_reasons
+                or decision.get("strategy") == "open_web_source_followup"
+            )
             and (
                 original_user_text_for_direct_url.startswith("http://")
                 or original_user_text_for_direct_url.startswith("https://")
+                or decision.get("strategy") == "open_web_source_followup"
             )
             and (text.startswith("http://") or text.startswith("https://"))
         ):
+
 
             web_result = {}
 
@@ -6136,6 +6199,8 @@ Rules:
             ).strip()
 
             error = self.safe_str(web_result.get("error") or "").strip()
+
+            assistant_text = ""
 
             if error and not summary and not body:
                 assistant_text = "Web fetch failed:\n" + error
@@ -7384,11 +7449,65 @@ Rules:
         text = self.safe_str(
             user_text
         ).strip().lower()
+
+        execution_commands = {
+            "next",
+            "continue",
+            "continue on",
+            "resume",
+            "run",
+            "run it",
+            "execute",
+            "execute all",
+            "go",
+            "what next",
+            "what now",
+            "run step",
+            "run_step",
+            "run_all",
+            "approve",
+            "approved",
+            "deny",
+            "retry",
+            "retry_failed",
+            "cancel",
+            "stop",
+        }
+
+        if (
+            text not in execution_commands
+            and not text.startswith("auto-plan")
+        ):
+            return None
+
         active_execution = (
             self._load_execution_state(
                 session_id
             )
             or {}
+        )
+
+        print(
+            "[CONTINUE TRACE]",
+            {
+                "session_id": session_id,
+                "command": text,
+                "has_execution": bool(active_execution),
+                "steps": len(active_execution.get("steps", []))
+                if isinstance(active_execution, dict)
+                else 0,
+                "project_id": (
+                    active_execution.get("project_id")
+                    if isinstance(active_execution, dict)
+                    else None
+                ),
+                "status": (
+                    active_execution.get("status")
+                    if isinstance(active_execution, dict)
+                    else None
+                ),
+            },
+            flush=True,
         )
 
         if not active_execution.get("steps"):
@@ -7802,6 +7921,43 @@ Rules:
             == "failed"
         ):
             command = "retry_failed"
+
+        current_execution = (
+            self._load_execution_state(
+                session_id
+            )
+            or {}
+        )
+
+        active_execution = (
+            isinstance(
+                current_execution,
+                dict,
+            )
+            and self.safe_str(
+                current_execution.get("status")
+            ).strip().lower()
+            in {
+                "running",
+                "paused",
+                "pending",
+                "failed",
+            }
+        )
+
+        if command in {
+            "run_all",
+            "run_step",
+        } and not active_execution:
+            print(
+                "[EXECUTION COMMAND BLOCKED: NO ACTIVE CONTEXT]",
+                {
+                    "command": command,
+                    "input": text,
+                },
+                flush=True,
+            )
+            command = None
 
         execution_state["lock"] = False
         execution_state["_execution_processing"] = False
@@ -10221,10 +10377,10 @@ Rules:
                     "[>]",
                     "[x]",
                     "[X]",
-                    "✓",
-                    "✔",
-                    "→",
-                    "➡",
+                    "?",
+                    "?",
+                    "?",
+                    "?",
                 ]
             ):
                 step_indexes.append(i)
@@ -11806,104 +11962,40 @@ Rules:
         user_text: str = "",
     ) -> str:
         try:
-            import base64
-            import mimetypes
-            import os
-            from pathlib import Path
-
-
-            raw_url = self.safe_str(image_url).strip()
-            raw_name = self.safe_str(image_name).strip()
-
-            if not raw_url:
-                return ""
-
-            filename = ""
-
-            if "/api/uploads/" in raw_url:
-                filename = raw_url.split("/api/uploads/", 1)[1].split("?", 1)[0].split("#", 1)[0]
-            elif raw_url.startswith("uploads/") or raw_url.startswith("uploads\\"):
-                filename = Path(raw_url).name
-            elif raw_name:
-                filename = Path(raw_name).name
-
-            if not filename:
-                filename = Path(raw_url).name
-
-            filename = filename.replace("\\", "/").split("/")[-1].strip()
-
-            if not filename:
-                return ""
-
-            candidates = [
-                Path.cwd() / "uploads" / filename,
-                Path.cwd() / "static" / "uploads" / filename,
-                Path(__file__).resolve().parents[2] / "uploads" / filename,
-                Path(__file__).resolve().parents[1] / "uploads" / filename,
-            ]
-
-            image_path = None
-
-            for candidate in candidates:
-                try:
-                    if candidate.exists() and candidate.is_file():
-                        image_path = candidate
-                        break
-                except Exception:
-                    continue
-
-            if image_path is None:
-                return ""
-
-            mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
-
-            with open(image_path, "rb") as image_file:
-                encoded = base64.b64encode(image_file.read()).decode("utf-8")
-
-            data_url = f"data:{mime_type};base64,{encoded}"
-
-            prompt_text = self.safe_str(user_text).strip() or "Describe this image clearly."
-
-            
-
-            response = chat_completions_create(
-                nova_username=getattr(self, "username", None) or os.getenv("NOVA_DEFAULT_USERNAME") or "richard",
-                nova_session_id=locals().get("session_id") or getattr(getattr(self, "session_service", None), "active_session_id", "") or "",
-                model=os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are Nova's image analysis module. "
-                            "Describe the attached image directly and honestly. "
-                            "If the image contains readable text, include the important text. "
-                            "Do not use web search. Do not mention unrelated news."
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": prompt_text,
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": data_url,
-                                },
-                            },
-                        ],
-                    },
-                ],
-                temperature=0.2,
-                max_tokens=500,
+            from nova_backend.services.image_vision_service import (
+                ImageVisionService,
             )
 
-            return self.safe_str(response.choices[0].message.content).strip()
+            result = ImageVisionService().handle(
+                image_item={
+                    "url": image_url,
+                    "filename": image_name,
+                    "name": image_name,
+                },
+                user_text=user_text,
+            )
+
+            if not isinstance(result, dict):
+                return (
+                    "VISION_DEBUG: ImageVisionService returned "
+                    "an invalid result."
+                )
+
+            text = self.safe_str(result.get("text")).strip()
+
+            if not result.get("vision_used"):
+                return (
+                    text
+                    or "VISION_DEBUG: Image vision did not complete."
+                )
+
+            return text
 
         except Exception as exc:
-            return ""
+            return (
+                "VISION_DEBUG: Could not invoke ImageVisionService: "
+                + str(exc)
+            )
 
     def _handle_attachment(
         self,
@@ -11958,6 +12050,81 @@ Rules:
                 or "attachment"
             )
 
+
+            att_type = self.safe_str(
+                item.get("type")
+            ).lower()
+
+            mime_type = self.safe_str(
+                item.get("mime_type")
+                or item.get("content_type")
+            ).lower()
+
+            url = self.safe_str(
+                item.get("url")
+                or item.get("file_url")
+            )
+
+            is_image = (
+                att_type == "image"
+                or mime_type.startswith("image/")
+                or name.lower().endswith(
+                    (".jpg", ".jpeg", ".png", ".webp", ".gif")
+                )
+            )
+
+            # NOVA_IMAGE_FIRST_ANALYSIS_20260929
+            # Never send raw image bytes through text extraction.
+            if is_image:
+                vision_text = ""
+
+                if url:
+                    vision_text = (
+                        self._nova_describe_image_with_openai_20260607(
+                            image_url=url,
+                            image_name=name,
+                            user_text=user_text,
+                        )
+                    )
+
+                if vision_text:
+                    return {
+                        "ok": True,
+                        "text": vision_text,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": vision_text,
+                        },
+                        "attachment_analysis": True,
+                        "vision_used": True,
+                        "ocr_used": False,
+                        "source_urls": [],
+                        "sources": [],
+                        "saved_artifact": None,
+                    }
+
+                failure_text = (
+                    f"Nova received the image '{name}', but could not "
+                    "analyze its visual contents. No raw image data "
+                    "was returned. Check the image upload path and "
+                    "vision API configuration."
+                )
+
+                return {
+                    "ok": False,
+                    "text": failure_text,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": failure_text,
+                    },
+                    "attachment_analysis": True,
+                    "vision_used": False,
+                    "ocr_used": False,
+                    "source_urls": [],
+                    "sources": [],
+                    "saved_artifact": None,
+                }
+
             existing_summary = (
                 self.attachment_analysis_service.existing_attachment_text(
                     item
@@ -11992,54 +12159,6 @@ Rules:
                     "sources": [],
                     "saved_artifact": None,
                 }
-
-            att_type = self.safe_str(
-                item.get("type")
-            ).lower()
-
-            mime_type = self.safe_str(
-                item.get("mime_type")
-                or item.get("content_type")
-            ).lower()
-
-            url = self.safe_str(
-                item.get("url")
-                or item.get("file_url")
-            )
-
-            if url and (
-                att_type == "image"
-                or mime_type.startswith("image/")
-            ):
-                vision_text = (
-                    self._nova_describe_image_with_openai_20260607(
-                        image_url=url,
-                        image_name=name,
-                        user_text=user_text,
-                    )
-                )
-
-                if vision_text:
-                    return {
-                        "ok": True,
-                        "text": vision_text,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": vision_text,
-                        },
-                        "attachment_analysis": True,
-                        "vision_used": True,
-                        "ocr_used": False,
-                        "source_urls": [],
-                        "sources": [],
-                        "saved_artifact": None,
-                    }
-
-            text = (
-                self.attachment_analysis_service.extracted_file_text(
-                    item
-                )
-            )
 
             if text:
                 preview = text[:6000].strip()
@@ -12221,6 +12340,7 @@ Rules:
         decision: dict,
         session_id: str = "",
         requested_model: str | None = None,
+        attachments=None,
     ) -> str:
 
         prompt = self._build_chat_input(
@@ -12229,13 +12349,66 @@ Rules:
             session_id=session_id,
         )
 
+        model_input = prompt
+
+        if attachments:
+            try:
+                from nova_backend.services.chat_turn_attachment_context import (
+                    nova_chat_turn_inject_attachment_context_from_locals,
+                )
+
+                messages = (
+                    nova_chat_turn_inject_attachment_context_from_locals(
+                        [
+                            {
+                                "role": "user",
+                                "content": prompt,
+                            }
+                        ],
+                        {"attachments": attachments},
+                    )
+                )
+
+                model_input = messages
+
+            except Exception as exc:
+                print(
+                    "[CHAT ATTACHMENT CONTEXT ERROR]",
+                    repr(exc),
+                    flush=True,
+                )
+
         try:
+            auth_user_id = ""
+
+            try:
+                from flask import g
+
+                user = getattr(g, "nova_auth_user", None) or {}
+                auth_user_id = str(user.get("id") or "").strip()
+            except Exception:
+                auth_user_id = ""
+
+            if not auth_user_id:
+                try:
+                    from flask import session as flask_session
+
+                    auth_user_id = str(
+                        flask_session.get("nova_user_id") or ""
+                    ).strip()
+                except Exception:
+                    auth_user_id = ""
+
             response = model_gateway_service.responses_create(
+                nova_user_id=auth_user_id or None,
+                nova_username=getattr(self, "username", None),
+                nova_session_id=session_id,
+                nova_enforce_credits=True,
                 model=(
                     requested_model
                     or self.chat_model
                 ),
-                input=prompt,
+                input=model_input,
             )
 
             assistant_text = self.response_handler.extract_response_text(
@@ -12293,7 +12466,6 @@ Rules:
         except Exception as e:
             return f"Model error: {e}"
 
-
     def _execute_memory_recall(
         self,
         decision: dict,
@@ -12346,6 +12518,7 @@ Rules:
             requested_model=decision.get(
                 "model"
             ),
+            attachments=attachments or [],
         )
 
         assistant_msg = self._build_assistant_message(
@@ -13382,13 +13555,43 @@ Rules:
             })
 
         try:
+            auth_user_id = ""
+
+            try:
+                from flask import g, session as flask_session
+
+                auth_user = getattr(g, "nova_auth_user", None)
+
+                if isinstance(auth_user, dict):
+                    auth_user_id = str(
+                        auth_user.get("id") or ""
+                    ).strip()
+                else:
+                    auth_user_id = str(
+                        getattr(auth_user, "id", "") or ""
+                    ).strip()
+
+                if not auth_user_id:
+                    auth_user_id = str(
+                        flask_session.get("nova_user_id") or ""
+                    ).strip()
+
+            except Exception:
+                auth_user_id = ""
+
             response = model_gateway_service.responses_create(
+                nova_user_id=auth_user_id or None,
+                nova_username=getattr(self, "username", None),
+                nova_session_id=session_id,
+                nova_enforce_credits=True,
                 model=self.chat_model,
                 input=model_messages,
             )
+
             assistant_text = self._extract_response_text(response)
 
         except Exception as e:
+            print("NOVA MODEL RESPONSE FAILED:", e)
             assistant_text = "Something went wrong."
 
         if not assistant_text:
@@ -13444,7 +13647,6 @@ Rules:
                     "NAME MEMORY RECALL FIX ERROR:",
                     e,
                 )
-
         try:
             if any(x in memory_text for x in ["prefer direct", "be direct", "no fluff", "keep answers short"]):
                 assistant_text = (assistant_text or "").strip()
@@ -13462,7 +13664,6 @@ Rules:
             for m in used_memory_items
             if isinstance(m, dict) and self._safe_str(m.get("text"))
         ]
-
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],

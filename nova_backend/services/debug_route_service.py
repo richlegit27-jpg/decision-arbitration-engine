@@ -84,6 +84,7 @@ class DebugRouteService:
             "/api/debug/chat-turn-dry-run",
             methods=["POST", "GET"],
         )
+
         def api_debug_chat_turn_dry_run():
             if not debug_routes_enabled():
                 return debug_routes_disabled_response()
@@ -91,22 +92,144 @@ class DebugRouteService:
             try:
                 from flask import request
 
-                payload = request.get_json(
-                    silent=True
-                ) or {}
+                payload = request.get_json(silent=True) or {}
+                nested = payload.get("request_json")
+
+                if isinstance(nested, dict):
+                    payload = {**nested, **payload}
 
                 user_text = str(
                     payload.get("user_text")
                     or payload.get("message")
                     or payload.get("text")
+                    or payload.get("input")
                     or ""
                 ).strip()
+
+                attachments = (
+                    payload.get("attachments")
+                    or payload.get("files")
+                    or payload.get("uploads")
+                    or payload.get("uploaded_files")
+                    or []
+                )
+
+                if not isinstance(attachments, list):
+                    attachments = [attachments]
+
+                session_id = (
+                    payload.get("session_id")
+                    or payload.get("sid")
+                )
+
+                has_image = any(
+                    isinstance(item, dict)
+                    and (
+                        str(
+                            item.get("mime_type")
+                            or item.get("content_type")
+                            or ""
+                        ).lower().startswith("image/")
+                        or str(
+                            item.get("filename")
+                            or item.get("name")
+                            or ""
+                        ).lower().endswith(
+                            (
+                                ".png",
+                                ".jpg",
+                                ".jpeg",
+                                ".gif",
+                                ".webp",
+                                ".bmp",
+                                ".tif",
+                                ".tiff",
+                                ".heic",
+                            )
+                        )
+                    )
+                    for item in attachments
+                )
+
+                normalized_attachments = []
+                for item in attachments:
+                    if not isinstance(item, dict):
+                        normalized_attachments.append(item)
+                        continue
+
+                    attachment = dict(item)
+                    mime_type = str(
+                        attachment.get("mime_type")
+                        or attachment.get("content_type")
+                        or ""
+                    ).lower()
+                    filename = str(
+                        attachment.get("filename")
+                        or attachment.get("name")
+                        or ""
+                    ).lower()
+
+                    is_image = (
+                        mime_type.startswith("image/")
+                        or filename.endswith(
+                            (
+                                ".png",
+                                ".jpg",
+                                ".jpeg",
+                                ".gif",
+                                ".webp",
+                                ".bmp",
+                                ".tif",
+                                ".tiff",
+                                ".heic",
+                            )
+                        )
+                    )
+
+                    attachment.setdefault(
+                        "kind",
+                        "image" if is_image else "file",
+                    )
+                    normalized_attachments.append(attachment)
+
+                intent = (
+                    "image_attachment"
+                    if has_image
+                    else "attachment"
+                    if attachments
+                    else "chat"
+                )
+
+                turn = {
+                    "session_id": session_id,
+                    "user_text": user_text,
+                    "user_text_preview": user_text[:200],
+                    "intent": intent,
+                    "attachment_count": len(attachments),
+                    "attachments": normalized_attachments,
+                }
 
                 return json_result(
                     {
                         "ok": True,
                         "dry_run": True,
+                        "turn": turn,
+                        "messages": {
+                            "count": 2,
+                            "items": [
+                                {
+                                    "role": "system",
+                                    "content": "[dry-run: system context]",
+                                },
+                                {
+                                    "role": "user",
+                                    "content": user_text,
+                                },
+                            ],
+                        },
                         "user_text": user_text,
+                        "attachment_count": len(attachments),
+                        "attachments": attachments,
                         "message": "Chat turn dry run completed.",
                     }
                 )
@@ -131,24 +254,70 @@ class DebugRouteService:
             try:
                 from flask import request
 
-                payload = request.get_json(
-                    silent=True
-                ) or {}
+                payload = request.get_json(silent=True) or {}
+                nested = payload.get("request_json")
+
+                if isinstance(nested, dict):
+                    payload = {**nested, **payload}
 
                 attachments = (
                     payload.get("attachments")
                     or payload.get("files")
+                    or payload.get("uploads")
+                    or payload.get("uploaded_files")
                     or []
                 )
 
                 if not isinstance(attachments, list):
                     attachments = [attachments]
 
+                context_keys = (
+                    "filename",
+                    "name",
+                    "summary",
+                    "description",
+                    "extracted_text",
+                    "text",
+                    "url",
+                )
+
+                context_present = any(
+                    isinstance(item, dict)
+                    and any(
+                        str(item.get(key) or "").strip()
+                        for key in context_keys
+                    )
+                    for item in attachments
+                )
+
+                context_lines = [
+                    "NOVA_ATTACHMENT_CONTEXT_20260705"
+                ]
+
+                for item in attachments:
+                    if not isinstance(item, dict):
+                        continue
+
+                    for key in context_keys:
+                        value = str(item.get(key) or "").strip()
+                        if value:
+                            context_lines.append(
+                                f"{key}: {value}"
+                            )
+
+                attachment_context = (
+                    "\n".join(context_lines)
+                    if context_present
+                    else ""
+                )
+
                 return json_result(
                     {
                         "ok": True,
                         "dry_run": True,
                         "attachment_count": len(attachments),
+                        "attachment_context_present": context_present,
+                        "attachment_context": attachment_context,
                         "attachments": attachments,
                         "message": (
                             "Attachment context dry run completed."
@@ -208,8 +377,13 @@ class DebugRouteService:
                     500,
                 )
 
+
         @app.route(
             "/api/debug/chat-attachment-intent-dry-run",
+            methods=["POST", "GET"],
+        )
+        @app.route(
+            "/api/debug/attachment-intent-guard",
             methods=["POST", "GET"],
         )
         def api_debug_chat_attachment_intent_dry_run():
@@ -218,10 +392,11 @@ class DebugRouteService:
 
             try:
                 from flask import request
+                from nova_backend.services.chat_attachment_intent_guard import (
+                    attachment_guard_metadata,
+                )
 
-                payload = request.get_json(
-                    silent=True
-                ) or {}
+                payload = request.get_json(silent=True) or {}
 
                 user_text = str(
                     payload.get("user_text")
@@ -233,11 +408,20 @@ class DebugRouteService:
                 attachments = (
                     payload.get("attachments")
                     or payload.get("files")
+                    or payload.get("uploads")
                     or []
                 )
 
                 if not isinstance(attachments, list):
                     attachments = [attachments]
+
+                guard = attachment_guard_metadata(
+                    user_text,
+                    {
+                        **payload,
+                        "attachments": attachments,
+                    },
+                )
 
                 return json_result(
                     {
@@ -245,7 +429,8 @@ class DebugRouteService:
                         "dry_run": True,
                         "user_text": user_text,
                         "attachment_count": len(attachments),
-                        "attachment_intent": bool(attachments),
+                        "attachment_intent": guard["attachment_focused"],
+                        "guard": guard,
                         "message": (
                             "Chat attachment intent dry run completed."
                         ),

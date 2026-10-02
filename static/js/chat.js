@@ -405,6 +405,8 @@ async function initCoreServices(){
     }) ||
     null
 
+  window.NovaActiveAttachmentsService = attachmentsService
+
   const streamFactory =
     window.NovaStreamService?.create ||
     window.NovaStreamService?.createStreamService ||

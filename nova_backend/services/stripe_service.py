@@ -70,6 +70,11 @@ def create_checkout_session(
             "nova_price_id": str(price_id),
             "nova_username": str(username or ""),
         },
+        "subscription_data": {
+            "metadata": {
+                "nova_username": str(username or ""),
+            },
+        },
     }
 
     return stripe.checkout.Session.create(

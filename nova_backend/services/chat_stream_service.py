@@ -105,11 +105,54 @@ class ChatStreamService:
 
             try:
 
-                yield self._event({
-                    "type": "meta",
-                    "stream": True,
-                    "status": "started",
-                })
+                done_payload = {
+                    "type": "done",
+                    "done": True,
+                }
+
+                if isinstance(payload, dict):
+                    assistant_message = payload.get(
+                        "assistant_message"
+                    )
+
+                    if isinstance(assistant_message, dict):
+                        if assistant_message.get("image_url"):
+                            done_payload["assistant_message"] = {
+                                "text": assistant_message.get(
+                                    "text",
+                                    ""
+                                ),
+                                "image_url": assistant_message.get(
+                                    "image_url"
+                                ),
+                                "attachments": assistant_message.get(
+                                    "attachments",
+                                    []
+                                ),
+                            }
+
+                        elif assistant_message.get("attachments"):
+                            done_payload["assistant_message"] = {
+                                "text": assistant_message.get(
+                                    "text",
+                                    ""
+                                ),
+                                "attachments": assistant_message.get(
+                                    "attachments"
+                                ),
+                            }
+
+                    if payload.get("image_url"):
+                        done_payload["image_url"] = payload.get(
+                            "image_url"
+                        )
+
+                    if payload.get("attachments"):
+                        done_payload["attachments"] = payload.get(
+                            "attachments"
+                        )
+
+                yield self._event(done_payload)
 
                 raw_before_api_chat = request.get_data(
                     cache=True,
@@ -175,17 +218,59 @@ class ChatStreamService:
                         or "No response generated."
                     )
 
-                    yield self._event({
-                        "type": "error",
-                        "content": str(error_message),
-                    })
+                yield self._event({
+                    "type": "message",
+                    "content": full.strip(),
+                })
 
-                    yield self._event({
-                        "type": "done",
-                        "done": True,
-                    })
+                done_payload = {
+                    "type": "done",
+                    "done": True,
+                }
 
-                    return
+                if isinstance(payload, dict):
+                    assistant_message = payload.get(
+                        "assistant_message"
+                    )
+
+                    if isinstance(assistant_message, dict):
+                        if assistant_message.get("image_url"):
+                            done_payload["assistant_message"] = {
+                                "text": assistant_message.get(
+                                    "text",
+                                    ""
+                                ),
+                                "image_url": assistant_message.get(
+                                    "image_url"
+                                ),
+                                "attachments": assistant_message.get(
+                                    "attachments",
+                                    []
+                                ),
+                            }
+
+                        elif assistant_message.get("attachments"):
+                            done_payload["assistant_message"] = {
+                                "text": assistant_message.get(
+                                    "text",
+                                    ""
+                                ),
+                                "attachments": assistant_message.get(
+                                    "attachments"
+                                ),
+                            }
+
+                    if payload.get("image_url"):
+                        done_payload["image_url"] = payload.get(
+                            "image_url"
+                        )
+
+                    if payload.get("attachments"):
+                        done_payload["attachments"] = payload.get(
+                            "attachments"
+                        )
+
+                yield self._event(done_payload)
 
                 full = ""
 

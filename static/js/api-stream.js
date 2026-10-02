@@ -272,14 +272,16 @@ async function readStreamResponse(response, handlers = {}){
 
 async function streamChat(payload = {}, handlers = {}){
 
-const body = {
-  chat_id: String(payload?.chatId || payload?.chat_id || "default-chat"),
-  message: String(payload?.message || ""),
-  regenerate: !!payload?.regenerate,
-  files: Array.isArray(payload?.files) ? payload.files : [],
-  attachments: Array.isArray(payload?.attachments)
-    ? payload.attachments : [],
-}
+  const body = {
+    chat_id: String(payload?.chatId || payload?.chat_id || "default-chat"),
+    message: String(payload?.message || ""),
+    regenerate: !!payload?.regenerate,
+    files: Array.isArray(payload?.files) ? payload.files : [],
+    attachments: Array.isArray(payload?.attachments)
+      ? payload.attachments : [],
+    uploaded_files: Array.isArray(payload?.uploaded_files)
+      ? payload.uploaded_files : [],
+  }
 
   const endpoints = [
     "/api/chat/stream",
@@ -372,4 +374,3 @@ window.NovaAPIStream = {
 }
 
 })()
-

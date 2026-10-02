@@ -1,3 +1,4 @@
+
 from flask import session
 
 
@@ -9,14 +10,7 @@ def get_current_user_id() -> str:
             or ""
         )
 
-        user_id = str(user_id).strip()
-
-        if user_id:
-            return user_id
-
-        # Local Nova mode uses the default owner when
-        # no authenticated session exists.
-        return "default"
+        return str(user_id).strip()
 
     except Exception:
-        return "default"
+        return ""

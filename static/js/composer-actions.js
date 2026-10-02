@@ -580,6 +580,35 @@ function clearThinkingIndicator(){
   function clearPendingInputAndAttachments(){
     safeCall(() => inputController?.clearInput?.(), null)
     state.pendingAttachments = []
+    state.pendingFiles = []
+    state.attachedFiles = []
+
+    if(typeof window.clearDesktopAttachments === "function"){
+      window.clearDesktopAttachments()
+    }
+
+    const fileInput = document.getElementById("fileInput")
+    if(fileInput){
+      fileInput.value = ""
+    }
+
+    const attachedFilesBar = document.getElementById("attachedFilesBar")
+    if(attachedFilesBar){
+      attachedFilesBar.innerHTML = ""
+      attachedFilesBar.style.display = "none"
+    }
+
+    if(window.app?.state){
+      window.app.state.attachedFiles = []
+    }
+
+    safeCall(() =>
+      window.NovaActiveAttachmentsService?.clear?.(), null)
+
+    if(state.attachments){
+      state.attachments.pendingFiles = []
+    }
+
     safeCall(() => attachmentsController?.renderPendingAttachments?.(), null)
     updateComposerState()
   }
@@ -824,44 +853,60 @@ const userId =
       }else{
         safeCall(() => inputController?.clearInput?.(), null)
         state.pendingAttachments = []
+        state.pendingFiles = []
+        state.attachedFiles = []
+
+        const fileInput = document.getElementById("fileInput")
+        if(fileInput){
+          fileInput.value = ""
+        }
+
+        const attachedFilesBar =
+          document.getElementById("attachedFilesBar")
+        if(attachedFilesBar){
+          attachedFilesBar.innerHTML = ""
+          attachedFilesBar.style.display = "none"
+        }
+
         safeCall(() => attachmentsController?.renderPendingAttachments?.(), null)
         updateComposerState()
       }
-
-
-
 
       showThinkingIndicator()
 
       let reply = null
 
-if(voiceCommand && voiceCommand.isVoice){
+      if(voiceCommand && voiceCommand.isVoice){
 
-  reply = await sendVoiceCommand({
-    chatId,
-    text: finalDisplayText,
-    prompt: voiceCommand.prompt,
-    uploadedAttachments,
-  })
+        reply = await sendVoiceCommand({
+          chatId,
+          text: finalDisplayText,
+          prompt: voiceCommand.prompt,
+          uploadedAttachments,
+        })
 
-}else if(streamService && typeof streamService.send === "function"){
+      }else if(streamService && typeof streamService.send === "function"){
 
 reply = await streamService.send({
   chatId,
+  model:
+    document.getElementById("modelSelect")?.value ||
+    window.NovaChatState?.state?.selectedModel ||
+    "",
   message: finalText,
-  files: attachmentPayload,
-  attachments: attachmentPayload,
-  regenerate: isRegeneration,
-  assistantId,
-  userId,
-  scrollEl: el.messagesScroll,
-})
+          files: attachmentPayload,
+          attachments: attachmentPayload,
+          uploaded_files: attachmentPayload,
+          regenerate: isRegeneration,
+          assistantId,
+          userId,
+          scrollEl: el.messagesScroll,
+        })
 
-  console.log("[COMPOSER REPLY DEBUG]", reply)
+        console.log("[COMPOSER REPLY DEBUG]", reply)
 
-  clearThinkingIndicator()
-  handleResolvedChatId(reply, chatId)
-
+        clearThinkingIndicator()
+        handleResolvedChatId(reply, chatId)
 
   if(
     reply?.status === "tool_approval_required" &&
@@ -1010,9 +1055,13 @@ const appended = appendAssistantMessage(
 }
 
 if(!streamService || typeof streamService.send !== "function"){
-  reply = await postChat({
-    chat_id: chatId,
-    message: finalText,
+reply = await postChat({
+  chat_id: chatId,
+  model:
+    document.getElementById("modelSelect")?.value ||
+    window.NovaChatState?.state?.selectedModel ||
+    "",
+  message: finalText,
     attachments: attachmentPayload,
   })
 
@@ -1030,7 +1079,19 @@ if(!streamService || typeof streamService.send !== "function"){
         onAfterSend(reply)
       }
 
+      // Refresh the displayed billing balance after a successful chat response.
+      try{
+        if(typeof window.NovaBilling?.loadAccount === "function"){
+          void window.NovaBilling.loadAccount().catch(error => {
+            console.warn("[NOVA BILLING] Balance refresh failed:", error)
+          })
+        }
+      }catch(error){
+        console.warn("[NOVA BILLING] Balance refresh failed:", error)
+      }
+
       return reply
+
     }catch(error){
       aborted = isAbortLikeError(error)
       clearThinkingIndicator()

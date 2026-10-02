@@ -339,16 +339,93 @@ class DecisionService:
                 reason="project_creation_with_execution_request",
             )
 
+        print(
+            "[NOVA_IMAGE_ROUTE_DIAGNOSTIC]",
+            {
+                "attachments_type": type(attachments).__name__,
+                "attachments_is_list": isinstance(attachments, list),
+                "attachment_count": (
+                    len(attachments)
+                    if isinstance(attachments, list)
+                    else None
+                ),
+                "attachment_items": [
+                    {
+                        "type": type(item).__name__,
+                        "mime_type": (
+                            item.get("mime_type") or item.get("type")
+                            if isinstance(item, dict)
+                            else None
+                        ),
+                        "filename": (
+                            item.get("filename")
+                            or item.get("original_filename")
+                            or item.get("name")
+                            if isinstance(item, dict)
+                            else None
+                        ),
+                    }
+                    for item in attachments
+                ] if isinstance(attachments, list) else [],
+                "detector_result": (
+                    self.chat_service._nova_has_image_attachment_20260607(
+                        attachments
+                    )
+                ),
+            },
+            flush=True,
+        )
+
+        # NOVA_IMAGE_ATTACHMENT_ROUTE_20260929
+        # Route uploaded images through the existing vision handler.
+        if (
+            isinstance(attachments, list)
+            and any(
+                isinstance(item, dict)
+                and (
+                    item.get("mime_type")
+                    or item.get("type")
+                    or item.get("filename")
+                    or item.get("url")
+                    or item.get("file_url")
+                )
+                for item in attachments
+            )
+        ):
+            return {
+                "route": self.chat_service.ROUTE_ATTACHMENT_ANALYSIS,
+                "mode": "image_analysis",
+                "intent": "image_analysis",
+                "confidence": 1.0,
+                "reasons": [
+                    "image_attachment_requires_vision",
+                ],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": False,
+                "prompt": user_text,
+            }
+
+        short_chat = (
+            "hello",
+            "hi",
+            "hey",
+            "yo",
+            "thanks",
+            "thank you",
+        )
+
         if (
             pending_execution
             and not approval_waiting
+            and lower_text.strip()
+            not in short_chat
         ):
             return self._execution_decision(
                 user_text=user_text,
                 intent="execution_continuation",
                 reason="pending_execution_priority",
             )
-
         # Explicit terminal-command execution must be evaluated before
         # general action classification and before the default chat route.
         explicit_command = self._extract_explicit_command(
@@ -452,16 +529,42 @@ class DecisionService:
             "thank you",
         )
 
-        if lower_text.strip() in short_chat:
+        if (
+            pending_execution
+            and not approval_waiting
+            and lower_text.strip()
+            not in short_chat
+        ):
+            return self._execution_decision(
+                user_text=user_text,
+                intent="execution_continuation",
+                reason="pending_execution_priority",
+            )
+        # Explicit terminal-command execution must be evaluated before
+        # existing ChatService image-generation pipeline.
+        if lower_text.startswith(
+            (
+                "/image ",
+                "/image",
+                "generate an image ",
+                "generate image ",
+                "create an image ",
+                "create image ",
+                "make an image ",
+                "make image ",
+                "draw ",
+                "draw me ",
+            )
+        ):
             return {
-                "route": "general_chat",
-                "mode": "chat",
-                "intent": "conversation",
+                "route": "image_generation",
+                "mode": "image_generation",
+                "intent": "image_generation",
                 "confidence": 0.95,
                 "reasons": [
-                    "short_chat",
+                    "explicit_image_request",
                 ],
-                "save_artifact": False,
+                "save_artifact": True,
                 "save_memory": False,
                 "use_memory": False,
                 "prompt": user_text,

@@ -3,6 +3,8 @@
 from nova_backend.services.model_gateway_service import (
     chat_completions_create,
 )
+from nova_backend.model_registry import get_default_model
+
 from services.auth_service import get_user_by_username
 from services.chat_service import (
     add_message,
@@ -194,7 +196,7 @@ async def create_real_ai_reply(chat_id: int, request: Request, payload: dict = B
 
     try:
         response = chat_completions_create(
-            model=model or "gpt-4.1-mini",
+            model=model or get_default_model(),
             messages=[
                 {
                     "role": item.get("role"),

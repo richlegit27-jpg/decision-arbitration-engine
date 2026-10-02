@@ -58,7 +58,7 @@ def test_web_routing_bool_wrapper_blocks_attachment_turn(monkeypatch):
         def _should_use_web(self, user_text, payload=None):
             return True
 
-    chat_service.ChatService = FakeService
+    monkeypatch.setattr(chat_service, "ChatService", FakeService)
 
     result = chat_service._nova_attachment_guard_install_web_routing_suppression()
 
@@ -100,7 +100,7 @@ def test_web_routing_result_wrapper_returns_suppressed_result(monkeypatch):
                 "results": ["should not be returned"],
             }
 
-    chat_service.ChatService = FakeService
+    monkeypatch.setattr(chat_service, "ChatService", FakeService)
 
     result = chat_service._nova_attachment_guard_install_web_routing_suppression()
 

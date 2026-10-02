@@ -36,11 +36,46 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+# Models are ordered from lowest to highest reference API cost.
+# Prices are USD per million tokens and must be verified against
+# the current provider price list before being treated as current.
 AVAILABLE_MODELS: List[Dict[str, str]] = [
-    {"id": "gpt-4.1-mini", "name": "GPT-4.1 Mini"},
-    {"id": "gpt-4.1", "name": "GPT-4.1"},
-    {"id": "gpt-4o-mini", "name": "GPT-4o Mini"},
-    {"id": "gpt-4o", "name": "GPT-4o"},
+    {
+        "id": "gpt-4o-mini",
+        "name": "GPT-4o Mini",
+        "label": "GPT-4o Mini | Fast, General | Cheapest",
+        "category": "Fast, General",
+        "input_cost_per_million": "$0.15",
+        "output_cost_per_million": "$0.60",
+        "cost_tier": "Cheapest",
+    },
+    {
+        "id": "gpt-4.1-mini",
+        "name": "GPT-4.1 Mini",
+        "label": "GPT-4.1 Mini | General, Coding | Low Cost",
+        "category": "General, Coding",
+        "input_cost_per_million": "$0.40",
+        "output_cost_per_million": "$1.60",
+        "cost_tier": "Low Cost",
+    },
+    {
+        "id": "gpt-4.1",
+        "name": "GPT-4.1",
+        "label": "GPT-4.1 | General, Coding, Reasoning | High Cost",
+        "category": "General, Coding, Reasoning",
+        "input_cost_per_million": "$2.00",
+        "output_cost_per_million": "$8.00",
+        "cost_tier": "High Cost",
+    },
+    {
+        "id": "gpt-4o",
+        "name": "GPT-4o",
+        "label": "GPT-4o | Fast, General, Multimodal | Most Expensive",
+        "category": "Fast, General, Multimodal",
+        "input_cost_per_million": "$2.50",
+        "output_cost_per_million": "$10.00",
+        "cost_tier": "Most Expensive",
+    },
 ]
 
 ALLOWED_MODEL_IDS = {item["id"] for item in AVAILABLE_MODELS}
@@ -79,7 +114,10 @@ def load_state() -> Dict[str, Any]:
         base = default_state()
         base.update(data)
 
-        selected_model = str(base.get("selectedModel", DEFAULT_MODEL)).strip()
+        selected_model = str(
+            base.get("selectedModel", DEFAULT_MODEL)
+        ).strip()
+
         if selected_model not in ALLOWED_MODEL_IDS:
             base["selectedModel"] = DEFAULT_MODEL
 
@@ -98,6 +136,7 @@ def load_state() -> Dict[str, Any]:
             base["conversationSummaries"] = {}
 
         return base
+
     except Exception:
         return default_state()
 
@@ -111,31 +150,47 @@ def save_state(state: Dict[str, Any]) -> None:
 
 def normalize_model(model: str) -> str:
     requested = str(model or "").strip()
-    return requested if requested in ALLOWED_MODEL_IDS else DEFAULT_MODEL
+    return (
+        requested
+        if requested in ALLOWED_MODEL_IDS
+        else DEFAULT_MODEL
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request},
+    )
 
 
 @app.get("/api/state")
 async def get_state() -> JSONResponse:
     state = load_state()
     state["models"] = get_default_models()
-    state["selectedModel"] = normalize_model(str(state.get("selectedModel", DEFAULT_MODEL)))
+    state["selectedModel"] = normalize_model(
+        str(state.get("selectedModel", DEFAULT_MODEL))
+    )
     return JSONResponse(state)
 
 
 @app.post("/api/state")
 async def post_state(request: Request) -> JSONResponse:
     data = await request.json()
+
     if not isinstance(data, dict):
-        return JSONResponse({"ok": False, "error": "Invalid state payload."}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Invalid state payload."},
+            status_code=400,
+        )
 
     current = default_state()
     current.update(data)
-    current["selectedModel"] = normalize_model(str(current.get("selectedModel", DEFAULT_MODEL)))
+
+    current["selectedModel"] = normalize_model(
+        str(current.get("selectedModel", DEFAULT_MODEL))
+    )
     current["models"] = get_default_models()
 
     if not isinstance(current.get("chats"), list):
@@ -151,6 +206,7 @@ async def post_state(request: Request) -> JSONResponse:
         current["conversationSummaries"] = {}
 
     save_state(current)
+
     return JSONResponse({"ok": True})
 
 
@@ -167,6 +223,7 @@ async def get_chat_models() -> JSONResponse:
 @app.get("/api/auth/status")
 async def auth_status() -> JSONResponse:
     has_key = bool(os.getenv("OPENAI_API_KEY", "").strip())
+
     return JSONResponse(
         {
             "authenticated": has_key,
@@ -178,4 +235,3 @@ async def auth_status() -> JSONResponse:
 
 app.include_router(chat_stream_router)
 app.include_router(files_router)
-

@@ -231,6 +231,50 @@
         updateUsage(state.account);
     }
 
+    async function loadTokenUsage() {
+        try {
+            const data = await apiRequest(
+                "/api/usage"
+            );
+
+            const totals = data.totals || {};
+
+            setText(
+                "billing-calls",
+                formatNumber(totals.calls)
+            );
+
+            setText(
+                "billing-input-tokens",
+                formatNumber(totals.input_tokens)
+            );
+            setText(
+                "billing-output-tokens",
+                formatNumber(totals.output_tokens)
+            );
+
+            setText(
+                "billing-total-tokens",
+                formatNumber(totals.total_tokens)
+            );
+
+            setText(
+                "billing-token-status",
+                "Recorded token usage"
+            );
+
+        } catch (error) {
+            console.error(
+                "[Nova Billing] Token usage failed:",
+                error
+            );
+
+            setText(
+                "billing-token-status",
+                "Token usage is currently unavailable."
+            );
+        }
+    }
 
     async function loadAccount() {
         setStatus(
@@ -422,6 +466,7 @@
             await Promise.all([
                 loadAccount(),
                 loadPlans(),
+                loadTokenUsage(),
             ]);
 
         } catch (error) {

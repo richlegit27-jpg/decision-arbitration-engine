@@ -201,7 +201,7 @@
 
 
                 attachmentsController:
-                    window.NovaAttachmentsService || null
+                    window.NovaActiveAttachmentsService || null
 
             });
 

@@ -122,10 +122,7 @@ class AttachmentAnalysisService:
             if not path.exists():
                 return ""
 
-            text = path.read_text(
-                encoding="utf-8",
-                errors="ignore",
-            )
+            text = self.read_attachment_text(path)
 
         except Exception as exc:
             print(

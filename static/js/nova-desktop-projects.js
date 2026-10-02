@@ -338,55 +338,55 @@ function openProjectWorkspace(project) {
     const activity = $("desktopProjectRecentActivity");
 
     if (status) {
-        status.textContent = "Loading project intelligence…";
+        status.textContent = "Loading project intelligence...";
     }
 
     if (mission) {
         mission.innerHTML = `
             <h3>Mission</h3>
-            <p>Loading project intelligence…</p>
+            <p>Loading project intelligence...</p>
         `;
     }
 
     if (progress) {
         progress.innerHTML = `
             <h3>Progress</h3>
-            <p>Loading project intelligence…</p>
+            <p>Loading project intelligence...</p>
         `;
     }
 
     if (health) {
         health.innerHTML = `
             <h3>Health</h3>
-            <p>Loading project intelligence…</p>
+            <p>Loading project intelligence...</p>
         `;
     }
 
     if (focus) {
         focus.innerHTML = `
             <h3>Current Focus</h3>
-            <p>Loading project intelligence…</p>
+            <p>Loading project intelligence...</p>
         `;
     }
 
     if (nextAction) {
         nextAction.innerHTML = `
             <h3>Next Action</h3>
-            <p>Loading project intelligence…</p>
+            <p>Loading project intelligence...</p>
         `;
     }
 
     if (recommendation) {
         recommendation.innerHTML = `
             <h3>AI Recommendation</h3>
-            <p>Loading project intelligence…</p>
+            <p>Loading project intelligence...</p>
         `;
     }
 
     if (activity) {
         activity.innerHTML = `
             <h3>Recent Activity</h3>
-            <p>Loading project intelligence…</p>
+            <p>Loading project intelligence...</p>
         `;
     }
 
@@ -614,34 +614,42 @@ async function loadProjectIntelligence(projectId) {
             $("desktopProjectRecentActivity");
 
         if (activity) {
-            const decisions =
-                Array.isArray(brain.decisions)
-                    ? brain.decisions
-                    : [];
+            const recentActivity = (
+                Array.isArray(brain.recent_activity)
+                    ? brain.recent_activity
+                    : []
+            )
+                .map((item) => {
+                    if (
+                        !item ||
+                        typeof item !== "object"
+                    ) {
+                        return null;
+                    }
 
-            const actions =
-                Array.isArray(brain.next_actions)
-                    ? brain.next_actions
-                    : [];
+                    const text =
+                        item.message ||
+                        item.title ||
+                        item.action ||
+                        item.description ||
+                        item.event ||
+                        item.decision ||
+                        "";
 
-            const recentActivity = [
-                ...actions.map(
-                    (item) => ({
-                        type: "Next action",
-                        text:
-                            item.action ||
-                            "Project action"
-                    })
-                ),
-                ...decisions.map(
-                    (item) => ({
-                        type: "Decision",
-                        text:
-                            item.decision ||
-                            "Project decision"
-                    })
-                )
-            ];
+                    if (!String(text).trim()) {
+                        return null;
+                    }
+
+                    return {
+                        type:
+                            item.type ||
+                            item.event_type ||
+                            item.status ||
+                            "Project event",
+                        text: String(text)
+                    };
+                })
+                .filter(Boolean);
 
             activity.innerHTML = `
                 <h3>Recent Activity</h3>
@@ -1183,9 +1191,9 @@ function renderProjectPhases(data) {
 
     if (summary) {
         summary.textContent =
-            `${phases.length} Phase(s) · ` +
-            `${tasks.length} Task(s) · ` +
-            `${totalSteps} Step(s) · ` +
+            `${phases.length} Phase(s) |` +
+            `${tasks.length} Task(s) |` +
+            `${totalSteps} Step(s) |` +
             `${completedTasks}/${tasks.length} tasks complete`;
     }
 
@@ -1690,6 +1698,7 @@ function renderProjectTasks(data) {
                         currentProjectId
                     );
 
+
                     setProjectStatus(
                         "Task created"
                     );
@@ -1780,13 +1789,27 @@ async function loadProjectWorkspace(
             );
         }
 
+// Set the active project before rendering or binding controls.
+window.__NOVA_PROJECT_STATE =
+    window.__NOVA_PROJECT_STATE || {};
+
+window.__NOVA_PROJECT_STATE.workspaceData = data;
+window.__NOVA_PROJECT_STATE.activeProjectId = projectId;
+
+// Bind the existing Add Task click handler.
+renderProjectTasks(data);
+
+// Render the canonical execution tree.
 renderProjectPhases(
     data
 );
-/*
- * Legacy task editor disabled.
- * Project execution is rendered by renderProjectPhases().
- */
+
+// Legacy task editor is disabled.
+// Clear its stale loading placeholder after rendering
+// the canonical project execution tree.
+if (tasksContainer) {
+    tasksContainer.replaceChildren();
+}
 
         const title =
             $("desktopProjectTitle");
@@ -1908,9 +1931,23 @@ window.__NOVA_PROJECT_STATE.activeProjectId =
                     const file =
                         projectFileInput.files?.[0];
 
-                    const currentProjectId =
-                        window.__NOVA_PROJECT_STATE
-                            ?.activeProjectId;
+const projectState =
+    window.__NOVA_PROJECT_STATE || {};
+
+let currentProjectId =
+    projectState.activeProjectId;
+
+if (
+    !currentProjectId &&
+    projectState.projects?.length === 1 &&
+    projectState.projects[0]?.id
+) {
+    currentProjectId =
+        projectState.projects[0].id;
+
+    projectState.activeProjectId =
+        currentProjectId;
+}
 
                     if (
                         !file ||
@@ -2319,6 +2356,7 @@ container
     }
 }
 
+
     async function loadProjects() {
         if (
             window.__NOVA_PROJECT_STATE.loading
@@ -2346,6 +2384,11 @@ container
                 projects.find(
                     (project) =>
                         project.active === true
+                ) ||
+                (
+                    projects.length === 1
+                        ? projects[0]
+                        : null
                 );
 
             if (activeProject?.id) {
@@ -2355,11 +2398,11 @@ container
 
             renderProjects(projects);
 
-if (activeProject) {
-    openProjectWorkspace(
-        activeProject
-    );
-}
+            if (activeProject?.id) {
+                await loadProjectWorkspace(
+                    activeProject.id
+                );
+            }
 
         } catch (error) {
             console.error(
@@ -2376,8 +2419,7 @@ if (activeProject) {
         }
     }
 
-
-    async function activateProject(
+     async function activateProject(
         projectId
     ) {
         if (!projectId) {
@@ -2749,9 +2791,8 @@ async function controlProjectExecution(
                     data.debug_last_result || {};
 
                 const messageLines = [
-                    `Project execution — ${action}.`,
                     data.message ||
-                        "Project execution updated.",
+                        `Project execution ${action}.`,
                     `Status: ${
                         execution.status ||
                         data.status ||
@@ -3170,6 +3211,7 @@ if (
 
                 const data =
                     await response.json();
+
 
                 if (
                     !response.ok ||

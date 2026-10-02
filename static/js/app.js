@@ -325,7 +325,21 @@ function renderMessages(){
           <strong>${escapeHtml(roleLabel)}</strong>
           <span class="chat-message-time">${escapeHtml(formatTime(message.created_at))}</span>
         </div>
-        <div class="chat-message-body">${safeContent}</div>
+        <div class="chat-message-body">
+          ${safeContent}
+          ${(Array.isArray(message.attachments) ? message.attachments : [])
+            .filter(a => String(a.mime_type || "").startsWith("image/") && a.url)
+            .map(a => `
+              <div class="chat-message-image">
+                <img
+                  src="${escapeHtml(a.url)}"
+                  alt="${escapeHtml(a.filename || "Generated image")}"
+                  loading="lazy"
+                >
+              </div>
+            `)
+            .join("")}
+        </div>
       </div>
     `;
   }).join("");
@@ -756,6 +770,7 @@ async function init(){
   Object.assign(window.NovaApp, {
     state,
     apiFetch,
+    renderAttachedFiles,
     getActiveChat,
     getActiveMessages,
     ensureActiveChat,

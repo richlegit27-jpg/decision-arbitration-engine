@@ -1,7 +1,10 @@
-﻿import json
+﻿
+
+import json
 import os
 import tempfile
 import threading
+from contextlib import contextmanager
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,14 +15,93 @@ BILLING_FILE = Path(
 )
 
 BILLING_LOCK = threading.RLock()
+_BILLING_PROCESS_LOCK_STATE = threading.local()
+
+
+@contextmanager
+def _billing_process_lock():
+    lock_file_path = BILLING_FILE.with_name(
+        f".{BILLING_FILE.name}.lock"
+    )
+
+    lock_file_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    with open(lock_file_path, "a+b") as lock_file:
+        lock_file.seek(0, os.SEEK_END)
+
+        if lock_file.tell() == 0:
+            lock_file.write(b"\0")
+            lock_file.flush()
+
+        lock_file.seek(0)
+
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(
+                lock_file.fileno(),
+                msvcrt.LK_LOCK,
+                1,
+            )
+        else:
+            import fcntl
+
+            fcntl.flock(
+                lock_file.fileno(),
+                fcntl.LOCK_EX,
+            )
+
+        try:
+            yield
+        finally:
+            lock_file.seek(0)
+
+            if os.name == "nt":
+                msvcrt.locking(
+                    lock_file.fileno(),
+                    msvcrt.LK_UNLCK,
+                    1,
+                )
+            else:
+                fcntl.flock(
+                    lock_file.fileno(),
+                    fcntl.LOCK_UN,
+                )
 
 def _billing_mutation_lock(function):
     def wrapped(*args, **kwargs):
         with BILLING_LOCK:
-            return function(
-                *args,
-                **kwargs,
+            depth = getattr(
+                _BILLING_PROCESS_LOCK_STATE,
+                "depth",
+                0,
             )
+
+            if depth:
+                _BILLING_PROCESS_LOCK_STATE.depth = depth + 1
+
+                try:
+                    return function(
+                        *args,
+                        **kwargs,
+                    )
+                finally:
+                    _BILLING_PROCESS_LOCK_STATE.depth = depth
+
+            with _billing_process_lock():
+                _BILLING_PROCESS_LOCK_STATE.depth = 1
+
+                try:
+                    return function(
+                        *args,
+                        **kwargs,
+                    )
+                finally:
+                    _BILLING_PROCESS_LOCK_STATE.depth = 0
+
 
     return wrapped
 
@@ -52,6 +134,21 @@ DEFAULT_USER = {
 }
 
 @_billing_mutation_lock
+def _default_account(
+    user_id="",
+    username="",
+):
+    return {
+        **DEFAULT_USER,
+        "user_id": _normalize_user_id(
+            user_id
+        ),
+        "username": _normalize_username(
+            username
+        ),
+    }
+
+@_billing_mutation_lock
 def _now():
     return datetime.now(
         timezone.utc
@@ -81,7 +178,6 @@ def _resolve_billing_identity(
     normalized_user_id = _normalize_user_id(
         user_id
     )
-
     normalized_username = _normalize_username(
         username
     )
@@ -93,22 +189,6 @@ def _resolve_billing_identity(
         return normalized_username
 
     return "unknown"
-
-@_billing_mutation_lock
-def _default_account(
-    user_id="",
-    username="",
-):
-    return {
-        **DEFAULT_USER,
-        "created_at": _now(),
-        "user_id": _normalize_user_id(
-            user_id
-        ),
-        "username": _normalize_username(
-            username
-        ),
-    }
 
 @_billing_mutation_lock
 def _load():
@@ -310,6 +390,16 @@ def get_account(
     identity = _resolve_billing_identity(
         user_id=user_id,
         username=username,
+    )
+
+    data = _load()
+
+    account = data["users"].setdefault(
+        identity,
+        _default_account(
+            user_id=user_id,
+            username=username,
+        ),
     )
 
     normalized_user_id = _normalize_user_id(
@@ -531,6 +621,94 @@ def get_balance(
     )
 
 @_billing_mutation_lock
+def set_subscription(
+    username=None,
+    plan="",
+    subscription_id="",
+    user_id=None,
+):
+    plan = str(plan or "").strip().lower()
+    subscription_id = str(subscription_id or "").strip()
+
+    if plan not in ("plus", "pro") or not subscription_id:
+        raise ValueError("A valid subscription plan and ID are required.")
+
+    identity = _resolve_billing_identity(
+        user_id=user_id,
+        username=username,
+    )
+
+    data = _load()
+
+    account = data["users"].setdefault(
+        identity,
+        _default_account(
+            user_id=user_id,
+            username=username,
+        ),
+    )
+
+    account["plan"] = plan
+    account["subscription_id"] = subscription_id
+    account["monthly_credits"] = int(PLAN_CREDITS[plan])
+
+    normalized_user_id = _normalize_user_id(user_id)
+    normalized_username = _normalize_username(username)
+
+    if normalized_user_id:
+        account["user_id"] = normalized_user_id
+
+    if normalized_username:
+        account["username"] = normalized_username
+
+    _save(data)
+
+    return dict(account)
+
+
+@_billing_mutation_lock
+def cancel_subscription(
+    username=None,
+    user_id=None,
+    subscription_id="",
+):
+    identity = _resolve_billing_identity(
+        user_id=user_id,
+        username=username,
+    )
+
+    data = _load()
+    account = data["users"].get(identity)
+
+    if account is None:
+        return None
+
+    requested_subscription_id = str(
+        subscription_id or ""
+    ).strip()
+
+    stored_subscription_id = str(
+        account.get("subscription_id", "") or ""
+    ).strip()
+
+    # Ignore stale cancellation events for an older subscription.
+    if (
+        requested_subscription_id
+        and stored_subscription_id
+        and requested_subscription_id != stored_subscription_id
+    ):
+        return dict(account)
+
+    account["plan"] = "free"
+    account["subscription_id"] = ""
+    account["monthly_credits"] = int(PLAN_CREDITS["free"])
+
+    _save(data)
+
+    return dict(account)
+
+
+@_billing_mutation_lock
 def add_credits(
     username=None,
     amount=0,
@@ -629,6 +807,7 @@ def consume_usage(
     input_tokens=0,
     output_tokens=0,
     user_id=None,
+    idempotency_key=None,
 ):
     cost = model_cost(
         model,
@@ -658,6 +837,65 @@ def consume_usage(
     normalized_username = _normalize_username(
         username
     )
+
+    idempotency_key = str(
+        idempotency_key or ""
+    ).strip()
+
+    if idempotency_key:
+        for existing_transaction in data.get(
+            "transactions",
+            [],
+        ):
+            if not isinstance(
+                existing_transaction,
+                dict,
+            ):
+                continue
+
+            existing_meta = existing_transaction.get(
+                "meta",
+                {},
+            )
+
+            if not isinstance(existing_meta, dict):
+                continue
+
+            if (
+                existing_transaction.get("type") != "usage"
+                or existing_meta.get("idempotency_key")
+                != idempotency_key
+            ):
+                continue
+
+            if normalized_user_id:
+                same_owner = (
+                    existing_transaction.get("user_id")
+                    == normalized_user_id
+                )
+            else:
+                same_owner = (
+                    bool(normalized_username)
+                    and existing_transaction.get("username")
+                    == normalized_username
+                )
+
+            if not same_owner:
+                continue
+
+            return {
+                "ok": True,
+                "cost": abs(
+                    int(existing_transaction.get("amount", 0))
+                ),
+                "balance": int(
+                    account.get("credits", 0)
+                ),
+                "transaction_id": existing_transaction.get("id"),
+                "user_id": normalized_user_id,
+                "username": normalized_username,
+                "idempotent_replay": True,
+            }
 
     if normalized_user_id:
         account["user_id"] = normalized_user_id
@@ -700,6 +938,7 @@ def consume_usage(
         meta={
             "source": "consume_usage",
             "credits_charged": cost,
+            "idempotency_key": idempotency_key or None,
         },
     )
 

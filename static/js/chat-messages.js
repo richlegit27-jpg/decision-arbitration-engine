@@ -410,91 +410,36 @@ function renderCodeBlock(content, language = ""){
     `
 }
 
-function renderPlainText(content){
-    const text = String(content || "")
-        .replace(/\r\n/g, "\n")
-
-    const fence = /(?:^|\n)\s*```([a-zA-Z0-9_-]*)\s*\n([\s\S]*?)\n\s*```/g
-
-    let html = ""
-    let lastIndex = 0
-    let match
-
-    while((match = fence.exec(text))){
-        const before = text.slice(
-            lastIndex,
-            match.index
-        )
-
-        if(before.trim()){
-            html += before
-                .split(/\n{2,}/)
-                .map((part) => {
-                    return `<p>${escapeHtml(part).replaceAll("\n", "<br>")}</p>`
-                })
-                .join("")
-        }
-
-        html += renderCodeBlock(
-            match[2],
-            match[1]
-        )
-
-        lastIndex = fence.lastIndex
-    }
-
-    const tail = text.slice(lastIndex)
-
-    if(tail.trim()){
-        html += tail
-            .split(/\n{2,}/)
-            .map((part) => {
-                return `<p>${escapeHtml(part).replaceAll("\n", "<br>")}</p>`
-            })
-            .join("")
-    }
-
-    return `
-        <div class="answer-payload">
-            <div class="answer-text">
-                ${html || "<p></p>"}
-            </div>
-        </div>
-    `
-}
-
-function renderMessageBody(message){
-    const content = message?.content ?? ""
-
-    if(message?.role === "assistant"){
-        const imageMarkup = renderImageMessage(content)
-
-        if(imageMarkup){
-            return imageMarkup
-        }
-
-        if(
-            answerPayloadApi &&
-            typeof answerPayloadApi.renderAnswerPayload === "function"
-        ){
-            return answerPayloadApi.renderAnswerPayload(
-                content,
-                {
-                    messageId: message.id,
-                    copiedMessageId,
-                }
-            )
-        }
-    }
-
-    return renderPlainText(content)
-}
-
 function renderMessageBody(message){
   const content = message?.content ?? ""
 
   if(message?.role === "assistant"){
-    const imageMarkup = renderImageMessage(content)
+    let imageContent = ""
+
+    if(message?.image_url){
+      imageContent = `[[image]]
+src: ${message.image_url}
+prompt: ${content}`
+    }else if(Array.isArray(message?.attachments)){
+      const imageAttachment = message.attachments.find(
+        (attachment) =>
+          String(attachment?.mime_type || "")
+            .toLowerCase()
+            .startsWith("image/") &&
+          attachment?.url
+      )
+
+      if(imageAttachment?.url){
+        imageContent = `[[image]]
+src: ${imageAttachment.url}
+prompt: ${content}`
+      }
+    }
+
+    const imageMarkup = renderImageMessage(
+      imageContent || content
+    )
+
     if(imageMarkup){
       return imageMarkup
     }
@@ -508,6 +453,64 @@ function renderMessageBody(message){
   }
 
   return renderPlainText(content)
+}
+
+function renderMessageBody(message){
+  const content = message?.content ?? ""
+
+  if(message?.role === "assistant"){
+    let imageContent = ""
+
+    if(message?.image_url){
+      imageContent = `[[image]]
+src: ${message.image_url}
+prompt: ${content}`
+    }else if(Array.isArray(message?.attachments)){
+      const imageAttachment = message.attachments.find(
+        (attachment) =>
+          String(attachment?.mime_type || "")
+            .toLowerCase()
+            .startsWith("image/") &&
+          attachment?.url
+      )
+
+      if(imageAttachment?.url){
+        imageContent = `[[image]]
+src: ${imageAttachment.url}
+prompt: ${content}`
+      }
+    }
+
+    const imageMarkup = renderImageMessage(
+      imageContent || content
+    )
+
+    if(imageMarkup){
+      return imageMarkup
+    }
+
+    if(
+      answerPayloadApi &&
+      typeof answerPayloadApi.renderAnswerPayload === "function"
+    ){
+      return answerPayloadApi.renderAnswerPayload(content, {
+        messageId: message.id,
+        copiedMessageId,
+      })
+    }
+  }
+
+  if(
+    answerPayloadApi &&
+    typeof answerPayloadApi.renderAnswerPayload === "function"
+  ){
+    return answerPayloadApi.renderAnswerPayload(content, {
+      messageId: message.id,
+      copiedMessageId,
+    })
+  }
+
+  return escapeHtml(content)
 }
 
 function getMessages(){

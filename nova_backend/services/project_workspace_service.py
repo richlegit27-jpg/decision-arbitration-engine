@@ -2322,6 +2322,7 @@ class ProjectWorkspaceService:
         last_action=_UNSET,
         steps=_UNSET,
         ):
+
         projects = self._load_projects()
 
         for project in projects:
@@ -3528,6 +3529,28 @@ class ProjectWorkspaceService:
                         in terminal_statuses
                         for nested_step in nested_steps
                     )
+
+                    print(
+                        "[TASK COMPLETION CHECK]",
+                        {
+                            "task_id": task.get("id"),
+                            "task_status_before": task.get("status"),
+                            "steps": [
+                                {
+                                    "id": s.get("id"),
+                                    "status": s.get("status"),
+                                    "state": s.get("state"),
+                                }
+                                for s in nested_steps
+                                if isinstance(s, dict)
+                            ],
+                            "all_steps_complete": all_steps_complete,
+                        },
+                        flush=True,
+                    )
+
+                    if all_steps_complete:
+                        task["status"] = "completed"
 
                     if all_steps_complete:
                         task["status"] = "completed"

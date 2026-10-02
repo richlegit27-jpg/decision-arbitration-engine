@@ -1192,9 +1192,20 @@ class ProjectBuilderService:
                     canonical_execution_file
                 )
 
-                canonical_task["target_file"] = ""
-                canonical_task["target_files"] = []
+                canonical_task["target_file"] = str(
+                    canonical_task.get("target_file")
+                    or canonical_target_file
+                    or ""
+                ).strip()
 
+                canonical_task["target_files"] = (
+                    canonical_target_files
+                    if isinstance(
+                        canonical_target_files,
+                        list,
+                    )
+                    else []
+                )
             elif is_output_persistence_task:
                 canonical_task["action"] = "implement"
                 canonical_task["execution_mode"] = "hybrid"
@@ -1396,9 +1407,13 @@ class ProjectBuilderService:
                         if len(word) >= 4
                     ]
 
-                    if phase_title_words and all(
-                        word in searchable_task_text
-                        for word in phase_title_words
+                    if (
+                        phase_title_words
+                        and len(phase_title_words) >= 2
+                        and all(
+                            word in searchable_task_text
+                            for word in phase_title_words
+                        )
                     ):
                         persistent_phase_id = created_phase_id
                         break
@@ -1599,9 +1614,31 @@ class ProjectBuilderService:
                     or "pending"
                 )
 
-                normalized_steps.append(
-                    step
-                )
+            normalized_steps.append(
+                step
+            )
+
+
+            # Repair planner steps that exist but contain no executable payload.
+            # The planner may create the task shell but omit implementation details.
+            for step in normalized_steps:
+                if (
+                    not step.get("command")
+                    and not step.get("content")
+                    and not step.get("code")
+                    and not step.get("execution_file")
+                    and not step.get("target_file")
+                ):
+                    step["action"] = (
+                        step.get("action")
+                        or "implement"
+                    )
+                    step["status"] = (
+                        step.get("status")
+                        or "pending"
+                    )
+                    step["needs_generation"] = True
+
 
             # If the planner supplied no executable steps, create
             # one normalized step from the task metadata.
@@ -2214,6 +2251,44 @@ class ProjectBuilderService:
                 task_steps,
                 flush=True,
             )
+
+            print(
+                "[NOVA DEBUG TASK EXECUTION CONTRACT]",
+                {
+                    "title": task_title,
+                    "action": normalized_action,
+                    "execution_mode": normalized_execution_mode,
+                    "execution_file": execution_file,
+                    "target_file": target_file,
+                    "target_files": target_files,
+                    "steps": len(task_steps)
+                    if isinstance(task_steps, list)
+                    else "NOT_LIST",
+                },
+                flush=True,
+            )
+
+            if not (
+                normalized_action
+                or execution_file
+                or target_file
+                or target_files
+                or task_steps
+                or task_spec.get("content")
+                or task_spec.get("code")
+                or task_spec.get("replacement")
+                or task_spec.get("command")
+            ):
+
+                print(
+                    "[PROJECT TASK REJECTED: NO EXECUTABLE CONTENT]",
+                    {
+                        "title": task_title,
+                        "task_spec": task_spec,
+                    },
+                    flush=True,
+                )
+                continue
 
             created_task = (
 

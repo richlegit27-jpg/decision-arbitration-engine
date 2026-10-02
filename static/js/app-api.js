@@ -74,7 +74,10 @@ async function request(url, options = {}) {
   const payload = await parseJsonSafe(response);
 
   if (!response.ok) {
-    const message = getErrorMessage(payload, `Request failed: ${response.status}`);
+    const message = getErrorMessage(
+      payload,
+      `Request failed: ${response.status}`
+    );
     throw new Error(message);
   }
 
@@ -119,7 +122,10 @@ async function getMessages(chatId) {
     throw new Error("Chat ID is required.");
   }
 
-  const payload = await request(`/api/chats/${encodeURIComponent(chatId)}/messages`);
+  const payload = await request(
+    `/api/chats/${encodeURIComponent(chatId)}/messages`
+  );
+
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload.messages)) return payload.messages;
   return [];
@@ -130,10 +136,13 @@ async function renameChat(chatId, title) {
     throw new Error("Chat ID is required.");
   }
 
-  const payload = await request(`/api/chats/${encodeURIComponent(chatId)}`, {
-    method: "PATCH",
-    json: { title: String(title || "").trim() }
-  });
+  const payload = await request(
+    `/api/chats/${encodeURIComponent(chatId)}`,
+    {
+      method: "PATCH",
+      json: { title: String(title || "").trim() }
+    }
+  );
 
   if (payload && payload.chat) return payload.chat;
   return payload;
@@ -154,19 +163,27 @@ async function exportChat(chatId) {
     throw new Error("Chat ID is required.");
   }
 
-  const response = await fetch(`/api/chats/${encodeURIComponent(chatId)}/export`, {
-    method: "GET",
-    credentials: "same-origin"
-  });
+  const response = await fetch(
+    `/api/chats/${encodeURIComponent(chatId)}/export`,
+    {
+      method: "GET",
+      credentials: "same-origin"
+    }
+  );
 
   if (!response.ok) {
     const payload = await parseJsonSafe(response);
-    const message = getErrorMessage(payload, `Export failed: ${response.status}`);
+    const message = getErrorMessage(
+      payload,
+      `Export failed: ${response.status}`
+    );
     throw new Error(message);
   }
 
   const blob = await response.blob();
-  const disposition = response.headers.get("Content-Disposition") || "";
+  const disposition =
+    response.headers.get("Content-Disposition") || "";
+
   let filename = `nova-chat-${chatId}.json`;
 
   const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
@@ -182,19 +199,19 @@ async function exportChat(chatId) {
 }
 
 async function setActiveModel(model) {
-  const payload = await request("/api/models/select", {
+  return request("/api/models/select", {
     method: "POST",
     json: { model: String(model || "").trim() }
   });
-
-  return payload;
 }
 
 async function getMemory() {
   const payload = await request("/api/memory");
+
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload.items)) return payload.items;
   if (Array.isArray(payload.memories)) return payload.memories;
+
   return [];
 }
 
@@ -205,12 +222,16 @@ async function clearMemory() {
 }
 
 async function uploadFiles(files) {
-  const list = Array.isArray(files) ? files : Array.from(files || []);
+  const list = Array.isArray(files)
+    ? files
+    : Array.from(files || []);
+
   if (!list.length) {
     return [];
   }
 
   const formData = new FormData();
+
   for (const file of list) {
     formData.append("files", file);
   }
@@ -224,12 +245,16 @@ async function uploadFiles(files) {
   const payload = await parseJsonSafe(response);
 
   if (!response.ok) {
-    const message = getErrorMessage(payload, `Upload failed: ${response.status}`);
+    const message = getErrorMessage(
+      payload,
+      `Upload failed: ${response.status}`
+    );
     throw new Error(message);
   }
 
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload.files)) return payload.files;
+
   return [];
 }
 
@@ -251,7 +276,9 @@ async function hydrateMessagesIntoState(chatId) {
   if (typeof app.setMessages === "function") {
     app.setMessages(chatId, messages);
   } else if (app.state) {
-    app.state.messagesByChatId = app.state.messagesByChatId || {};
+    app.state.messagesByChatId =
+      app.state.messagesByChatId || {};
+
     app.state.messagesByChatId[chatId] = messages;
   }
 
@@ -270,30 +297,101 @@ async function hydrateModelsIntoState() {
           ? modelsPayload.models
           : [];
 
-  const models = rawModels.map((model) => {
-    if (typeof model === "string") {
-      return {
-        value: model,
-        label: model
+  // Use the billing tiers supplied by the live model API.
+  const costTierOrder = {
+    cheapest: 0,
+    cheap: 1,
+    standard: 2,
+    balanced: 3,
+    advanced: 4,
+    premium: 5,
+    pro: 6,
+    maximum: 7
+  };
+
+  const models = rawModels
+    .map((model) => {
+      if (typeof model === "string") {
+        return {
+          value: model,
+          label: model,
+          category: "General",
+          billing_tier: "unknown",
+          cost_tier: "Cost unknown"
+        };
+      }
+
+      const value =
+        model?.value ||
+        model?.id ||
+        model?.name ||
+        "";
+
+      const description = String(model?.description || "").toLowerCase();
+      const modelName = String(model?.label || model?.name || value);
+      const categorySet = new Set();
+
+      if (/fast|speed|efficient|everyday|routine|high-throughput|simple/.test(description)) {
+        categorySet.add("Fast");
+      }
+
+      if (/coding|code|developer|software/.test(description)) {
+        categorySet.add("Coding");
+      }
+
+      if (/reasoning|complex|problem solving|difficult|precision|multi-step/.test(description)) {
+        categorySet.add("Reasoning");
+      }
+
+      if (/multimodal|image|audio|video|vision/.test(description)) {
+        categorySet.add("Multimodal");
+      }
+
+      if (/agent|agentic|execution/.test(description)) {
+        categorySet.add("Agentic");
+      }
+
+      if (/general|everyday|general-purpose/.test(description)) {
+        categorySet.add("General");
+      }
+
+      if (categorySet.size === 0) {
+        categorySet.add("General");
+      }
+
+      const category = [...categorySet].join(", ");
+      const billingTier = String(model?.billing_tier || "unknown").toLowerCase();
+
+      const costTierLabels = {
+        cheapest: "CHEAPEST",
+        cheap: "CHEAP",
+        standard: "STANDARD",
+        balanced: "BALANCED",
+        advanced: "ADVANCED",
+        premium: "PREMIUM",
+        pro: "PRO",
+        maximum: "MAXIMUM"
       };
-    }
 
-    const value =
-      model?.value ||
-      model?.id ||
-      model?.name ||
-      "";
+      const costTier = costTierLabels[billingTier] || "COST UNKNOWN";
 
-    return {
-      ...model,
-      value,
-      label: model?.label || value
-    };
-  });
+      return {
+        ...model,
+        value,
+        category,
+        billing_tier: billingTier,
+        cost_tier: costTier,
+        label: `${modelName} | ${category} | ${costTier}`
+      };
+    })
+    .sort((a, b) => {
+      const aTier = costTierOrder[a.billing_tier] ?? 99;
+      const bTier = costTierOrder[b.billing_tier] ?? 99;
 
+      return aTier - bTier;
+    });
 
-  // Refresh persistence:
-  // Prefer the user's saved browser selection over backend defaults.
+  // Prefer the user's saved browser selection when it still exists.
   let savedModel = "";
 
   try {
@@ -308,9 +406,15 @@ async function hydrateModelsIntoState() {
     (model) => String(model.value) === String(savedModel)
   );
 
+  const currentModel = app.state?.selectedModel || "";
+
+  const currentModelExists = models.some(
+    (model) => String(model.value) === String(currentModel)
+  );
+
   const selected =
     (savedModelExists ? savedModel : "") ||
-    app.state?.selectedModel ||
+    (currentModelExists ? currentModel : "") ||
     modelsPayload?.selected_model ||
     modelsPayload?.active_model ||
     modelsPayload?.default_model ||
@@ -329,22 +433,30 @@ async function hydrateModelsIntoState() {
     app.state.selectedModel = selected;
   }
 
-  const modelSelect =
-    document.getElementById("modelSelect");
+  const modelSelect = document.getElementById("modelSelect");
 
   if (modelSelect) {
     modelSelect.innerHTML = models
-      .map((model) => `
-        <option value="${String(model.value)}">
-          ${String(model.label)}
-        </option>
-      `)
+      .map((model) => {
+        const value = String(model.value)
+          .replace(/&/g, "&amp;")
+          .replace(/"/g, "&quot;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+
+        const label = String(model.label)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+
+        return `<option value="${value}">${label}</option>`;
+      })
       .join("");
 
     modelSelect.value = selected;
 
     console.log(
-      "[NOVA MODELS] rendered",
+      "[NOVA MODELS] rendered cheapest to most expensive",
       [...modelSelect.options].map(
         (option) =>
           `${option.textContent.trim()} [${option.value}]`
@@ -380,4 +492,3 @@ app.api = {
 };
 
 })();
-

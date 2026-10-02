@@ -178,6 +178,7 @@ async function normalizeFile(file){
     kind: inferKind(file),
     url,
     content,
+    rawFile: file,
   }
 }
 
@@ -372,9 +373,77 @@ function getPreviewMarkup(item){
   `
 }
 
+async function uploadPendingAttachments(){
+  const pending = ensurePendingAttachments()
+
+  if(!pending.length){
+    return []
+  }
+
+  const files = pending
+    .map((item) => item?.rawFile)
+    .filter((file) => file instanceof File)
+
+  if(!files.length){
+    return []
+  }
+
+  const formData = new FormData()
+
+  for(const file of files){
+    formData.append("files", file)
+  }
+
+  const response = await fetch("/api/upload", {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    body: formData,
+  })
+
+  const text = await response.text()
+  let data = {}
+
+  try{
+    data = text ? JSON.parse(text) : {}
+  }catch(_error){
+    throw new Error("Upload returned invalid JSON")
+  }
+
+  if(!response.ok){
+    throw new Error(
+      data?.detail ||
+      data?.error ||
+      "Attachment upload failed"
+    )
+  }
+
+  const uploaded = Array.isArray(data?.files)
+    ? data.files
+    : []
+
+  return uploaded
+}
+
+function makeAttachmentPayload(attachments){
+  return Array.isArray(attachments)
+    ? attachments.map((item) => ({
+        id: item?.id || null,
+        original_name: item?.original_name || item?.name || "",
+        saved_name: item?.saved_name || "",
+        content_type: item?.content_type || item?.type || "",
+        size: Number(item?.size || item?.size_bytes || 0),
+        uploaded_at: item?.uploaded_at || "",
+        url: item?.url || item?.file_url || "",
+      }))
+    : []
+}
+
 window.NovaAttachmentsService = {
   openPicker,
   addFiles,
+  uploadPendingAttachments,
+  makeAttachmentPayload,
   addFromEvent,
   getAttachments,
   getAttachmentById,

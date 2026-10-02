@@ -91,6 +91,7 @@ def resolve_nova_task_model(
 ):
     from nova_backend.model_registry import (
         get_default_model_alias,
+        get_model_provider,
         resolve_model,
     )
 
@@ -238,40 +239,80 @@ def _nova_pop_internal_kwargs(
         )
     )
 
+    # Resolve the authenticated identity centrally when the
+    # caller did not explicitly provide a user ID.
+    if not str(user_id or "").strip():
+        try:
+            from flask import g, has_request_context, session
+
+            if has_request_context():
+                auth_user = getattr(
+                    g,
+                    "nova_auth_user",
+                    None,
+                )
+
+                if isinstance(auth_user, dict):
+                    user_id = auth_user.get("id")
+                elif auth_user is not None:
+                    user_id = getattr(
+                        auth_user,
+                        "id",
+                        None,
+                    )
+
+                if not str(user_id or "").strip():
+                    user_id = session.get("nova_user_id")
+
+        except Exception:
+            # Never infer authenticated identity from a username.
+            user_id = None
+
     return (
         user_id,
         username,
         session_id,
         enforce,
     )
-
-
 # ---------------------------------------------------------------------
 # CREDIT PREFLIGHT
 # ---------------------------------------------------------------------
 
+
 def _nova_preflight_credits(
+    user_id=None,
     username=None,
     model=None,
 ):
-    try:
-        from nova_backend.services.usage_ledger_service import (
-            ensure_user_can_use_model,
-        )
-
-        return ensure_user_can_use_model(
-            username=username,
-            model=model,
-        )
-
-    except ImportError:
-        return None
-
-    except Exception as error:
+    if not str(user_id or "").strip():
         raise RuntimeError(
-            f"Nova credit preflight failed: {error}"
-        ) from error
+            "Nova credit enforcement requires an authenticated user ID."
+        )
 
+    from nova_backend.services import billing_service
+
+    balance = billing_service.get_balance(
+        user_id=user_id,
+        username=username,
+    )
+
+    minimum_cost = billing_service.model_cost(
+        model=model,
+        input_tokens=1,
+        output_tokens=0,
+    )
+
+    if balance < minimum_cost:
+        raise RuntimeError(
+            "Insufficient Nova credits. "
+            f"Balance: {balance}; "
+            f"minimum required: {minimum_cost}."
+        )
+
+    return {
+        "ok": True,
+        "balance": balance,
+    }
 
 # ---------------------------------------------------------------------
 # USAGE / BILLING
@@ -286,27 +327,8 @@ def _nova_consume_and_record_usage(
     response=None,
     enforce=False,
 ):
-    if not enforce:
-        return None
-
     billing_result = None
-
-    try:
-        from nova_backend.services.usage_ledger_service import (
-            consume_model_usage,
-        )
-
-        billing_result = consume_model_usage(
-            username=username,
-            model=model,
-            response=response,
-        )
-
-    except ImportError:
-        pass
-
-    except Exception:
-        pass
+    billing_error = None
 
     try:
         input_text = _nova_text(messages)
@@ -359,55 +381,180 @@ def _nova_consume_and_record_usage(
         provider_usage = None
 
         if usage:
-            provider_usage = usage
+            if hasattr(usage, "model_dump"):
+                provider_usage = usage.model_dump()
+            elif isinstance(usage, dict):
+                provider_usage = usage
+            else:
+                provider_usage = {
+                    key: value
+                    for key in (
+                        "prompt_tokens",
+                        "completion_tokens",
+                        "total_tokens",
+                        "input_tokens",
+                        "output_tokens",
+                    )
+                    if (value := getattr(usage, key, None)) is not None
+                }
 
-            input_tokens = int(
-                getattr(
-                    usage,
-                    "prompt_tokens",
-                    0,
+            if isinstance(usage, dict):
+                input_tokens = int(
+                    usage.get("prompt_tokens")
+                    or usage.get("input_tokens")
+                    or 0
                 )
-                or getattr(
-                    usage,
-                    "input_tokens",
-                    0,
+
+                output_tokens = int(
+                    usage.get("completion_tokens")
+                    or usage.get("output_tokens")
+                    or 0
                 )
-                or 0
+            else:
+                input_tokens = int(
+                    getattr(usage, "prompt_tokens", 0)
+                    or getattr(usage, "input_tokens", 0)
+                    or 0
+                )
+
+                output_tokens = int(
+                    getattr(usage, "completion_tokens", 0)
+                    or getattr(usage, "output_tokens", 0)
+                    or 0
+                )
+
+        if enforce and (input_tokens + output_tokens) <= 0:
+            total_tokens = 0
+
+            if isinstance(provider_usage, dict):
+                total_tokens = int(
+                    provider_usage.get("total_tokens") or 0
+                )
+
+            if total_tokens > 0:
+                input_tokens = total_tokens
+            else:
+                raise RuntimeError(
+                    "Provider token usage is missing or zero; "
+                    "refusing to complete an enforced request."
+                )
+
+        if enforce:
+            from nova_backend.services import billing_service
+
+            provider_response_id = getattr(
+                response,
+                "id",
+                None,
             )
 
-            output_tokens = int(
-                getattr(
-                    usage,
-                    "completion_tokens",
-                    0,
+            if isinstance(response, dict):
+                provider_response_id = (
+                    provider_response_id
+                    or response.get("id")
                 )
-                or getattr(
-                    usage,
-                    "output_tokens",
-                    0,
-                )
-                or 0
+
+            idempotency_key = (
+                f"provider_response:{str(provider_response_id).strip()}"
+                if provider_response_id
+                and str(provider_response_id).strip()
+                else None
             )
+
+            billing_result = billing_service.consume_usage(
+                user_id=user_id,
+                username=username,
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                idempotency_key=idempotency_key,
+            )
+
+            if (
+                not isinstance(billing_result, dict)
+                or not billing_result.get("ok")
+            ):
+                reason = (
+                    billing_result.get("reason", "Billing failed")
+                    if isinstance(billing_result, dict)
+                    else "Billing did not complete"
+                )
+
+                raise RuntimeError(
+                    f"Nova billing enforcement failed: {reason}"
+                )
+
 
         from nova_backend.services.usage_ledger_service import (
             record_model_usage,
         )
 
-        record_model_usage(
-            user_id=user_id,
-            username=username,
-            session_id=session_id,
-            route="model_gateway",
-            model=model,
-            input_text=input_text,
-            output_text=output_text,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            provider_usage=provider_usage,
-        )
+        usage_recorded = False
 
-    except Exception:
-        pass
+        try:
+            record_model_usage(
+                user_id=user_id,
+                username=username,
+                session_id=session_id,
+                model=model,
+                input_text=input_text,
+                output_text=output_text,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                provider_usage=provider_usage,
+                meta={"source": "model_gateway"},
+            )
+            usage_recorded = True
+
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Nova usage analytics write failed after "
+                "model response; billing result is preserved."
+            )
+
+        if usage_recorded and provider_usage and any(
+            provider_usage.get(key) is not None
+            for key in (
+                "prompt_tokens",
+                "completion_tokens",
+                "total_tokens",
+                "input_tokens",
+                "output_tokens",
+            )
+        ):
+            try:
+                from flask import g
+
+                g._nova_provider_usage_recorded = True
+
+            except Exception:
+                pass
+
+    except Exception as exc:
+        billing_error = exc
+
+    if enforce and billing_error is not None:
+        raise RuntimeError(
+            f"Nova billing enforcement failed: {billing_error}"
+        ) from billing_error
+
+    if enforce:
+
+        if (
+            not isinstance(billing_result, dict)
+            or not billing_result.get("ok")
+        ):
+            reason = (
+                billing_result.get("reason", "Billing failed")
+                if isinstance(billing_result, dict)
+                else "Billing did not complete"
+            )
+
+            raise RuntimeError(
+                f"Nova billing enforcement failed: {reason}"
+            )
 
     try:
         setattr(
@@ -415,7 +562,6 @@ def _nova_consume_and_record_usage(
             "_nova_billing",
             billing_result,
         )
-
         setattr(
             response,
             "_nova_usage_tokens",
@@ -439,17 +585,42 @@ def _nova_consume_and_record_usage(
 # IMAGE GENERATION
 # ---------------------------------------------------------------------
 
+
 def images_generate_create(
     *args,
     **kwargs,
 ):
+    from nova_backend.model_registry import (
+        get_image_model,
+        get_model_provider,
+    )
+
+    model = str(
+        kwargs.get("model")
+        or get_image_model()
+    ).strip()
+
+    if not model:
+        raise RuntimeError(
+            "Image generation model is not configured."
+        )
+
+    kwargs["model"] = model
+
+    provider = get_model_provider(model)
+
+    if provider != "openai":
+        raise RuntimeError(
+            f"Model provider '{provider}' is not yet connected "
+            f"for image generation model '{model}'."
+        )
+
     client = _get_openai_client()
 
     return client.images.generate(
         *args,
         **kwargs,
     )
-
 
 # ---------------------------------------------------------------------
 # CHAT COMPLETIONS
@@ -486,32 +657,57 @@ def chat_completions_create(
 
     if enforce:
         _nova_preflight_credits(
+            user_id=user_id,
             username=username,
             model=model,
         )
 
-    client = _get_openai_client()
+    from nova_backend.model_registry import get_model_provider
 
-    try:
-        response = client.chat.completions.create(
-            *args,
+    provider = get_model_provider(model)
+
+    from nova_backend.services.provider_gateway_service import (
+        create_provider_client,
+    )
+
+    client = create_provider_client(
+        provider
+    )
+
+    if provider in {"anthropic", "google", "xai"}:
+        from nova_backend.services.provider_execution_service import (
+            execute_provider_chat,
+        )
+
+        response = execute_provider_chat(
+            provider=provider,
+            client=client,
+            model=model,
+            messages=messages,
             **kwargs,
         )
+    else:
 
-    except Exception as error:
-        print(
-            "MODEL GATEWAY EXECUTION ERROR =",
-            repr(error),
-            flush=True,
-        )
+        try:
+            response = client.chat.completions.create(
+                *args,
+                **kwargs,
+            )
 
-        print(
-            "MODEL GATEWAY FAILED MODEL =",
-            model,
-            flush=True,
-        )
+        except Exception as error:
+            print(
+                "MODEL GATEWAY EXECUTION ERROR =",
+                repr(error),
+                flush=True,
+            )
 
-        raise
+            print(
+                "MODEL GATEWAY FAILED MODEL =",
+                model,
+                flush=True,
+            )
+
+            raise
 
     _nova_consume_and_record_usage(
         user_id=user_id,
@@ -561,6 +757,7 @@ def responses_create(
 
     if enforce:
         _nova_preflight_credits(
+            user_id=user_id,
             username=username,
             model=model,
         )
@@ -571,7 +768,17 @@ def responses_create(
         flush=True,
     )
 
-    client = _get_openai_client()
+    from nova_backend.model_registry import get_model_provider
+
+    provider = get_model_provider(model)
+
+    from nova_backend.services.provider_gateway_service import (
+        create_provider_client,
+    )
+
+    client = create_provider_client(
+        provider
+    )
 
     try:
         response = client.responses.create(
