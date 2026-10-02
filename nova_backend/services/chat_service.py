@@ -6230,6 +6230,7 @@ Rules:
                         )
 
                         response = chat_completions_create(
+                            nova_enforce_credits=True,
                             nova_username=getattr(self, "username", None)
                             or os.getenv("NOVA_DEFAULT_USERNAME")
                             or "richard",
@@ -7086,6 +7087,7 @@ Rules:
                 )
 
                 response = chat_completions_create(
+                    nova_enforce_credits=True,
                     nova_username=getattr(self, "username", None) or os.getenv("NOVA_DEFAULT_USERNAME") or "richard",
                     nova_session_id=locals().get("session_id") or getattr(getattr(self, "session_service", None), "active_session_id", "") or "",
                     model=getattr(self, "model", "gpt-4o-mini"),
@@ -8409,6 +8411,21 @@ Rules:
             }
 
             if text in triggers:
+                if text in {
+                    "next",
+                    "nex",
+                    "continue",
+                    "continue on",
+                    "go",
+                }:
+                    execution_state = self.chat_execution_service.get_state(session_id)
+
+                    if not isinstance(execution_state, dict):
+                        return False
+
+                    if not execution_state.get("steps"):
+                        return False
+
                 return True
 
             return False
@@ -14155,6 +14172,7 @@ def _nova_install_attachment_guard_web_suppression():
 
 def _create_model_response(self, model_messages):
     return model_gateway_service.responses_create(
+        nova_enforce_credits=True,
         model=self.chat_model,
         input=model_messages,
     )

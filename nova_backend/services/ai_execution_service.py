@@ -424,6 +424,7 @@ class AIExecutionService:
         user_prompt,
     ):
         return model_gateway_service.responses_create(
+            nova_enforce_credits=True,
             nova_username=(
                 os.getenv("NOVA_DEFAULT_USERNAME")
                 or "richard"

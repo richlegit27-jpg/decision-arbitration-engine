@@ -2683,6 +2683,8 @@ async function runAllProject(projectId) {
     );
 }
 
+const projectExecutionInFlight = new Map();
+const projectInterruptInFlight = new Set();
 
 async function controlProjectExecution(
     projectId,
@@ -2690,6 +2692,42 @@ async function controlProjectExecution(
 ) {
     if (!projectId) {
         return;
+    }
+
+    const interruptAction =
+        action === "pause" || action === "stop";
+
+    if (
+        !interruptAction &&
+        projectExecutionInFlight.has(projectId)
+    ) {
+        const activeAction =
+            projectExecutionInFlight.get(projectId);
+        const message =
+            `Project execution is already processing ${activeAction}.`;
+        setProjectStatus(message);
+        return {
+            ok: false,
+            status: "busy",
+            message,
+        };
+    }
+
+    if (
+        interruptAction &&
+        projectInterruptInFlight.has(projectId)
+    ) {
+        return {
+            ok: false,
+            status: "busy",
+            message: "An execution interrupt is already being processed.",
+        };
+    }
+
+    if (!interruptAction) {
+        projectExecutionInFlight.set(projectId, action);
+    } else {
+        projectInterruptInFlight.add(projectId);
     }
 
     setProjectStatus(
@@ -2723,13 +2761,27 @@ async function controlProjectExecution(
             ""
         ).trim().toLowerCase();
 
-        const approvalWaiting =
-            executionStatus === "paused";
+        const interruptedOutcome = new Set([
+            "paused",
+            "stopped",
+            "cancelled",
+            "canceled",
+            "waiting",
+            "waiting_approval",
+            "busy",
+        ]).has(executionStatus);
+
+        const explicitFailure =
+            data?.ok === false ||
+            ["error", "failed", "blocked", "invalid_action"].includes(
+                executionStatus
+            );
 
         if (
             !response.ok ||
-            (!data.ok && !approvalWaiting)
+            (explicitFailure && !interruptedOutcome)
         ) {
+            await loadProjectWorkspace(projectId);
             throw new Error(
                 data.error ||
                 data.message ||
@@ -2996,12 +3048,29 @@ await loadProjectFiles(
             error.message ||
             "Project execution failed."
         );
+        return {
+            ok: false,
+            status: "error",
+            message: error.message || "Project execution failed.",
+        };
+    } finally {
+        if (!interruptAction) {
+            projectExecutionInFlight.delete(projectId);
+        } else {
+            projectInterruptInFlight.delete(projectId);
+        }
     }
 }
 
 document.addEventListener(
     "DOMContentLoaded",
     () => {
+        const continueButton =
+            $("desktopContinueProject");
+
+        const approveButton =
+            $("desktopApproveProject");
+
         const runAllButton =
             $("desktopRunAll");
 
@@ -3010,6 +3079,26 @@ document.addEventListener(
 
         const stopButton =
             $("desktopStop");
+
+        if (continueButton) {
+            continueButton.addEventListener(
+                "click",
+                () => controlProjectExecution(
+                    window.__NOVA_PROJECT_STATE?.activeProjectId,
+                    "continue"
+                )
+            );
+        }
+
+        if (approveButton) {
+            approveButton.addEventListener(
+                "click",
+                () => controlProjectExecution(
+                    window.__NOVA_PROJECT_STATE?.activeProjectId,
+                    "approve"
+                )
+            );
+        }
 
         if (runAllButton) {
             runAllButton.addEventListener(

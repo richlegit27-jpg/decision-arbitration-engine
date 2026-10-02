@@ -1,13 +1,115 @@
 ﻿from __future__ import annotations
 
+import builtins
 from datetime import datetime, timezone
-from pathlib import Path
+from functools import wraps
+import logging
+import os
+import threading
 from nova_backend.services.project_artifact_publisher_service import (
     ProjectArtifactPublisherService,
 )
 from nova_backend.services.execution_approval_service import (
     ExecutionApprovalService,
 )
+
+
+_PROJECT_EXECUTION_LOCKS = {}
+_PROJECT_EXECUTION_ACTIONS = {}
+_PROJECT_EXECUTION_LOCKS_GUARD = threading.Lock()
+_LOGGER = logging.getLogger(__name__)
+
+
+def _execution_debug(*args, **kwargs):
+    """Emit verbose execution diagnostics only when explicitly enabled."""
+
+    enabled = str(os.environ.get("NOVA_EXECUTION_DEBUG") or "").lower()
+    if enabled in {"1", "true", "yes", "on"}:
+        builtins.print(*args, **kwargs)
+
+
+def _exclusive_project_execution(action_name):
+    """Allow only one advancing execution action per project at a time."""
+
+    def decorate(method):
+        @wraps(method)
+        def guarded(self, project_id, *args, **kwargs):
+            project_key = str(project_id or "").strip()
+
+            with _PROJECT_EXECUTION_LOCKS_GUARD:
+                execution_lock = _PROJECT_EXECUTION_LOCKS.setdefault(
+                    project_key,
+                    threading.Lock(),
+                )
+
+            if not execution_lock.acquire(blocking=False):
+                with _PROJECT_EXECUTION_LOCKS_GUARD:
+                    active_action = _PROJECT_EXECUTION_ACTIONS.get(
+                        project_key,
+                        "execution",
+                    )
+
+                _LOGGER.warning(
+                    "Project execution busy project=%s requested=%s active=%s",
+                    project_key,
+                    action_name,
+                    active_action,
+                )
+                return {
+                    "ok": False,
+                    "project_id": project_id,
+                    "action": action_name,
+                    "status": "busy",
+                    "execution_status": "running",
+                    "message": (
+                        "Project execution is already processing "
+                        f"'{active_action}'."
+                    ),
+                }
+
+            with _PROJECT_EXECUTION_LOCKS_GUARD:
+                _PROJECT_EXECUTION_ACTIONS[project_key] = action_name
+
+            _LOGGER.info(
+                "Project execution start project=%s action=%s",
+                project_key,
+                action_name,
+            )
+            try:
+                result = method(self, project_id, *args, **kwargs)
+                result_status = (
+                    str(result.get("status") or "")
+                    if isinstance(result, dict)
+                    else "unknown"
+                )
+                log_method = (
+                    _LOGGER.warning
+                    if result_status.lower()
+                    in {"failed", "blocked", "cancelled", "canceled"}
+                    else _LOGGER.info
+                )
+                log_method(
+                    "Project execution finish project=%s action=%s status=%s",
+                    project_key,
+                    action_name,
+                    result_status,
+                )
+                return result
+            except Exception:
+                _LOGGER.exception(
+                    "Project execution exception project=%s action=%s",
+                    project_key,
+                    action_name,
+                )
+                raise
+            finally:
+                with _PROJECT_EXECUTION_LOCKS_GUARD:
+                    _PROJECT_EXECUTION_ACTIONS.pop(project_key, None)
+                execution_lock.release()
+
+        return guarded
+
+    return decorate
 
 class ProjectExecutionController:
 
@@ -23,19 +125,29 @@ class ProjectExecutionController:
         action_map = {
             "implement": "implement",
             "build": "implement",
+            "create": "implement",
             "edit": "implement",
             "write": "write",
             "modify": "implement",
             "patch": "implement",
             "fix": "implement",
+            "refactor": "implement",
             "execute": "execute",
             "run": "execute",
+            "run_file": "execute",
+            "run_script": "execute",
+            "python_run": "execute",
+            "command": "command",
+            "shell": "command",
+            "run_command": "command",
             "review": "review",
             "analyze": "review",
             "analysis": "review",
             "inspect": "review",
-            "verify": "review",
-            "test": "review",
+            "verify": "verify",
+            "validation": "verify",
+            "validate": "verify",
+            "test": "verify",
         }
 
         return action_map.get(
@@ -55,6 +167,8 @@ class ProjectExecutionController:
 
     VALID_ACTIONS = {
         "continue",
+        "next",
+        "next_task",
         "next_step",
         "run_all",
         "pause",
@@ -95,139 +209,53 @@ class ProjectExecutionController:
             )
         )
 
+    @_exclusive_project_execution("reset")
     def reset_execution_state(
         self,
         project_id,
     ):
-        return (
+        execution = (
             self.project_workspace_service
             .reset_execution_state(
                 project_id
             )
         )
 
-    def _sandbox_dir(self):
-        sandbox_dir = (
-            Path(__file__).resolve().parents[1]
-            / "sandbox"
-        ).resolve()
-
-        sandbox_dir.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        return sandbox_dir
-
-    def _resolve_sandbox_target(
-        self,
-        target_file,
-    ):
-        target = str(
-            target_file or ""
-        ).strip()
-
-        if not target:
+        if execution is None:
             return None
 
-        sandbox_dir = self._sandbox_dir()
-
-        candidate = (
-            sandbox_dir / target
-        ).resolve()
-
-        try:
-            candidate.relative_to(
-                sandbox_dir
-            )
-        except ValueError:
-            return None
-
-        return candidate
-
-    def _write_task_file(
-        self,
-        task,
-    ):
-
-
-        if not isinstance(
-            task,
-            dict,
-        ):
-            return None
-
-        target_file = str(
-            task.get(
-                "target_file",
-                "",
-            )
-            or ""
-        ).strip()
-
-        content = task.get(
-            "content",
+        orchestrator = self.execution_orchestrator_service
+        state_service = getattr(
+            orchestrator,
+            "execution_state_service",
             None,
         )
 
-        if not target_file:
-            return None
-
-        if content is None:
-            return None
-
-        target = self._resolve_sandbox_target(
-            target_file
-        )
-
-        if target is None:
-            return None
-
-        target.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        target.write_text(
-            str(content),
-            encoding="utf-8",
-        )
-
-        return str(target)
-
-    def _materialize_task_files(
-        self,
-        tasks,
-    ):
-        written_files = []
-
-        if not isinstance(
-            tasks,
-            list,
+        if state_service is not None and hasattr(
+            state_service,
+            "save_execution_state",
         ):
-            return written_files
+            state_service.save_execution_state(
+                f"project:{project_id}",
+                {
+                    "steps": [],
+                    "current_index": 0,
+                    "status": "ready",
+                    "waiting": False,
+                    "complete": False,
+                    "project_id": project_id,
+                    "project_controller_managed": True,
+                },
+            )
 
-        for task in tasks:
-            try:
-                written_file = (
-                    self._write_task_file(
-                        task
-                    )
-                )
-
-                if written_file:
-                    written_files.append(
-                        written_file
-                    )
-
-            except Exception as exc:
-                print(
-                    "[PROJECT FILE WRITE FAILED]",
-                    exc,
-                    flush=True,
-                )
-
-        return written_files
+        return {
+            "ok": True,
+            "project_id": project_id,
+            "action": "reset",
+            "status": "ready",
+            "execution": execution,
+            "message": "Project execution was reset and is ready.",
+        }
 
     def _get_project(
         self,
@@ -293,6 +321,8 @@ class ProjectExecutionController:
             "complete",
             "done",
             "success",
+            "succeeded",
+            "finished",
         }
 
         non_runnable_statuses = {
@@ -300,13 +330,23 @@ class ProjectExecutionController:
             "complete",
             "done",
             "success",
+            "succeeded",
+            "finished",
             "cancelled",
             "canceled",
             "blocked",
             "failed",
+            "failure",
+            "error",
+            "errored",
+            "exception",
             "waiting",
+            "waiting_input",
+            "needs_input",
             "waiting_approval",
+            "awaiting_approval",
             "paused",
+            "stopped",
         }
 
         def normalize_reference(
@@ -427,9 +467,11 @@ class ProjectExecutionController:
                 )
             ).strip().lower()
 
-            nested_steps = task.get(
-                "steps",
-                [],
+            nested_steps = (
+                task.get("steps")
+                or task.get("substeps")
+                or task.get("execution_steps")
+                or []
             )
 
             if not isinstance(
@@ -443,6 +485,8 @@ class ProjectExecutionController:
                 "complete",
                 "done",
                 "success",
+                "succeeded",
+                "finished",
                 "cancelled",
                 "canceled",
             }
@@ -464,7 +508,14 @@ class ProjectExecutionController:
                     or nested_step.get("failure")
                 )
 
-                if nested_status == "failed" or nested_error:
+                if nested_status in {
+                    "failed",
+                    "failure",
+                    "error",
+                    "errored",
+                    "exception",
+                    "blocked",
+                } or nested_error:
                     nested_real_failure = True
 
                 if nested_status not in nested_terminal_statuses:
@@ -483,7 +534,13 @@ class ProjectExecutionController:
                 "done",
                 "success",
                 "succeeded",
+                "finished",
                 "failed",
+                "failure",
+                "error",
+                "errored",
+                "exception",
+                "blocked",
                 "cancelled",
                 "canceled",
             }:
@@ -546,7 +603,7 @@ class ProjectExecutionController:
                             task_step["next_action"] = None
                             task_step["mutation_ready"] = False
 
-            print(
+            _execution_debug(
                 "[PROJECT RUNNABLE TASK DIAGNOSTIC]",
                 {
                     "task_id": task.get("id"),
@@ -574,10 +631,12 @@ class ProjectExecutionController:
                 flush=True,
             )
 
-            if (
-                status in non_runnable_statuses
-                and not has_resumable_nested_work
-            ):
+            if status in non_runnable_statuses:
+                continue
+
+            # A failed child is authoritative. Do not automatically retry a
+            # parent that still says open because of stale or legacy state.
+            if nested_real_failure:
                 continue
 
 
@@ -624,7 +683,7 @@ class ProjectExecutionController:
                 if not resolved:
                     dependencies_satisfied = False
 
-                    print(
+                    _execution_debug(
                         "[PROJECT DEPENDENCY BLOCKED]",
                         {
                             "task_id": task.get(
@@ -689,8 +748,19 @@ class ProjectExecutionController:
                                 "write",
                                 "edit",
                                 "modify",
+                                "refactor",
                                 "delete",
                                 "test",
+                                "verify",
+                                "validate",
+                                "analysis",
+                                "analyze",
+                                "research",
+                                "review",
+                                "plan",
+                                "planning",
+                                "design",
+                                "document",
                                 "run",
                                 "execute",
                             }
@@ -709,8 +779,19 @@ class ProjectExecutionController:
                         "write",
                         "edit",
                         "modify",
+                        "refactor",
                         "delete",
                         "test",
+                        "verify",
+                        "validate",
+                        "analysis",
+                        "analyze",
+                        "research",
+                        "review",
+                        "plan",
+                        "planning",
+                        "design",
+                        "document",
                         "run",
                         "execute",
                     }
@@ -724,7 +805,7 @@ class ProjectExecutionController:
                     runnable.append(task)
 
                 else:
-                    print(
+                    _execution_debug(
                         "[PROJECT TASK SKIPPED: NO EXECUTABLE INSTRUCTIONS]",
                         {
                             "task_id": task.get("id"),
@@ -733,7 +814,7 @@ class ProjectExecutionController:
                         flush=True,
                     )
 
-        print(
+        _execution_debug(
             "[PROJECT RUNNABLE TASKS]",
             {
                 "total": len(tasks),
@@ -755,6 +836,497 @@ class ProjectExecutionController:
 
     def _get_execution_service(self):
         return self.chat_execution_service
+
+    @staticmethod
+    def _find_execution_failure(execution_state):
+        """Return the first failed execution node, including nested steps."""
+        failure_statuses = {
+            "failed",
+            "failure",
+            "error",
+            "errored",
+            "exception",
+            "blocked",
+            "cancelled",
+            "canceled",
+        }
+        waiting_statuses = {
+            "waiting",
+            "waiting_input",
+            "waiting_approval",
+            "awaiting_approval",
+            "needs_input",
+            "paused",
+        }
+
+        pending = [execution_state]
+        visited = set()
+
+        while pending:
+            node = pending.pop()
+            if not isinstance(node, dict) or id(node) in visited:
+                continue
+            visited.add(id(node))
+
+            statuses = [
+                str(node.get(key) or "").strip().lower()
+                for key in (
+                    "status",
+                    "state",
+                    "completion_status",
+                    "execution_status",
+                )
+            ]
+            status = next((value for value in statuses if value), "")
+            metadata = node.get("execution_metadata")
+            runtime_result = node.get("runtime_result")
+
+            failed = (
+                any(value in failure_statuses for value in statuses)
+                or (
+                    isinstance(metadata, dict)
+                    and metadata.get("success") is False
+                    and status not in waiting_statuses
+                    and node.get("waiting") is not True
+                )
+                or (
+                    isinstance(runtime_result, dict)
+                    and runtime_result.get("ok") is False
+                )
+                or (
+                    bool(node.get("error"))
+                    and status not in waiting_statuses
+                )
+            )
+
+            if failed:
+                return {
+                    "status": status or "failed",
+                    "error": (
+                        node.get("error")
+                        or (
+                            metadata.get("error")
+                            if isinstance(metadata, dict)
+                            else None
+                        )
+                        or "Project task execution failed."
+                    ),
+                    "node": node,
+                }
+
+            for key in (
+                "execution",
+                "execution_state",
+                "steps",
+                "substeps",
+                "execution_steps",
+            ):
+                child = node.get(key)
+                if isinstance(child, dict):
+                    pending.append(child)
+                elif isinstance(child, list):
+                    pending.extend(child)
+
+        return None
+
+    @staticmethod
+    def _preflight_execution_steps(steps):
+        """Normalize inherited inputs and block malformed executable steps."""
+        implementation_actions = {
+            "implement",
+            "create",
+            "write",
+            "edit",
+            "modify",
+            "patch",
+            "fix",
+            "delete",
+        }
+        run_actions = {
+            "execute",
+            "run",
+            "run_file",
+            "run_script",
+            "python_run",
+        }
+        command_actions = {
+            "command",
+            "shell",
+            "run_command",
+        }
+
+        normalized_steps = []
+        first_blocker = None
+
+        for raw_step in steps or []:
+            if not isinstance(raw_step, dict):
+                continue
+
+            step = dict(raw_step)
+            action = str(step.get("action") or "").strip().lower()
+            target_file = str(step.get("target_file") or "").strip()
+            target_files = step.get("target_files") or []
+
+            if isinstance(target_files, str):
+                target_files = [target_files]
+
+            if not target_file and isinstance(target_files, list):
+                target_file = next(
+                    (
+                        str(candidate).strip()
+                        for candidate in target_files
+                        if str(candidate or "").strip()
+                    ),
+                    "",
+                )
+
+            if target_file:
+                step["target_file"] = target_file
+
+            execution_file = str(
+                step.get("execution_file")
+                or step.get("run_file")
+                or step.get("script_file")
+                or step.get("test_script")
+                or step.get("test_file")
+                or ""
+            ).strip()
+            command = str(step.get("command") or "").strip()
+
+            if action in run_actions and not execution_file and target_file:
+                execution_file = target_file
+                step["execution_file"] = execution_file
+
+            blocker = ""
+            if action in implementation_actions and not target_file:
+                blocker = (
+                    "Execution is blocked because the file operation has no "
+                    "target file. Add target_file or a non-empty target_files "
+                    "entry to the planned step."
+                )
+            elif action in run_actions and not (execution_file or command):
+                blocker = (
+                    "Execution is blocked because the run step has no "
+                    "execution_file, command, or runnable target file."
+                )
+            elif action in command_actions and not command:
+                blocker = (
+                    "Execution is blocked because the command step has no "
+                    "command to run."
+                )
+
+            if blocker:
+                step["status"] = "blocked"
+                step["state"] = "blocked"
+                step["completion_status"] = "blocked"
+                step["complete"] = False
+                step["waiting"] = False
+                step["error"] = blocker
+                first_blocker = first_blocker or step
+
+            normalized_steps.append(step)
+
+        return normalized_steps, first_blocker
+
+    @staticmethod
+    def _project_progress_signature(project):
+        """Return the persisted task/step state used for no-progress checks."""
+        tasks = project.get("tasks") if isinstance(project, dict) else []
+        if not isinstance(tasks, list):
+            tasks = []
+
+        signature = []
+        for task in tasks:
+            if not isinstance(task, dict):
+                continue
+
+            child_steps = (
+                task.get("steps")
+                or task.get("substeps")
+                or task.get("execution_steps")
+                or []
+            )
+            if not isinstance(child_steps, list):
+                child_steps = []
+
+            signature.append(
+                (
+                    str(task.get("id") or ""),
+                    str(task.get("status") or "").strip().lower(),
+                    tuple(
+                        (
+                            str(step.get("id") or step.get("step_id") or ""),
+                            str(
+                                step.get("status")
+                                or step.get("state")
+                                or ""
+                            ).strip().lower(),
+                        )
+                        for step in child_steps
+                        if isinstance(step, dict)
+                    ),
+                )
+            )
+
+        return tuple(signature)
+
+    def _finalize_no_runnable_work(self, project_id, action):
+        """Persist a truthful terminal or blocked state when nothing can run."""
+        import re
+
+        project = self._get_project(project_id)
+        if not project:
+            return None
+
+        tasks = self._get_tasks(project)
+        success_statuses = {
+            "completed",
+            "complete",
+            "done",
+            "success",
+            "succeeded",
+            "finished",
+        }
+        failure_statuses = {
+            "failed",
+            "failure",
+            "error",
+            "errored",
+            "exception",
+        }
+        cancelled_statuses = {"cancelled", "canceled"}
+        stopped_statuses = {"stopped"}
+        waiting_approval_statuses = {
+            "waiting_approval",
+            "awaiting_approval",
+        }
+        waiting_statuses = {
+            "waiting",
+            "waiting_input",
+            "needs_input",
+        }
+        paused_statuses = {"paused"}
+
+        statuses = [
+            str(task.get("status") or "open").strip().lower()
+            for task in tasks
+        ]
+        failed_tasks = [
+            task
+            for task in tasks
+            if str(task.get("status") or "").strip().lower()
+            in failure_statuses
+        ]
+        unfinished_tasks = [
+            task
+            for task in tasks
+            if str(task.get("status") or "open").strip().lower()
+            not in (
+                success_statuses
+                | failure_statuses
+                | cancelled_statuses
+                | stopped_statuses
+                | waiting_approval_statuses
+                | waiting_statuses
+                | paused_statuses
+            )
+        ]
+
+        def normalize(value):
+            return re.sub(
+                r"[^a-z0-9]+",
+                "_",
+                str(value or "").strip().lower(),
+            ).strip("_")
+
+        completed_references = set()
+        for task in tasks:
+            if str(task.get("status") or "").strip().lower() not in success_statuses:
+                continue
+            for reference in (task.get("id"), task.get("title")):
+                if reference:
+                    completed_references.add(str(reference).strip().lower())
+                    completed_references.add(normalize(reference))
+
+        blocked_ids = []
+        for task in unfinished_tasks:
+            dependencies = task.get("dependencies") or []
+            if not isinstance(dependencies, list):
+                dependencies = []
+            unresolved = [
+                str(dependency).strip()
+                for dependency in dependencies
+                if str(dependency or "").strip()
+                and str(dependency).strip().lower() not in completed_references
+                and normalize(dependency) not in completed_references
+            ]
+
+            existing_blocker = str(
+                task.get("error")
+                or task.get("failure_reason")
+                or task.get("blocked_reason")
+                or ""
+            ).strip()
+
+            if existing_blocker:
+                blocker = existing_blocker
+            elif unresolved:
+                blocker = (
+                    "Unresolved dependencies: "
+                    + ", ".join(unresolved)
+                    + ". The dependency may be missing or cyclic."
+                )
+            else:
+                blocker = ""
+                if not blocker:
+                    nested_steps = (
+                        task.get("steps")
+                        or task.get("substeps")
+                        or task.get("execution_steps")
+                        or []
+                    )
+                    if isinstance(nested_steps, list):
+                        failed_child = next(
+                            (
+                                step
+                                for step in nested_steps
+                                if isinstance(step, dict)
+                                and (
+                                    str(step.get("status") or "").strip().lower()
+                                    in {
+                                        "failed",
+                                        "failure",
+                                        "error",
+                                        "errored",
+                                        "exception",
+                                    }
+                                    or step.get("error")
+                                )
+                            ),
+                            None,
+                        )
+                    else:
+                        failed_child = None
+                    if failed_child is not None:
+                        blocker = str(
+                            failed_child.get("error")
+                            or failed_child.get("failure_reason")
+                            or "Nested execution step failed."
+                        )
+                        task_id = task.get("id")
+                        if task_id:
+                            self.project_workspace_service.update_task_status(
+                                project_id,
+                                task_id,
+                                "failed",
+                                error=blocker,
+                            )
+                            failed_tasks.append(task)
+                        continue
+                    blocker = (
+                        "No executable input is available for this task. Add the "
+                        "required target file, command, execution file, or step input."
+                    )
+
+            task_id = task.get("id")
+            if task_id:
+                self.project_workspace_service.update_task_status(
+                    project_id,
+                    task_id,
+                    "blocked",
+                    error=blocker,
+                )
+                blocked_ids.append(task_id)
+
+        if failed_tasks:
+            final_status = "failed"
+            queue = [task.get("id") for task in failed_tasks if task.get("id")]
+            message = "Project execution ended with failed tasks."
+        elif blocked_ids:
+            final_status = "blocked"
+            queue = blocked_ids
+            message = (
+                "Project execution is blocked because no remaining task is "
+                "runnable. See each blocked task for its blocker."
+            )
+        elif statuses and all(
+            status in success_statuses for status in statuses
+        ):
+            final_status = "completed"
+            queue = []
+            message = "Project execution is complete; no work remains."
+        elif any(status in waiting_approval_statuses for status in statuses):
+            final_status = "waiting_approval"
+            queue = [
+                task.get("id")
+                for task in tasks
+                if str(task.get("status") or "").strip().lower()
+                in waiting_approval_statuses
+                and task.get("id")
+            ]
+            message = "Project execution is waiting for approval."
+        elif any(status in waiting_statuses for status in statuses):
+            final_status = "waiting"
+            queue = [
+                task.get("id")
+                for task in tasks
+                if str(task.get("status") or "").strip().lower()
+                in waiting_statuses
+                and task.get("id")
+            ]
+            message = "Project execution is waiting for required input."
+        elif any(status in paused_statuses for status in statuses):
+            final_status = "paused"
+            queue = [
+                task.get("id")
+                for task in tasks
+                if str(task.get("status") or "").strip().lower()
+                in paused_statuses
+                and task.get("id")
+            ]
+            message = "Project execution is paused."
+        elif any(status in stopped_statuses for status in statuses):
+            final_status = "stopped"
+            queue = []
+            message = "Project execution was stopped."
+        elif statuses and all(
+            status in success_statuses | cancelled_statuses for status in statuses
+        ):
+            final_status = "cancelled"
+            queue = []
+            message = "Project execution was cancelled before all work completed."
+        elif not tasks:
+            final_status = "completed"
+            queue = []
+            message = "Project has no executable work."
+        else:
+            final_status = "blocked"
+            queue = []
+            message = "Project execution is blocked because no work can advance."
+
+        execution = self.project_workspace_service.update_execution_state(
+            project_id,
+            status=final_status,
+            current_task_id=queue[0] if queue else None,
+            current_step=None,
+            queue=queue,
+            failed_tasks=[
+                task.get("id")
+                for task in failed_tasks
+                if task.get("id")
+            ],
+            last_action=action,
+        )
+
+        return {
+            "ok": final_status in {"completed", "waiting", "waiting_approval"},
+            "project_id": project_id,
+            "action": action,
+            "status": final_status,
+            "execution_status": final_status,
+            "execution": execution,
+            "message": message,
+        }
 
     def _build_execution_steps(
         self,
@@ -782,9 +1354,18 @@ class ProjectExecutionController:
             "test_script",
             "test_file",
             "content",
+            "file_content",
             "code",
             "replacement",
             "command",
+            "payload",
+            "tool_name",
+            "tool",
+            "tool_action",
+            "verification_file",
+            "approval_required",
+            "requires_approval",
+            "approval_status",
         )
 
         for task in tasks:
@@ -824,8 +1405,10 @@ class ProjectExecutionController:
                 )
             )
 
-            nested_steps = task.get(
-                "steps"
+            nested_steps = (
+                task.get("steps")
+                or task.get("substeps")
+                or task.get("execution_steps")
             )
 
             # New planner format: execute the real nested steps.
@@ -886,6 +1469,8 @@ class ProjectExecutionController:
                     "steps",
                     None,
                 )
+                step.pop("substeps", None)
+                step.pop("execution_steps", None)
 
                 step.update(
                     {
@@ -932,9 +1517,12 @@ class ProjectExecutionController:
                 # Nested step metadata overrides inherited task metadata.
                 for field_name in execution_fields:
                     if field_name in task_step:
-                        step[field_name] = task_step.get(
-                            field_name
-                        )
+                        nested_value = task_step.get(field_name)
+                        if (
+                            nested_value not in (None, "", [], {})
+                            or isinstance(nested_value, bool)
+                        ):
+                            step[field_name] = nested_value
 
                 # Preserve project context for downstream execution.
                 if "project_context" in task_step:
@@ -953,7 +1541,7 @@ class ProjectExecutionController:
                             field_name
                         )
 
-                print(
+                _execution_debug(
                     "[DEBUG BUILT EXECUTION STEP]",
                     {
                         "id": step.get("id"),
@@ -1003,7 +1591,7 @@ class ProjectExecutionController:
                 ),
             }
 
-        print(
+        _execution_debug(
             "[DEBUG TASKS BEFORE BUILD STEPS]",
             tasks,
             flush=True,
@@ -1013,7 +1601,11 @@ class ProjectExecutionController:
             tasks
         )
 
-        print(
+        steps, blocked_step = self._preflight_execution_steps(
+            steps
+        )
+
+        _execution_debug(
             "[DEBUG FINAL STEPS SENT TO EXECUTOR]",
             steps,
             flush=True,
@@ -1031,6 +1623,37 @@ class ProjectExecutionController:
                     "Execution cannot continue because the selected "
                     "task produced no executable steps."
                 ),
+            }
+
+        if blocked_step is not None:
+            blocker = str(
+                blocked_step.get("error")
+                or "Execution is blocked by missing required input."
+            )
+            return {
+                "ok": False,
+                "status": "blocked",
+                "error": blocker,
+                "execution": {
+                    "status": "blocked",
+                    "complete": False,
+                    "waiting": False,
+                    "current_index": next(
+                        (
+                            index
+                            for index, candidate in enumerate(steps)
+                            if candidate is blocked_step
+                            or candidate.get("id") == blocked_step.get("id")
+                        ),
+                        0,
+                    ),
+                    "current_step": blocked_step,
+                    "steps": steps,
+                    "error": blocker,
+                    "project_id": project_id,
+                    "project_controller_managed": True,
+                },
+                "message": blocker,
             }
 
         task_ids = [
@@ -1072,7 +1695,7 @@ class ProjectExecutionController:
         }
 
         try:
-            print(
+            _execution_debug(
                 "[PROJECT EXECUTION] starting",
                 {
                     "session_id": session_id,
@@ -1083,7 +1706,7 @@ class ProjectExecutionController:
                 flush=True,
             )
 
-            print(
+            _execution_debug(
                 "[DEBUG CONTROLLER STEPS BEFORE START]",
                 steps,
                 flush=True,
@@ -1094,7 +1717,7 @@ class ProjectExecutionController:
             )
 
             if orchestrator is None:
-                print(
+                _execution_debug(
                     "[PROJECT EXECUTION] canonical orchestrator unavailable; "
                     "falling back to legacy execution service",
                     flush=True,
@@ -1109,14 +1732,14 @@ class ProjectExecutionController:
                         session_id=session_id
                     )
 
-                print(
+                _execution_debug(
                     "[PROJECT EXECUTION] legacy executor returned",
                     type(execution),
                     flush=True,
                 )
 
             else:
-                print(
+                _execution_debug(
                     "[PROJECT EXECUTION] routing through canonical orchestrator",
                     {
                         "session_id": session_id,
@@ -1167,14 +1790,7 @@ class ProjectExecutionController:
                     and persisted_task_id in incoming_task_ids
                 )
 
-                print(
-                    "[PROJECT EXECUTION PERSISTED STATE]",
-                    {
-                        ...
-                    }
-                )
-
-                print(
+                _execution_debug(
                     "[PROJECT EXECUTION PERSISTED STATE]",
                     {
                         "status": persisted_state.get(
@@ -1207,7 +1823,7 @@ class ProjectExecutionController:
                     flush=True,
                 )
 
-                if command == "approve":
+                if command == "approve" and persisted_state.get("steps"):
                     # Approval must continue the exact persisted
                     # execution state. Do not replace its steps
                     # with freshly reconstructed project-task steps,
@@ -1217,6 +1833,38 @@ class ProjectExecutionController:
                     execution_state = dict(
                         persisted_state
                     )
+
+                elif command == "approve":
+                    workspace_execution = (
+                        self.project_workspace_service.get_execution_state(
+                            project_id
+                        )
+                        or {}
+                    )
+                    approval_index = workspace_execution.get(
+                        "current_index",
+                        workspace_execution.get("current_step_index", 0),
+                    )
+                    try:
+                        approval_index = int(approval_index)
+                    except (TypeError, ValueError):
+                        approval_index = 0
+                    if approval_index < 0 or approval_index >= len(steps):
+                        approval_index = 0
+
+                    # The project workspace can contain the authoritative
+                    # approval state before the orchestrator state store has
+                    # been initialized. Seed the canonical state from the
+                    # approved project task so the same step is released.
+                    execution_state = {
+                        "steps": steps,
+                        "current_index": approval_index,
+                        "current_step_index": approval_index,
+                        "status": "waiting_approval",
+                        "waiting": True,
+                        "complete": False,
+                        "project_id": project_id,
+                    }
 
                 else:
                     # Continue an existing canonical execution when
@@ -1284,6 +1932,8 @@ class ProjectExecutionController:
                     project_id
                 )
 
+                execution_state["project_controller_managed"] = True
+
                 execution_state["command"] = (
                     command
                 )
@@ -1309,7 +1959,7 @@ class ProjectExecutionController:
                     )
                 )
 
-                print(
+                _execution_debug(
                     "[POST ORCHESTRATOR TASK REFRESH BEFORE]",
                     tasks,
                     flush=True,
@@ -1331,87 +1981,26 @@ class ProjectExecutionController:
                     else []
                 )
 
-                print(
+                _execution_debug(
                     "[POST ORCHESTRATOR TASK REFRESH AFTER]",
                     tasks,
                     flush=True,
                 )
 
-                print(
+                _execution_debug(
                     "[EXECUTOR RETURN DEBUG]",
                     execution,
                     flush=True,
                 )
 
-                print(
+                _execution_debug(
                     "[PROJECT EXECUTION] canonical orchestrator returned",
                     type(execution),
                     flush=True,
                 )
 
-                if isinstance(execution, dict):
-                    canonical_execution = execution
-
-                    for _ in range(3):
-                        if not isinstance(
-                            canonical_execution,
-                            dict,
-                        ):
-                            break
-
-                        if isinstance(
-                            canonical_execution.get("steps"),
-                            list,
-                        ):
-                            break
-
-                        canonical_execution = canonical_execution.get(
-                            "execution"
-                        )
-
-                    if isinstance(
-                        canonical_execution,
-                        dict,
-                    ):
-                        canonical_steps = canonical_execution.get(
-                            "steps"
-                        )
-
-                        if isinstance(
-                            canonical_steps,
-                            list,
-                        ):
-                            self._sync_project_execution(
-                                project_id,
-                                canonical_execution,
-                                command,
-                                tasks=tasks,
-                            )
-
-                result = (
-                    self._execute_with_existing_orchestrator(
-                        project_id=project_id,
-                        tasks=tasks,
-                        command="run_all",
-                    )
-                )
-
-                print(
-                    "[PROJECT EXECUTION RAW RESULT]",
-                    result,
-                    flush=True,
-                )
-
-                result_execution = (
-                    result.get("execution")
-                    or result.get("execution_state")
-                    or {}
-                ) if isinstance(result, dict) else {}
-
-
-
         except Exception as exc:
-            print(
+            _execution_debug(
                 "[PROJECT EXECUTION ERROR]",
                 repr(exc),
                 flush=True,
@@ -1419,6 +2008,8 @@ class ProjectExecutionController:
 
             return {
                 "ok": False,
+                "status": "failed",
+                "task_id": task_ids[0] if task_ids else None,
                 "error": (
                     "Project execution failed: "
                     f"{exc}"
@@ -1431,6 +2022,8 @@ class ProjectExecutionController:
         ):
             return {
                 "ok": False,
+                "status": "failed",
+                "task_id": task_ids[0] if task_ids else None,
                 "error": (
                     "The execution service "
                     "returned no result."
@@ -1533,6 +2126,7 @@ class ProjectExecutionController:
 
         return None
 
+    @_exclusive_project_execution("approve")
     def approve_project(
         self,
         project_id,
@@ -1577,6 +2171,7 @@ class ProjectExecutionController:
 
         if current_task is None:
             return {
+                "ok": False,
                 "project_id": project_id,
                 "action": "approve",
                 "status": "error",
@@ -1586,8 +2181,34 @@ class ProjectExecutionController:
                 ),
             }
 
-        canonical_steps = execution_state.get("steps") or []
-        canonical_index = execution_state.get("current_index", 0)
+        orchestrator_state = {}
+        orchestrator = self.execution_orchestrator_service
+        state_service = getattr(orchestrator, "execution_state_service", None)
+        if state_service is not None and hasattr(
+            state_service,
+            "get_execution_state",
+        ):
+            candidate_state = state_service.get_execution_state(
+                f"project:{project_id}"
+            )
+            if isinstance(candidate_state, dict):
+                orchestrator_state = candidate_state
+
+        canonical_steps = (
+            orchestrator_state.get("steps")
+            or execution_state.get("steps")
+            or []
+        )
+        canonical_index = orchestrator_state.get(
+            "current_index",
+            orchestrator_state.get(
+                "current_step_index",
+                execution_state.get(
+                    "current_index",
+                    execution_state.get("current_step_index", 0),
+                ),
+            ),
+        )
 
         try:
             canonical_index = int(canonical_index)
@@ -1624,7 +2245,13 @@ class ProjectExecutionController:
                 pending_approval_step = candidate_step
 
         if pending_approval_step is None:
+            pending_approval_step = self._pending_approval_step(
+                current_task
+            )
+
+        if pending_approval_step is None:
             return {
+                "ok": False,
                 "project_id": project_id,
                 "action": "approve",
                 "status": "error",
@@ -1648,12 +2275,56 @@ class ProjectExecutionController:
                 and task.get("id") == current_task_id
             ):
                 task = dict(task)
-                nested_steps = (
-                    task.get("steps")
-                    or task.get("substeps")
-                    or task.get("execution_steps")
-                    or []
+                pending_step_id = str(
+                    pending_approval_step.get("id")
+                    or pending_approval_step.get("step_id")
+                    or ""
+                ).strip()
+                nested_step_key = next(
+                    (
+                        key
+                        for key in (
+                            "steps",
+                            "substeps",
+                            "execution_steps",
+                        )
+                        if isinstance(task.get(key), list)
+                        and any(
+                            isinstance(step, dict)
+                            and (
+                                step is pending_approval_step
+                                or str(
+                                    step.get("id")
+                                    or step.get("step_id")
+                                    or ""
+                                ).strip()
+                                == pending_step_id
+                            )
+                            for step in task.get(key)
+                        )
+                    ),
+                    None,
                 )
+                if nested_step_key is None:
+                    nested_step_key = next(
+                        (
+                            key
+                            for key in (
+                                "steps",
+                                "substeps",
+                                "execution_steps",
+                            )
+                            if isinstance(task.get(key), list)
+                            and task.get(key)
+                        ),
+                        None,
+                    )
+                nested_steps = (
+                    task.get(nested_step_key) or []
+                    if nested_step_key
+                    else []
+                )
+                matched_nested_step = False
 
                 if isinstance(nested_steps, list):
                     updated_steps = []
@@ -1675,10 +2346,23 @@ class ProjectExecutionController:
                             updated_steps.append(
                                 approved_step
                             )
+                            matched_nested_step = True
                         else:
                             updated_steps.append(step)
 
-                    task["steps"] = updated_steps
+                    if nested_step_key:
+                        task[nested_step_key] = updated_steps
+
+                if not matched_nested_step:
+                    # A task-level approval is represented as a synthesized
+                    # runtime step. Persist the grant on the task itself so
+                    # rebuilding the canonical step preserves the decision.
+                    task["approved"] = True
+                    task["approval_required"] = False
+                    task["requires_approval"] = False
+                    task["approval_status"] = "approved"
+                    task["approval_was_required"] = True
+                    task.pop("error", None)
 
             updated_tasks.append(task)
 
@@ -1691,6 +2375,7 @@ class ProjectExecutionController:
 
         if persisted_tasks is None:
             return {
+                "ok": False,
                 "project_id": project_id,
                 "action": "approve",
                 "status": "error",
@@ -1710,10 +2395,6 @@ class ProjectExecutionController:
         )
 
 
-        self._materialize_task_files(
-            [current_task]
-        )
-
         result = (
             self._execute_with_existing_orchestrator(
                 project_id=project_id,
@@ -1722,7 +2403,7 @@ class ProjectExecutionController:
             )
         )
 
-        print(
+        _execution_debug(
             "[APPROVE RAW ORCHESTRATOR RESULT]",
             repr(result),
             flush=True,
@@ -1734,41 +2415,65 @@ class ProjectExecutionController:
             "approve",
         )
 
-        published_artifacts = (
-            self._publish_completed_artifacts(
+        persisted_execution = (
+            self.project_workspace_service.get_execution_state(project_id)
+            or {}
+        )
+
+        persisted_status = str(
+            persisted_execution.get("status") or ""
+        ).strip().lower()
+        unsuccessful_statuses = {
+            "failed",
+            "failure",
+            "error",
+            "errored",
+            "exception",
+            "blocked",
+            "cancelled",
+            "canceled",
+        }
+        approval_ok = (
+            isinstance(result, dict)
+            and result.get("ok", False) is not False
+            and persisted_status not in unsuccessful_statuses
+        )
+
+        published_artifacts = []
+        if approval_ok:
+            published_artifacts = self._publish_completed_artifacts(
                 project_id,
                 [current_task],
                 result,
             )
+
+        response_message = (
+            result.get("assistant_message", {}).get("text")
+            if isinstance(result, dict)
+            and isinstance(result.get("assistant_message"), dict)
+            else ""
+        )
+        response_error = str(
+            persisted_execution.get("error")
+            or (result.get("error") if isinstance(result, dict) else "")
+            or ""
         )
 
         return {
+            "ok": approval_ok,
             "project_id": project_id,
             "action": "approve",
+            "status": persisted_status or (
+                "running" if approval_ok else "failed"
+            ),
             "artifacts": published_artifacts,
-            "execution": (
-                self.project_workspace_service
-                .get_execution_state(
-                    project_id
-                )
-            ),
-            "message": (
-                result.get(
-                    "assistant_message",
-                    {},
-                ).get(
-                    "text",
-                    "Execution approved.",
-                )
-                if isinstance(
-                    result,
-                    dict,
-                )
-                else "Execution approved."
-            ),
+            "execution": persisted_execution,
+            "error": response_error or None,
+            "message": response_message or response_error or "Execution approved.",
         }
 
 
+    @_exclusive_project_execution("next_step")
     def continue_project(
         self,
         project_id,
@@ -1796,16 +2501,18 @@ class ProjectExecutionController:
         existing_index = (
             existing_execution.get(
                 "current_index",
-                0,
+                existing_execution.get("current_step_index", 0),
             )
         )
+        if not isinstance(existing_index, int) or existing_index < 0:
+            existing_index = 0
 
         if (
             existing_execution.get("status") == "running"
             and isinstance(existing_steps, list)
             and existing_index < len(existing_steps)
         ):
-            print(
+            _execution_debug(
                 "[PROJECT CONTINUE RESUME EXISTING EXECUTION]",
                 {
                     "current_index": existing_index,
@@ -1818,7 +2525,7 @@ class ProjectExecutionController:
             project
         )
 
-        print(
+        _execution_debug(
             "[PROJECT CONTINUE TASKS BEFORE FILTER]",
             [
                 {
@@ -1868,6 +2575,8 @@ class ProjectExecutionController:
             }
             and (
                 task.get("steps")
+                or task.get("substeps")
+                or task.get("execution_steps")
                 or task.get("command")
                 or task.get("target_file")
                 or task.get("target_files")
@@ -1959,102 +2668,34 @@ class ProjectExecutionController:
         ]
 
         if failed_tasks:
-            final_status = "failed"
-            message = (
-                "Project execution ended with "
-                "failed tasks."
-            )
-
             queue = [
                 task.get("id")
                 for task in failed_tasks
                 if task.get("id")
             ]
-
-            next_task = (
-                failed_tasks[0]
-                if failed_tasks
-                else None
+            execution = self.project_workspace_service.update_execution_state(
+                project_id,
+                status="failed",
+                current_task_id=None,
+                current_step=None,
+                queue=queue,
+                failed_tasks=queue,
+                last_action="continue",
             )
-
-            print(
-                "[PROJECT CONTINUE FAILED]",
-                {
-                    "project_id": project_id,
-                    "failed": len(
-                        failed_tasks
-                    ),
-                    "queue": queue,
-                },
-                flush=True,
-            )
-
-        elif unfinished_tasks:
-            final_status = "blocked"
-            message = (
-                "Project execution is blocked "
-                "because unfinished tasks remain."
-            )
-
-            queue = [
-                task.get("id")
-                for task in unfinished_tasks
-                if task.get("id")
-            ]
-
-            next_task = (
-                unfinished_tasks[0]
-                if unfinished_tasks
-                else None
-            )
-
-            print(
-                "[PROJECT CONTINUE BLOCKED]",
-                {
-                    "project_id": project_id,
-                    "unfinished": len(
-                        unfinished_tasks
-                    ),
-                    "queue": queue,
-                },
-                flush=True,
-            )
-
-        else:
-            final_status = "completed"
-
-            if ignored_tasks:
-                message = (
-                    "Project completed successfully. "
-                    f"Ignored {len(ignored_tasks)} "
-                    "non-executable task(s)."
-                )
-            else:
-                message = (
-                    "Project completed successfully."
-                )
-            queue = []
-            next_task = None
-
-            execution = (
-                self.project_workspace_service
-                .update_execution_state(
-                    project_id,
-                    status=final_status,
-                    current_task_id=None,
-                    current_step=None,
-                    queue=queue,
-                    last_action="continue",
-                )
-            )
-
             return {
+                "ok": False,
                 "project_id": project_id,
                 "action": "continue",
                 "execution": execution,
-                "status": final_status,
-                "message": message,
+                "status": "failed",
+                "message": "Project execution ended with failed tasks.",
             }
+
+        if not runnable:
+            return self._finalize_no_runnable_work(
+                project_id,
+                "continue",
+            )
 
         project_execution = (
             self.project_workspace_service
@@ -2086,15 +2727,13 @@ class ProjectExecutionController:
 
 
         if current_task is None:
-            current_task = (
-                runnable[0]
-                if runnable
-                else next_task
-            )
+            current_task = runnable[0]
 
         current_task_id = (
             current_task.get("id")
         )
+
+        progress_before = self._project_progress_signature(project)
 
         queue = [
             task.get("id")
@@ -2109,6 +2748,7 @@ class ProjectExecutionController:
         self.project_workspace_service.update_execution_state(
             project_id,
             status="running",
+            control_request=None,
             current_task_id=current_task_id,
             current_step=(
                 current_task.get("steps", [{}])[0].get(
@@ -2124,17 +2764,13 @@ class ProjectExecutionController:
             last_action="continue",
         )
 
-        self._materialize_task_files(
-            [current_task]
-        )
-
         result = self._execute_with_existing_orchestrator(
             project_id=project_id,
             tasks=[current_task],
             command="run_step",
         )
 
-        print(
+        _execution_debug(
             "[CONTINUE RAW ORCHESTRATOR RESULT]",
             repr(result),
             flush=True,
@@ -2147,135 +2783,236 @@ class ProjectExecutionController:
             tasks=[current_task],
         )
 
-        execution_result = (
-            result.get("execution")
-            or result.get("execution_state")
-            or result
-            if isinstance(result, dict)
-            else {}
+        persisted_control = (
+            self.project_workspace_service.get_execution_state(project_id)
+            or {}
         )
-
-        execution_status = str(
-            execution_result.get("status")
-            if isinstance(execution_result, dict)
-            else ""
+        persisted_status = str(
+            persisted_control.get("status") or ""
         ).strip().lower()
-
-        if execution_status in {
-            "completed",
-            "complete",
-            "done",
-            "success",
+        control_request = str(
+            persisted_control.get("control_request") or ""
+        ).strip().lower()
+        if persisted_status in {
+            "failed",
+            "blocked",
+            "cancelled",
+            "canceled",
         }:
             self.project_workspace_service.update_execution_state(
                 project_id,
-                status="completed",
-                current_task_id=None,
-                current_step=None,
+                status=(
+                    "cancelled"
+                    if persisted_status in {"cancelled", "canceled"}
+                    else persisted_status
+                ),
+                control_request=None,
                 last_action="continue",
             )
+            control_request = ""
 
-        # The orchestrator may legitimately pause on a task that
-        # requires user input. Never leave that state persisted
-        # as running.
-        if isinstance(result, dict):
-            execution_result = (
-                result.get("execution")
-                or result.get("execution_state")
-                or result
+        if control_request in {"pause", "stop"}:
+            latest_project = self._get_project(project_id) or {}
+            latest_tasks = self._get_tasks(latest_project)
+            all_tasks_completed = bool(latest_tasks) and all(
+                str(task.get("status") or "").strip().lower()
+                in {"completed", "complete", "done", "success", "succeeded"}
+                for task in latest_tasks
+                if isinstance(task, dict)
             )
 
-            execution_status = str(
-                execution_result.get("status")
-                if isinstance(
-                    execution_result,
-                    dict,
-                )
-                else ""
-            ).strip().lower()
-
-            if execution_status in {
-                "waiting",
-                "needs_input",
-                "waiting_input",
-            }:
-                persisted_execution = (
-                    self.project_workspace_service
-                    .get_execution_state(
-                        project_id
-                    )
-                    or {}
-                )
-
-                waiting_task_id = (
-                    persisted_execution.get(
-                        "current_task_id"
-                    )
-                    or current_task_id
-                )
-
-                waiting_queue = (
-                    persisted_execution.get(
-                        "queue"
-                    )
-                    or [waiting_task_id]
-                )
-
+            if all_tasks_completed:
                 self.project_workspace_service.update_execution_state(
                     project_id,
-                    status="waiting",
-                    current_task_id=waiting_task_id,
-                    current_step=current_task.get(
-                        "title",
-                        "Current task",
-                    ),
-                    queue=waiting_queue,
+                    status="completed",
+                    current_task_id=None,
+                    current_step=None,
+                    queue=[],
+                    control_request=None,
                     last_action="continue",
                 )
+                completed_project = self._get_project(project_id) or {}
+                return {
+                    "ok": True,
+                    "project_id": project_id,
+                    "action": "continue",
+                    "status": "completed",
+                    "execution_status": "completed",
+                    "execution": completed_project.get("execution") or {},
+                    "message": "Project execution is complete; no work remains.",
+                }
 
-                print(
-                    "[CONTINUE WAITING STATE RESTORED]",
-                    {
-                        "project_id": project_id,
-                        "task_id": waiting_task_id,
-                        "queue": waiting_queue,
-                        "status": "waiting",
-                    },
-                    flush=True,
+            control_status = (
+                "paused" if control_request == "pause" else "stopped"
+            )
+            return {
+                "ok": False,
+                "project_id": project_id,
+                "action": "continue",
+                "status": control_status,
+                "execution_status": control_status,
+                "execution": persisted_control,
+                "message": f"Project execution is {control_status}.",
+            }
+
+        execution_result = result if isinstance(result, dict) else {}
+        for _ in range(3):
+            nested = (
+                execution_result.get("execution")
+                or execution_result.get("execution_state")
+            )
+            if not isinstance(nested, dict):
+                break
+            execution_result = nested
+
+        execution_status = str(
+            execution_result.get("status") or ""
+        ).strip().lower()
+        execution_failure = self._find_execution_failure(execution_result)
+
+        if execution_failure is not None:
+            failure_status = str(
+                execution_failure.get("status") or "failed"
+            ).strip().lower()
+            final_status = (
+                "blocked"
+                if failure_status == "blocked"
+                else (
+                    "cancelled"
+                    if failure_status in {"cancelled", "canceled"}
+                    else "failed"
+                )
+            )
+            message = str(
+                execution_failure.get("error")
+                or (
+                    "Project execution was cancelled."
+                    if final_status == "cancelled"
+                    else "Project execution failed."
+                )
+            )
+        elif execution_status in {
+            "waiting",
+            "waiting_approval",
+            "awaiting_approval",
+            "needs_input",
+            "waiting_input",
+            "paused",
+        }:
+            final_status = (
+                "paused"
+                if execution_status == "paused"
+                else (
+                    "waiting_approval"
+                    if execution_status in {
+                        "waiting_approval",
+                        "awaiting_approval",
+                    }
+                    else "waiting"
+                )
+            )
+            message = "Project execution is waiting before it can advance."
+        else:
+            refreshed_project = self._get_project(project_id) or {}
+            refreshed_tasks = self._get_tasks(refreshed_project)
+            remaining_runnable = self._runnable_tasks(refreshed_tasks)
+            failed_after = [
+                task
+                for task in refreshed_tasks
+                if str(task.get("status") or "").strip().lower()
+                in {"failed", "error"}
+            ]
+            unfinished_after = [
+                task
+                for task in refreshed_tasks
+                if str(task.get("status") or "").strip().lower()
+                not in {
+                    "completed",
+                    "complete",
+                    "done",
+                    "success",
+                    "cancelled",
+                    "canceled",
+                }
+            ]
+
+            if failed_after:
+                final_status = "failed"
+                message = "Project execution ended with a failed task."
+            elif remaining_runnable:
+                final_status = "ready"
+                message = "One execution step advanced; more work is ready."
+            elif unfinished_after:
+                final_status = "blocked"
+                message = (
+                    "Project execution is blocked by unresolved dependencies "
+                    "or missing executable input."
+                )
+            else:
+                final_status = "completed"
+                message = "Project execution is complete; no work remains."
+
+            if (
+                final_status == "ready"
+                and self._project_progress_signature(refreshed_project)
+                == progress_before
+            ):
+                final_status = "blocked"
+                message = (
+                    "Execution stopped because no progress was possible for "
+                    f"task '{current_task.get('title') or current_task_id}'."
                 )
 
-        published_artifacts = (
-            self._publish_completed_artifacts(
+        active_task_id = (
+            current_task_id
+            if final_status in {
+                "waiting",
+                "waiting_approval",
+                "paused",
+                "blocked",
+            }
+            else None
+        )
+        queue = [active_task_id] if active_task_id else []
+        if final_status in {"failed", "blocked", "cancelled"} and current_task_id:
+            self.project_workspace_service.update_task_status(
+                project_id,
+                current_task_id,
+                final_status,
+                error=message,
+            )
+        persisted_execution = (
+            self.project_workspace_service.update_execution_state(
+                project_id,
+                status=final_status,
+                current_task_id=active_task_id,
+                current_step=(
+                    current_task.get("title")
+                    if active_task_id
+                    else None
+                ),
+                queue=queue,
+                last_action="continue",
+            )
+        )
+
+        published_artifacts = []
+        if final_status in {"ready", "completed"}:
+            published_artifacts = self._publish_completed_artifacts(
                 project_id,
                 [current_task],
                 result,
             )
-        )
 
         return {
+            "ok": final_status not in {"failed", "blocked", "cancelled"},
             "project_id": project_id,
             "action": "continue",
+            "status": final_status,
+            "execution_status": final_status,
             "artifacts": published_artifacts,
-            "execution": (
-                self.project_workspace_service
-                .get_execution_state(
-                    project_id
-                )
-            ),
-            "message": (
-                result.get(
-                    "assistant_message",
-                    {},
-                ).get(
-                    "text",
-                    "Project execution continued.",
-                )
-                if isinstance(
-                    result,
-                    dict,
-                )
-                else "Project execution continued."
-            ),
+            "execution": persisted_execution,
+            "message": message,
         }
 
     def _repair_execution_history(
@@ -2545,6 +3282,7 @@ class ProjectExecutionController:
         return execution
 
 
+    @_exclusive_project_execution("run_all")
     def run_all(
         self,
         project_id,
@@ -2573,7 +3311,12 @@ class ProjectExecutionController:
                 execution_state.get("status") or ""
             ).strip().lower()
 
-            if execution_status == "stopped":
+            if execution_status in {
+                "paused",
+                "stopped",
+                "cancelled",
+                "canceled",
+            }:
                 return {
                     "ok": False,
                     "project_id": project_id,
@@ -2587,6 +3330,17 @@ class ProjectExecutionController:
                         if execution_status == "paused"
                         else "Project execution was stopped."
                     ),
+                }
+
+            if execution_state.get("control_request"):
+                return {
+                    "ok": False,
+                    "project_id": project_id,
+                    "action": "run_all",
+                    "status": execution_status or "paused",
+                    "execution": execution_state,
+                    "artifacts": all_published_artifacts,
+                    "message": "Project execution is awaiting a control action.",
                 }
 
 
@@ -2611,7 +3365,7 @@ class ProjectExecutionController:
             if not isinstance(runnable, list):
                 runnable = []
 
-            print(
+            _execution_debug(
                 "[PROJECT RUN-ALL LOOP]",
                 loop_guard,
                 "RUNNABLE:",
@@ -2624,7 +3378,7 @@ class ProjectExecutionController:
                 ._load_projects()
             )
 
-            print(
+            _execution_debug(
                 "[RUN_ALL PROJECT LOAD DEBUG]",
                 {
                     "type": type(projects).__name__,
@@ -2638,239 +3392,10 @@ class ProjectExecutionController:
                 flush=True,
             )
             if not runnable:
-                try:
-                    failed_tasks = []
-                    unfinished_tasks = []
-
-                    if isinstance(projects, list):
-                        for stored_project in projects:
-
-                            if not isinstance(
-                                stored_project,
-                                dict,
-                            ):
-                                continue
-
-                            if (
-                                stored_project.get("id")
-                                != project_id
-                            ):
-                                continue
-
-                            stored_tasks = (
-                                stored_project.get("tasks")
-                                or []
-                            )
-
-                            for task in stored_tasks:
-                                if not isinstance(task, dict):
-                                    continue
-
-                                task_status = str(
-                                    task.get("status") or ""
-                                ).strip().lower()
-
-                                task_has_execution = bool(
-                                    task.get("steps")
-                                    or task.get("command")
-                                    or task.get("target_file")
-                                    or task.get("target_files")
-                                    or task.get("content")
-                                    or task.get("code")
-                                    or task.get("replacement")
-                                    or task.get("execution_file")
-                                )
-
-                                if not task_has_execution:
-                                    print(
-                                        "[PROJECT CONTINUE NON EXECUTABLE]",
-                                        {
-                                            "title": task.get("title"),
-                                            "status": task_status,
-                                        },
-                                        flush=True,
-                                    )
-
-                                    if task_status not in {
-                                        "completed",
-                                        "complete",
-                                        "done",
-                                        "success",
-                                        "cancelled",
-                                        "canceled",
-                                    }:
-                                        unfinished_tasks.append(task)
-
-                                    continue
-
-                                if task_status in {
-                                    "failed",
-                                    "error",
-                                    "errored",
-                                    "exception",
-                                }:
-                                    failed_tasks.append(task)
-                                elif task_status not in {
-                                    "completed",
-                                    "complete",
-                                    "done",
-                                    "success",
-                                    "cancelled",
-                                    "canceled",
-                                }:
-                                    unfinished_tasks.append(task)
-
-                            if failed_tasks:
-                                final_status = "failed"
-                            elif unfinished_tasks:
-                                final_status = "blocked"
-                            else:
-                                final_status = "completed"
-
-                            stored_project["status"] = (
-                                final_status
-                            )
-                            stored_project["active"] = False
-                            stored_project["updated_at"] = (
-                                datetime.now(
-                                    timezone.utc
-                                ).isoformat()
-                            )
-
-                            self.project_workspace_service._save_projects(
-                                projects
-                            )
-
-                            completed_task_ids = [
-                                task.get("id")
-                                for task in stored_tasks
-                                if isinstance(task, dict)
-                                and str(
-                                    task.get("status") or ""
-                                ).strip().lower()
-                                in {
-                                    "completed",
-                                    "complete",
-                                    "done",
-                                    "success",
-                                }
-                                and task.get("id")
-                            ]
-
-                            completed_step_ids = [
-                                step.get("id")
-                                for task in stored_tasks
-                                if isinstance(task, dict)
-                                for step in task.get("steps", [])
-                                if isinstance(step, dict)
-                                and str(
-                                    step.get("status")
-                                    or step.get("state")
-                                    or step.get("completion_status")
-                                    or ""
-                                ).strip().lower()
-                                in {
-                                    "completed",
-                                    "complete",
-                                    "done",
-                                    "success",
-                                }
-                                and step.get("id")
-                            ]
-
-                            failed_task_ids = [
-                                task.get("id")
-                                for task in stored_tasks
-                                if isinstance(task, dict)
-                                and str(
-                                    task.get("status") or ""
-                                ).strip().lower()
-                                in {
-                                    "failed",
-                                    "error",
-                                }
-                                and task.get("id")
-                            ]
-
-                            execution = (
-                                self.project_workspace_service
-                                .update_execution_state(
-                                    project_id,
-                                    status=final_status,
-                                    current_task_id=None,
-                                    current_step=None,
-                                    queue=[],
-                                    completed_steps=completed_step_ids,
-                                    completed_tasks=completed_task_ids,
-                                    failed_tasks=failed_task_ids,
-                                    last_action="run_all",
-                                )
-                            )
-
-                            return {
-                                "ok": final_status == "completed",
-                                "project_id": project_id,
-                                "status": final_status,
-                                "message": (
-                                    "Project execution completed. "
-                                    "No runnable tasks remain."
-                                    if final_status == "completed"
-                                    else (
-                                        "Project execution stopped. "
-                                        "Failed tasks remain."
-                                        if final_status == "failed"
-                                        else (
-                                            "Project execution stopped. "
-                                            "Unfinished tasks are blocked."
-                                        )
-                                    )
-                                ),
-                                "execution": execution,
-                            }
-
-                except Exception as exc:
-                    print(
-                        "[PROJECT RUN-ALL PROJECT STATUS SYNC ERROR]",
-                        repr(exc),
-                        flush=True,
-                    )
-
-                execution = (
-                    self.project_workspace_service
-                    .update_execution_state(
-                        project_id,
-                        status="blocked",
-                        current_task_id=None,
-                        current_step=None,
-                        queue=[],
-                        last_action="run_all",
-                    )
+                return self._finalize_no_runnable_work(
+                    project_id,
+                    "run_all",
                 )
-
-                return {
-                    "ok": False,
-                    "project_id": project_id,
-                    "status": "blocked",
-                    "message": (
-                        "Project execution stopped. "
-                        "No runnable tasks remain."
-                    ),
-                    "execution": execution,
-                }
-
-                return {
-                    "ok": final_status == "completed",
-                    "project_id": project_id,
-                    "action": "run_all",
-                    "status": final_status,
-                    "artifacts": all_published_artifacts,
-                    "execution": execution,
-                    "debug_last_result": last_result,
-                    "message": (
-                        "Project execution completed. "
-                        "No runnable tasks remain."
-                    ),
-                }
 
             current_task = runnable[0]
 
@@ -2904,7 +3429,7 @@ class ProjectExecutionController:
                 current_task,
                 dict,
             ):
-                print(
+                _execution_debug(
                     "[PROJECT RUN-ALL INVALID TASK]",
                     repr(current_task),
                     flush=True,
@@ -2925,14 +3450,33 @@ class ProjectExecutionController:
                 and task.get("id")
             ]
 
+            progress_before = self._project_progress_signature(
+                fresh_project
+                if isinstance(fresh_project, dict)
+                else project
+            )
+
             # FINAL DEPENDENCY EXECUTION GATE
             dependencies = current_task.get("dependencies", [])
 
             if isinstance(dependencies, list) and dependencies:
-                runnable_check = self._runnable_tasks([current_task])
+                dependency_context_tasks = (
+                    fresh_tasks
+                    if "fresh_tasks" in locals()
+                    and isinstance(fresh_tasks, list)
+                    else tasks
+                )
+                runnable_check = self._runnable_tasks(
+                    dependency_context_tasks
+                )
+                current_task_is_runnable = any(
+                    isinstance(candidate, dict)
+                    and candidate.get("id") == current_task.get("id")
+                    for candidate in runnable_check
+                )
 
-                if not runnable_check:
-                    print(
+                if not current_task_is_runnable:
+                    _execution_debug(
                         "[PROJECT RUN-ALL FINAL DEPENDENCY BLOCK]",
                         {
                             "task": current_task.get("title"),
@@ -2972,10 +3516,6 @@ class ProjectExecutionController:
             )
 
             try:
-                self._materialize_task_files(
-                    [current_task]
-                )
-
                 result = (
                     self._execute_with_existing_orchestrator(
                         project_id=project_id,
@@ -3007,82 +3547,9 @@ class ProjectExecutionController:
                     if isinstance(result, dict)
                     else None
                 )
-                failure_statuses = {
-                    "failed",
-                    "failure",
-                    "error",
-                    "errored",
-                    "exception",
-                    "blocked",
-                }
-
-                if (
-                    result_ok is False
-                    and not (
-                        isinstance(result, dict)
-                        and (
-                            result.get("complete") is True
-                            or (
-                                isinstance(result.get("execution"), dict)
-                                and (
-                                    result["execution"].get("complete") is True
-                                    or result["execution"].get("completed") is True
-                                )
-                            )
-                        )
-                    )
-                    or result_status in failure_statuses
-                ):
-
-                    failure_error = (
-                        (
-                            result_execution.get("error")
-                            if isinstance(result_execution, dict)
-                            else None
-                        )
-                        or (
-                            result.get("error")
-                            if isinstance(result, dict)
-                            else None
-                        )
-                        or (
-                            result.get("message")
-                            if isinstance(result, dict)
-                            else None
-                        )
-                        or "Project task execution failed."
-                    )
-                    current_task["status"] = "failed"
-                    current_task["error"] = str(
-                        failure_error
-                    )
-                    current_task_steps = (
-                        current_task.get("steps")
-                        or current_task.get("substeps")
-                        or current_task.get("execution_steps")
-                        or []
-                    )
-                    if isinstance(current_task_steps, list):
-                        for current_task_step in current_task_steps:
-                            if not isinstance(current_task_step, dict):
-                                continue
-                            current_task_step["status"] = "failed"
-                            current_task_step["state"] = "failed"
-                            current_task_step["completion_status"] = "failed"
-                            current_task_step["error"] = str(
-                                failure_error
-                            )
-                            current_task_step["next_action"] = None
-                            current_task_step["mutation_ready"] = False
                 # Normalize the task result before synchronization.
                 # The execution service may return ok=True even when the
                 # nested execution is waiting for input or approval.
-
-                result_execution = (
-                    result.get("execution")
-                    if isinstance(result, dict)
-                    else {}
-                )
 
                 if not isinstance(result_execution, dict):
                     result_execution = {}
@@ -3092,13 +3559,17 @@ class ProjectExecutionController:
                 if isinstance(nested_execution, dict):
                     result_execution = nested_execution
 
+                execution_failure = self._find_execution_failure(
+                    result_execution
+                )
+
                 execution_status = str(
                     result_execution.get("status")
                     or result_status
                     or ""
                 ).strip().lower()
 
-                print(
+                _execution_debug(
                     "[EXECUTION STATUS DETAILS]",
                     {
                         "result_ok": result_ok,
@@ -3124,7 +3595,9 @@ class ProjectExecutionController:
                     result_execution.get("waiting") is True
                     or execution_status in {
                         "waiting",
+                        "waiting_input",
                         "waiting_approval",
+                        "awaiting_approval",
                         "needs_input",
                         "paused",
                     }
@@ -3135,19 +3608,31 @@ class ProjectExecutionController:
                     in {
                         "needs_input",
                         "waiting",
+                        "waiting_input",
                         "waiting_approval",
+                        "awaiting_approval",
                     }
                 )
 
                 execution_failed = (
-                    (
-                        result_ok is False
-                        and not execution_complete
-                    )
-                    or result_status in failure_statuses
+                    (result_ok is False and not execution_waiting)
+                    or execution_failure is not None
+                    or result_status in {
+                        "failed",
+                        "failure",
+                        "error",
+                        "errored",
+                        "exception",
+                        "blocked",
+                        "cancelled",
+                        "canceled",
+                    }
                     or execution_status in {
                         "failed",
+                        "failure",
                         "error",
+                        "errored",
+                        "exception",
                         "blocked",
                         "cancelled",
                         "canceled",
@@ -3160,7 +3645,7 @@ class ProjectExecutionController:
                     and execution_complete
                 )
 
-                print(
+                _execution_debug(
                     "[PROJECT RUN-ALL RESULT CLASSIFICATION]",
                     {
                         "project_id": project_id,
@@ -3177,21 +3662,92 @@ class ProjectExecutionController:
                 )
 
                 if execution_failed:
+                    failure_status = str(
+                        (
+                            execution_failure.get("status")
+                            if isinstance(execution_failure, dict)
+                            else ""
+                        )
+                        or execution_status
+                        or result_status
+                        or "failed"
+                    ).strip().lower()
+                    terminal_status = (
+                        "blocked"
+                        if failure_status == "blocked"
+                        else (
+                            "cancelled"
+                            if failure_status in {"cancelled", "canceled"}
+                            else "failed"
+                        )
+                    )
+                    failure_error = (
+                        execution_failure.get("error")
+                        if execution_failure
+                        else None
+                    )
+                    if not failure_error and isinstance(result, dict):
+                        failure_error = (
+                            result_execution.get("error")
+                            or result.get("error")
+                            or result.get("message")
+                        )
+                    failure_error = (
+                        failure_error or "Project task execution failed."
+                    )
                     current_task_id = str(
                         current_task.get("id") or ""
                     ).strip()
 
+                    current_task["status"] = terminal_status
+                    current_task["error"] = str(failure_error)
+
                     if current_task_id:
-                        self.project_workspace_service.update_task_status(
-                            project_id,
-                            current_task_id,
-                            "failed",
+                        failed_node = (
+                            execution_failure.get("node")
+                            if isinstance(execution_failure, dict)
+                            else None
                         )
+                        failed_node_task_id = str(
+                            failed_node.get("task_id") or ""
+                        ).strip() if isinstance(failed_node, dict) else ""
+                        failed_step_id = str(
+                            (
+                                failed_node.get("step_id")
+                                or failed_node.get("id")
+                            )
+                            or ""
+                        ).strip() if isinstance(failed_node, dict) else ""
+
+                        step_update = None
+                        if (
+                            failed_step_id
+                            and failed_node_task_id == current_task_id
+                        ):
+                            step_update = (
+                                self.project_workspace_service
+                                .update_nested_step_status(
+                                    project_id,
+                                    current_task_id,
+                                    failed_step_id,
+                                    terminal_status,
+                                    result=str(failure_error),
+                                    error=str(failure_error),
+                                )
+                            )
+
+                        if not isinstance(step_update, dict):
+                            self.project_workspace_service.update_task_status(
+                                project_id,
+                                current_task_id,
+                                terminal_status,
+                                error=str(failure_error),
+                            )
 
                     execution = (
                         self.project_workspace_service.update_execution_state(
                             project_id,
-                            status="failed",
+                            status=terminal_status,
                             current_task_id=None,
                             current_step=None,
                             queue=[],
@@ -3203,12 +3759,17 @@ class ProjectExecutionController:
                         "ok": False,
                         "project_id": project_id,
                         "action": "run_all",
-                        "status": "failed",
+                        "status": terminal_status,
                         "execution": execution,
                         "debug_last_result": result,
                         "message": (
-                            "Project execution failed while processing "
-                            "a task."
+                            "Project execution is blocked by missing or "
+                            "unresolved task input."
+                            if terminal_status == "blocked"
+                            else (
+                                "Project execution failed while processing "
+                                "a task."
+                            )
                         ),
                     }
 
@@ -3275,13 +3836,13 @@ class ProjectExecutionController:
                                     ),
                                 )
                             except Exception as activity_error:
-                                print(
+                                _execution_debug(
                                     "[PROJECT ACTIVITY LOG ERROR]",
                                     str(activity_error),
                                     flush=True,
                                 )
 
-                            print(
+                            _execution_debug(
                                 "[PROJECT RUN-ALL TASK COMPLETED]",
                                 {
                                     "project_id": project_id,
@@ -3299,7 +3860,7 @@ class ProjectExecutionController:
                                 f"could not be persisted: {exc}"
                             )
 
-                            print(
+                            _execution_debug(
                                 "[PROJECT RUN-ALL TASK COMPLETION ERROR]",
                                 {
                                     "project_id": project_id,
@@ -3320,6 +3881,7 @@ class ProjectExecutionController:
                                         project_id,
                                         current_task_id,
                                         "failed",
+                                        error=error_message,
                                     )
                                 )
 
@@ -3364,13 +3926,13 @@ class ProjectExecutionController:
                                         ),
                                     )
                                 except Exception as activity_error:
-                                    print(
+                                    _execution_debug(
                                         "[PROJECT ACTIVITY LOG ERROR]",
                                         str(activity_error),
                                         flush=True,
                                     )
 
-                                print(
+                                _execution_debug(
                                     "[PROJECT RUN-ALL TASK FAILURE PERSISTED]",
                                     {
                                         "project_id": project_id,
@@ -3383,7 +3945,7 @@ class ProjectExecutionController:
                                 )
 
                             except Exception as failure_exc:
-                                print(
+                                _execution_debug(
                                     "[PROJECT RUN-ALL TASK FAILURE "
                                     "PERSISTENCE ERROR]",
                                     {
@@ -3393,7 +3955,7 @@ class ProjectExecutionController:
                                     },
                                     flush=True,
                                 )
-                                print(
+                                _execution_debug(
                                     "[PROJECT RUN-ALL TASK FAILURE "
                                     "PERSISTENCE ERROR]",
                                     {
@@ -3412,7 +3974,7 @@ class ProjectExecutionController:
 
                 last_result = result
 
-                print(
+                _execution_debug(
                     "[PROJECT RUN-ALL TASK RESULT]",
                     {
                         "task_id": current_task.get("id"),
@@ -3471,7 +4033,7 @@ class ProjectExecutionController:
                     exc
                 )
 
-                print(
+                _execution_debug(
                     "[PROJECT RUN-ALL TASK ERROR]",
                     {
                         "task_id": current_task.get("id"),
@@ -3498,7 +4060,7 @@ class ProjectExecutionController:
                         "run_all",
                     )
                 except Exception as sync_exc:
-                    print(
+                    _execution_debug(
                         "[PROJECT RUN-ALL FAILURE SYNC ERROR]",
                         repr(sync_exc),
                         flush=True,
@@ -3524,6 +4086,43 @@ class ProjectExecutionController:
                 list,
             ):
                 refreshed_tasks = []
+
+            progress_after = self._project_progress_signature(
+                refreshed_project
+            )
+
+            if progress_after == progress_before:
+                no_progress_error = (
+                    "Execution stopped because no progress was possible for "
+                    f"task '{current_task.get('title') or current_task_id}'."
+                )
+                current_task["status"] = "blocked"
+                current_task["error"] = no_progress_error
+                self.project_workspace_service.update_task_status(
+                    project_id,
+                    current_task_id,
+                    "blocked",
+                    error=no_progress_error,
+                )
+                execution = (
+                    self.project_workspace_service.update_execution_state(
+                        project_id,
+                        status="blocked",
+                        current_task_id=current_task_id,
+                        current_step=current_task.get("title") or current_task_id,
+                        queue=[current_task_id] if current_task_id else [],
+                        last_action="run_all",
+                    )
+                )
+                return {
+                    "ok": False,
+                    "project_id": project_id,
+                    "action": "run_all",
+                    "status": "blocked",
+                    "execution": execution,
+                    "debug_last_result": last_result,
+                    "message": no_progress_error,
+                }
 
             refreshed_runnable = (
                 self._runnable_tasks(
@@ -3580,6 +4179,8 @@ class ProjectExecutionController:
                 "complete",
                 "done",
                 "success",
+                "succeeded",
+                "finished",
             }
 
             unresolved_statuses = {
@@ -3622,7 +4223,7 @@ class ProjectExecutionController:
             else:
                 final_status = "blocked"
 
-            print(
+            _execution_debug(
                 "[PROJECT RUN-ALL FINAL CLASSIFICATION]",
                 {
                     "project_id": project_id,
@@ -3665,26 +4266,50 @@ class ProjectExecutionController:
                 ),
             }
 
-        execution = (
-            self.project_workspace_service
-            .get_execution_state(
-                project_id
+        remaining_task = (
+            refreshed_runnable[0]
+            if refreshed_runnable
+            and isinstance(refreshed_runnable[0], dict)
+            else {}
+        )
+        remaining_task_id = str(
+            remaining_task.get("id") or ""
+        ).strip()
+        safety_error = (
+            "Project execution stopped after reaching "
+            f"the {max_loops}-cycle safety limit."
+        )
+        if remaining_task_id:
+            self.project_workspace_service.update_task_status(
+                project_id,
+                remaining_task_id,
+                "blocked",
+                error=safety_error,
             )
-            or {}
+        execution = self.project_workspace_service.update_execution_state(
+            project_id,
+            status="blocked",
+            current_task_id=remaining_task_id or None,
+            current_step=(
+                remaining_task.get("title") or remaining_task_id
+            ),
+            queue=[
+                task.get("id")
+                for task in refreshed_runnable
+                if isinstance(task, dict) and task.get("id")
+            ],
+            last_action="run_all",
         )
 
         return {
             "ok": False,
             "project_id": project_id,
             "action": "run_all",
-            "status": "running",
+            "status": "blocked",
             "artifacts": all_published_artifacts,
             "execution": execution,
             "debug_last_result": last_result,
-            "message": (
-                "Project execution stopped after reaching "
-                f"the {max_loops}-cycle safety limit."
-            ),
+            "message": safety_error,
         }
     def pause_project(
         self,
@@ -3697,44 +4322,48 @@ class ProjectExecutionController:
         if not project:
             return None
 
+        current_execution = (
+            self.project_workspace_service.get_execution_state(project_id)
+            or {}
+        )
+        current_status = str(
+            current_execution.get("status") or ""
+        ).strip().lower()
+        if current_status in {
+            "completed",
+            "complete",
+            "done",
+            "success",
+            "succeeded",
+            "finished",
+            "failed",
+            "failure",
+            "error",
+            "blocked",
+            "cancelled",
+            "canceled",
+            "stopped",
+        }:
+            return {
+                "ok": False,
+                "project_id": project_id,
+                "action": "pause",
+                "status": current_status,
+                "execution": current_execution,
+                "message": (
+                    "Project execution is already in terminal state "
+                    f"'{current_status}'."
+                ),
+            }
+
         execution = (
             self.project_workspace_service
             .update_execution_state(
                 project_id,
                 status="paused",
+                control_request="pause",
                 last_action="pause",
             )
-        )
-
-        projects = (
-            self.project_workspace_service
-            ._load_projects()
-        )
-
-        for stored_project in projects:
-            if not isinstance(
-                stored_project,
-                dict,
-            ):
-                continue
-
-            if stored_project.get("id") != project_id:
-                continue
-
-            stored_project["status"] = "paused"
-            stored_project["active"] = False
-            stored_project["updated_at"] = (
-                execution.get("updated_at")
-                if isinstance(
-                    execution,
-                    dict,
-                )
-                else stored_project.get("updated_at")
-            )
-            break
-
-        self.project_workspace_service._save_projects(
-            projects
         )
 
         return {
@@ -3757,44 +4386,47 @@ class ProjectExecutionController:
         if not project:
             return None
 
+        current_execution = (
+            self.project_workspace_service.get_execution_state(project_id)
+            or {}
+        )
+        current_status = str(
+            current_execution.get("status") or ""
+        ).strip().lower()
+        if current_status in {
+            "completed",
+            "complete",
+            "done",
+            "success",
+            "succeeded",
+            "finished",
+            "failed",
+            "failure",
+            "error",
+            "blocked",
+            "cancelled",
+            "canceled",
+        }:
+            return {
+                "ok": False,
+                "project_id": project_id,
+                "action": "stop",
+                "status": current_status,
+                "execution": current_execution,
+                "message": (
+                    "Project execution is already in terminal state "
+                    f"'{current_status}'."
+                ),
+            }
+
         execution = (
             self.project_workspace_service
             .update_execution_state(
                 project_id,
                 status="stopped",
+                control_request="stop",
                 last_action="stop",
             )
-        )
-
-        projects = (
-            self.project_workspace_service
-            ._load_projects()
-        )
-
-        for stored_project in projects:
-            if not isinstance(
-                stored_project,
-                dict,
-            ):
-                continue
-
-            if stored_project.get("id") != project_id:
-                continue
-
-            stored_project["status"] = "stopped"
-            stored_project["active"] = False
-            stored_project["updated_at"] = (
-                execution.get("updated_at")
-                if isinstance(
-                    execution,
-                    dict,
-                )
-                else stored_project.get("updated_at")
-            )
-            break
-
-        self.project_workspace_service._save_projects(
-            projects
         )
 
         return {
@@ -3810,12 +4442,31 @@ class ProjectExecutionController:
         project_id,
         action,
     ):
-        action = str(
+        requested_action = str(
             action or ""
         ).strip().lower()
 
+        action = {
+            "next": "next_step",
+            "next_task": "next_step",
+            "run_next": "next_step",
+            "resume": "continue",
+        }.get(
+            requested_action,
+            requested_action,
+        )
+
         if action not in self.VALID_ACTIONS:
-            return None
+            return {
+                "ok": False,
+                "project_id": project_id,
+                "action": requested_action,
+                "status": "invalid_action",
+                "message": (
+                    f"Unsupported project execution action: "
+                    f"{requested_action or '<empty>'}."
+                ),
+            }
 
         if action == "continue":
             return self.continue_project(
@@ -4104,7 +4755,7 @@ class ProjectExecutionController:
         published = []
         published_task_ids = set()
 
-        print(
+        _execution_debug(
             "[PROJECT ARTIFACT PUBLISH START]",
             {
                 "project_id": project_id,
@@ -4148,7 +4799,7 @@ class ProjectExecutionController:
             )
 
             if not task_id:
-                print(
+                _execution_debug(
                     "[PROJECT ARTIFACT NO TASK ID]",
                     step,
                     flush=True,
@@ -4199,7 +4850,7 @@ class ProjectExecutionController:
                         break
 
             if not task:
-                print(
+                _execution_debug(
                     "[PROJECT ARTIFACT TASK NOT FOUND]",
                     {
                         "task_id": task_id,
@@ -4211,7 +4862,7 @@ class ProjectExecutionController:
                 )
                 continue
 
-            print(
+            _execution_debug(
                 "[PROJECT ARTIFACT STEP DATA]",
                 {
                     "task_id": task_id,
@@ -4241,7 +4892,7 @@ class ProjectExecutionController:
                 ),
             }
 
-            print(
+            _execution_debug(
                 "[PROJECT ARTIFACT EXTRACTED RESULT]",
                 {
                     "task_id": task_id,
@@ -4272,7 +4923,7 @@ class ProjectExecutionController:
                     task_id
                 )
 
-                print(
+                _execution_debug(
                     "[PROJECT ARTIFACT PUBLISHED]",
                     {
                         "task_id": task_id,
@@ -4283,7 +4934,7 @@ class ProjectExecutionController:
                     flush=True,
                 )
             else:
-                print(
+                _execution_debug(
                     "[PROJECT ARTIFACT NOT CREATED]",
                     {
                         "task_id": task_id,
@@ -4307,7 +4958,7 @@ class ProjectExecutionController:
         tasks=None,
     ):
 
-        print(
+        _execution_debug(
             "[PROJECT SYNC ENTRY]",
             {
                 "project_id": project_id,
@@ -4365,6 +5016,11 @@ class ProjectExecutionController:
                 list,
             ):
                 execution = result
+            elif any(
+                key in result
+                for key in ("status", "error", "task_id", "completion_status")
+            ):
+                execution = result
             else:
                 return
 
@@ -4410,7 +5066,7 @@ class ProjectExecutionController:
                 current_task_id
                 and current_task_id not in runnable_task_ids
             ):
-                print(
+                _execution_debug(
                     "[PROJECT STALE EXECUTION POINTER RESET]",
                     {
                         "stale_task_id": current_task_id,
@@ -4436,7 +5092,7 @@ class ProjectExecutionController:
         ):
             steps = []
 
-        print(
+        _execution_debug(
             "[PROJECT SYNC RAW STEPS]",
             {
                 "count": len(steps),
@@ -4469,20 +5125,48 @@ class ProjectExecutionController:
             and isinstance(completed_steps, list)
             and completed_steps
         ):
-            steps = [
-                {
-                    "task_id": task.get("id"),
-                    "step_id": completed_step_id,
-                    "id": completed_step_id,
-                    "status": "completed",
-                }
-                for task in tasks
-                if isinstance(task, dict)
+            completed_step_ids = {
+                str(completed_step_id).strip()
                 for completed_step_id in completed_steps
-                if completed_step_id
-            ]
+                if str(completed_step_id or "").strip()
+            }
+            steps = []
+            for task in tasks:
+                if not isinstance(task, dict):
+                    continue
+                task_id = str(task.get("id") or "").strip()
+                nested_steps = task.get("steps") or []
+                matched_nested_step = False
+                if isinstance(nested_steps, list):
+                    for nested_step in nested_steps:
+                        if not isinstance(nested_step, dict):
+                            continue
+                        nested_id = str(
+                            nested_step.get("id")
+                            or nested_step.get("step_id")
+                            or ""
+                        ).strip()
+                        if nested_id in completed_step_ids:
+                            steps.append(
+                                {
+                                    "task_id": task_id,
+                                    "step_id": nested_id,
+                                    "id": nested_id,
+                                    "status": "completed",
+                                }
+                            )
+                            matched_nested_step = True
 
-            print(
+                if task_id in completed_step_ids and not matched_nested_step:
+                    steps.append(
+                        {
+                            "task_id": task_id,
+                            "id": task_id,
+                            "status": "completed",
+                        }
+                    )
+
+            _execution_debug(
                 "[PROJECT SYNC COMPLETED STEP FALLBACK]",
                 {
                     "project_id": project_id,
@@ -4536,7 +5220,7 @@ class ProjectExecutionController:
                 }
             ]
 
-            print(
+            _execution_debug(
                 "[PROJECT ARTIFACT FALLBACK STEPS]",
                 {
                     "project_id": project_id,
@@ -4577,7 +5261,7 @@ class ProjectExecutionController:
             )
 
             if not task_id:
-                print(
+                _execution_debug(
                     "[PROJECT SYNC STEP SKIPPED]",
                     {
                         "reason": "missing_task_id",
@@ -4608,7 +5292,7 @@ class ProjectExecutionController:
                 status,
             )
 
-            print(
+            _execution_debug(
                 "[PROJECT SYNC STEP]",
                 {
                     "task_id": task_id,
@@ -4626,7 +5310,7 @@ class ProjectExecutionController:
                 "failed",
                 "blocked",
             }:
-                print(
+                _execution_debug(
                     "[PROJECT SYNC STEP IGNORED]",
                     {
                         "task_id": task_id,
@@ -4645,7 +5329,7 @@ class ProjectExecutionController:
 
                 update_result = None
 
-                print(
+                _execution_debug(
                     "[NESTED STEP ID MATCH DEBUG]",
                     {
                         "task_id": task_id,
@@ -4685,6 +5369,8 @@ class ProjectExecutionController:
                             project_id,
                             task_id,
                             normalized_status,
+                            result=step.get("result"),
+                            error=step.get("error"),
                         )
                     )
 
@@ -4692,7 +5378,7 @@ class ProjectExecutionController:
                     task_id
                 )
 
-                print(
+                _execution_debug(
                     "[PROJECT SYNC TASK UPDATED]",
                     {
                         "project_id": project_id,
@@ -4704,7 +5390,7 @@ class ProjectExecutionController:
                 )
 
             except Exception as exc:
-                print(
+                _execution_debug(
                     "[PROJECT SYNC TASK UPDATE ERROR]",
                     {
                         "project_id": project_id,
@@ -4715,7 +5401,7 @@ class ProjectExecutionController:
                     flush=True,
                 )
 
-        print(
+        _execution_debug(
             "[PROJECT SYNC TASK IDS]",
             synced_task_ids,
             flush=True,
@@ -4738,14 +5424,71 @@ class ProjectExecutionController:
             latest_tasks
         )
 
-        execution_status = str(
-            execution.get(
-                "status",
-                "",
-            )
+        persisted_control_state = (
+            self.project_workspace_service.get_execution_state(project_id)
+            or {}
+        )
+        control_request = str(
+            persisted_control_state.get("control_request") or ""
+        ).strip().lower()
+        raw_execution_status = str(
+            execution.get("status") or ""
         ).strip().lower()
 
-        print(
+        if (
+            control_request in {"pause", "stop"}
+            and raw_execution_status
+            not in {
+                "failed",
+                "failure",
+                "error",
+                "errored",
+                "exception",
+                "blocked",
+                "cancelled",
+                "canceled",
+            }
+        ):
+            all_tasks_completed = bool(latest_tasks) and all(
+                str(task.get("status") or "").strip().lower()
+                in {"completed", "complete", "done", "success", "succeeded"}
+                for task in latest_tasks
+                if isinstance(task, dict)
+            )
+
+            if all_tasks_completed:
+                self.project_workspace_service.update_execution_state(
+                    project_id,
+                    status="completed",
+                    current_task_id=None,
+                    current_step=None,
+                    queue=[],
+                    control_request=None,
+                    last_action=action,
+                )
+                self._get_project(project_id)
+                return
+
+            control_status = (
+                "paused" if control_request == "pause" else "stopped"
+            )
+            self.project_workspace_service.update_execution_state(
+                project_id,
+                status=control_status,
+                control_request=control_request,
+                last_action=control_request,
+            )
+            return
+
+        execution_status = raw_execution_status
+        execution_status = {
+            "failure": "failed",
+            "error": "failed",
+            "errored": "failed",
+            "exception": "failed",
+        }.get(execution_status, execution_status)
+
+        _execution_debug(
             "[PROJECT SYNC DECISION]",
             {
                 "project_id": project_id,
@@ -4765,16 +5508,55 @@ class ProjectExecutionController:
             flush=True,
         )
 
-        projects = (
-            self.project_workspace_service._load_projects()
-        )
-
-
         # A genuine failed/blocked execution stops the project.
         if execution_status in {
             "failed",
             "blocked",
+            "cancelled",
+            "canceled",
         }:
+            terminal_execution_status = (
+                "cancelled"
+                if execution_status in {"cancelled", "canceled"}
+                else execution_status
+            )
+            if not synced_task_ids:
+                candidate_task_id = str(
+                    execution.get("task_id")
+                    or result.get("task_id")
+                    or (
+                        tasks[0].get("id")
+                        if tasks and isinstance(tasks[0], dict)
+                        else ""
+                    )
+                    or persisted_control_state.get("current_task_id")
+                    or ""
+                ).strip()
+                failure_error = str(
+                    execution.get("error")
+                    or result.get("error")
+                    or result.get("message")
+                    or (
+                        "Project execution is blocked."
+                        if terminal_execution_status == "blocked"
+                        else (
+                            "Project execution was cancelled."
+                            if terminal_execution_status == "cancelled"
+                            else "Project execution failed."
+                        )
+                    )
+                )
+                if candidate_task_id:
+                    self.project_workspace_service.update_task_status(
+                        project_id,
+                        candidate_task_id,
+                        terminal_execution_status,
+                        error=failure_error,
+                    )
+                    synced_task_ids.append(candidate_task_id)
+                    project = self._get_project(project_id) or {}
+                    latest_tasks = self._get_tasks(project)
+                    remaining_tasks = self._runnable_tasks(latest_tasks)
 
             queue = [
                 task.get("id")
@@ -4806,7 +5588,7 @@ class ProjectExecutionController:
             execution = (
                 self.project_workspace_service.update_execution_state(
                     project_id,
-                    status=execution_status,
+                    status=terminal_execution_status,
                     current_task_id=(
                         next_task.get("id")
                         if next_task
@@ -4822,52 +5604,20 @@ class ProjectExecutionController:
                     ),
                     queue=queue,
                     failed_tasks=failed_task_ids,
+                    control_request=None,
                     last_action=action,
                 )
             )
 
-            projects = (
-                self.project_workspace_service._load_projects()
-            )
-
-        for project in projects:
-            if project.get("id") != project_id:
-                continue
-
-            persisted_execution_status = str(
-                execution_status or ""
-            ).strip().lower()
-
-            if persisted_execution_status == "completed":
-                project["status"] = "completed"
-                project["active"] = False
-
-            elif persisted_execution_status == "failed":
-                project["status"] = "failed"
-                project["active"] = False
-
-            elif persisted_execution_status == "blocked":
-                project["status"] = "blocked"
-                project["active"] = False
-
-            else:
-                project["status"] = "active"
-                project["active"] = True
-
-            project["updated_at"] = datetime.now(
-                timezone.utc
-            ).isoformat()
-
-            self.project_workspace_service._save_projects(
-                projects
-            )
-            break
-
+            self._get_project(project_id)
             return
 
 
         # Approval must remain explicitly waiting for approval.
-        if execution_status == "waiting_approval":
+        if execution_status in {
+            "waiting_approval",
+            "awaiting_approval",
+        }:
             queue = [
                 task.get("id")
                 for task in remaining_tasks
@@ -4931,7 +5681,7 @@ class ProjectExecutionController:
                 and task.get("id")
             ]
 
-            print(
+            _execution_debug(
                 "[PROJECT SYNC WAITING]",
                 {
                     "project_id": project_id,
@@ -5069,7 +5819,7 @@ class ProjectExecutionController:
                     and task.get("id")
                 ]
 
-                print(
+                _execution_debug(
                     "[PROJECT FAILURE PERSIST DEBUG]",
                     {
                         "failed_task_ids": failed_task_ids,
@@ -5130,7 +5880,7 @@ class ProjectExecutionController:
                 else "running"
             )
 
-            print(
+            _execution_debug(
                 "[PROJECT SYNC CONTINUE]",
                 {
                     "project_id": project_id,
@@ -5165,7 +5915,12 @@ class ProjectExecutionController:
                 step.get("id")
                 for task in latest_tasks
                 if isinstance(task, dict)
-                for step in task.get("steps", [])
+                for step in (
+                    task.get("steps")
+                    or task.get("substeps")
+                    or task.get("execution_steps")
+                    or []
+                )
                 if isinstance(step, dict)
                 and str(
                     step.get("status")
@@ -5213,6 +5968,8 @@ class ProjectExecutionController:
             "complete",
             "done",
             "success",
+            "succeeded",
+            "finished",
         }
 
         task_statuses = [
@@ -5236,7 +5993,7 @@ class ProjectExecutionController:
             for status in task_statuses
         )
 
-        print(
+        _execution_debug(
             "[PROJECT SYNC FINAL DECISION]",
             {
                 "project_id": project_id,
@@ -5262,7 +6019,12 @@ class ProjectExecutionController:
             step.get("id")
             for task in latest_tasks
             if isinstance(task, dict)
-            for step in task.get("steps", [])
+            for step in (
+                task.get("steps")
+                or task.get("substeps")
+                or task.get("execution_steps")
+                or []
+            )
             if isinstance(step, dict)
             and str(
                 step.get("status")
@@ -5279,7 +6041,7 @@ class ProjectExecutionController:
             and step.get("id")
         ]
 
-        print(
+        _execution_debug(
             "[PROJECT FAILED TASK DEBUG]",
             {
                 "latest_tasks": [
@@ -5309,7 +6071,6 @@ class ProjectExecutionController:
         ]
 
         if all_tasks_completed:
-
             self.project_workspace_service.update_execution_state(
                 project_id,
                 status="completed",
@@ -5319,27 +6080,11 @@ class ProjectExecutionController:
                 completed_tasks=completed_task_ids,
                 completed_steps=completed_step_ids,
                 failed_tasks=failed_task_ids,
+                control_request=None,
                 last_action=action,
             )
-
-            projects = (
-                self.project_workspace_service._load_projects()
-            )
-
-            for project in projects:
-                if project.get("id") != project_id:
-                    continue
-
-                project["status"] = "completed"
-                project["active"] = False
-                project["updated_at"] = datetime.now(
-                    timezone.utc
-                ).isoformat()
-
-            self.project_workspace_service._save_projects(
-                projects
-            )
-
+            self._get_project(project_id)
+            return
         else:
             # No runnable tasks remain, but the project is not
             # successfully complete. Preserve the actual task
@@ -5356,7 +6101,7 @@ class ProjectExecutionController:
                 else "blocked"
             )
 
-            print(
+            _execution_debug(
                 "[PROJECT SYNC NOT COMPLETE]",
                 {
                     "project_id": project_id,
@@ -5376,100 +6121,11 @@ class ProjectExecutionController:
                 completed_tasks=completed_task_ids,
                 completed_steps=completed_step_ids,
                 failed_tasks=failed_task_ids,
+                control_request=None,
                 last_action=action,
             )
-
-            projects = (
-                self.project_workspace_service._load_projects()
-            )
-
-            for project in projects:
-                if project.get("id") != project_id:
-                    continue
-
-                project["status"] = final_status
-                project["active"] = False
-                project["updated_at"] = datetime.now(
-                    timezone.utc
-                ).isoformat()
-
-            self.project_workspace_service._save_projects(
-                projects
-            )
-
-        if execution_status not in {
-            "failed",
-            "blocked",
-            "completed",
-            "complete",
-            "done",
-            "success",
-        }:
-            self.project_workspace_service.update_execution_state(
-                project_id,
-                status=(
-                    "waiting_approval"
-                    if execution_status == "waiting_approval"
-                    else "paused"
-                ),
-                current_task_id=None,
-                current_step="",
-                queue=[],
-                last_action=action,
-            )
-
-            self.project_workspace_service.update_execution_state(
-                project_id,
-                status=(
-                    "waiting_approval"
-                    if execution_status == "waiting_approval"
-                    else "paused"
-                ),
-                current_task_id=None,
-                current_step="",
-                queue=[],
-                last_action=action,
-            )
-
-        # Persist the top-level project status consistently with the
-        # execution-state decision. Never force completion here.
-        projects = (
-            self.project_workspace_service._load_projects()
-        )
-
-        for project in projects:
-            if project.get("id") != project_id:
-                continue
-
-            persisted_execution_status = str(
-                execution_status or ""
-            ).strip().lower()
-
-            if persisted_execution_status == "completed":
-                project["status"] = "completed"
-                project["active"] = False
-
-            elif persisted_execution_status == "failed":
-                project["status"] = "failed"
-                project["active"] = False
-
-            elif persisted_execution_status == "blocked":
-                project["status"] = "blocked"
-                project["active"] = False
-
-            else:
-                project["status"] = "active"
-                project["active"] = True
-
-            project["updated_at"] = datetime.now(
-                timezone.utc
-            ).isoformat()
-
-            break
-
-        self.project_workspace_service._save_projects(
-            projects
-        )
+            self._get_project(project_id)
+            return
 
 
 

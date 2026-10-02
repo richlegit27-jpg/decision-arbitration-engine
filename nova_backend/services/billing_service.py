@@ -233,6 +233,12 @@ def _load():
         ):
             data["transactions"] = []
 
+        if not isinstance(
+            data.get("processed_stripe_events"),
+            list,
+        ):
+            data["processed_stripe_events"] = []
+
         return data
 
     except Exception as exc:
@@ -322,6 +328,65 @@ def _save(
         except Exception:
             pass
         raise
+
+
+@_billing_mutation_lock
+def stripe_event_was_processed(event_id):
+    normalized_event_id = str(event_id or "").strip()
+    if not normalized_event_id:
+        return False
+    return normalized_event_id in _load().get("processed_stripe_events", [])
+
+
+@_billing_mutation_lock
+def mark_stripe_event_processed(event_id):
+    normalized_event_id = str(event_id or "").strip()
+    if not normalized_event_id:
+        raise ValueError("A Stripe event ID is required.")
+
+    data = _load()
+    processed = data.setdefault("processed_stripe_events", [])
+    if normalized_event_id in processed:
+        return False
+
+    processed.append(normalized_event_id)
+    _save(data)
+    return True
+
+
+@_billing_mutation_lock
+def process_stripe_subscription_event(
+    event_id,
+    action,
+    username="",
+    user_id="",
+    plan="",
+    subscription_id="",
+):
+    normalized_event_id = str(event_id or "").strip()
+    if not normalized_event_id:
+        raise ValueError("A Stripe event ID is required.")
+
+    if stripe_event_was_processed(normalized_event_id):
+        return {"duplicate": True, "processed": False}
+
+    normalized_action = str(action or "ignore").strip().lower()
+    if normalized_action == "activate":
+        set_subscription(
+            username=username,
+            user_id=user_id,
+            plan=plan,
+            subscription_id=subscription_id,
+        )
+    elif normalized_action == "cancel":
+        cancel_subscription(
+            username=username,
+            user_id=user_id,
+            subscription_id=subscription_id,
+        )
+
+    mark_stripe_event_processed(normalized_event_id)
+    return {"duplicate": False, "processed": True}
 
 def _record_transaction(
     data,

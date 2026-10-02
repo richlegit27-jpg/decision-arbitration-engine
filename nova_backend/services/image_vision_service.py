@@ -134,6 +134,7 @@ class ImageVisionService:
                     )
 
                     response = chat_completions_create(
+                        nova_enforce_credits=True,
                         model=os.getenv(
                             "NOVA_VISION_MODEL",
                             "gpt-4o-mini",

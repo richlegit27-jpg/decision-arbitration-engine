@@ -1433,6 +1433,8 @@ def chat_handle(
             )
         ):
 
+            mission_control_fresh_project_id = None
+
             if (
                 decision_intent == "task_execution"
                 and not execution_state
@@ -1449,6 +1451,12 @@ def chat_handle(
                             user_text=user_text,
                             owner_id=get_current_user_id(),
                         )
+                    )
+
+                    mission_control_fresh_project_id = (
+                        project_result.get("project_id")
+                        if isinstance(project_result, dict)
+                        else None
                     )
 
                     print(
@@ -1483,14 +1491,39 @@ def chat_handle(
                 None,
             )
 
-            refreshed_active_project = (
-                project_workspace.get_active_project()
-                if project_workspace is not None
-                and hasattr(
-                    project_workspace,
-                    "get_active_project",
+            if (
+                mission_control_fresh_project_id
+                and project_workspace is not None
+                and hasattr(project_workspace, "set_active_project")
+            ):
+                refreshed_active_project = (
+                    project_workspace.set_active_project(
+                        mission_control_fresh_project_id
+                    )
                 )
-                else None
+            else:
+                refreshed_active_project = (
+                    project_workspace.get_active_project()
+                    if project_workspace is not None
+                    and hasattr(
+                        project_workspace,
+                        "get_active_project",
+                    )
+                    else None
+                )
+
+            print(
+                "[MISSION_CONTROL PROJECT HANDOFF]",
+                {
+                    "fresh_project_id": mission_control_fresh_project_id,
+                    "active_project_id": (
+                        refreshed_active_project.get("project_id")
+                        or refreshed_active_project.get("id")
+                        if isinstance(refreshed_active_project, dict)
+                        else None
+                    ),
+                },
+                flush=True,
             )
 
             if isinstance(

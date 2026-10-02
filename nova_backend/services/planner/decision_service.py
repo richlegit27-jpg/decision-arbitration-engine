@@ -327,6 +327,7 @@ class DecisionService:
 
         project_execution_request = (
             "create a project" in lower_text
+            or "create a new project" in lower_text
             or "create a tiny test project" in lower_text
             or "build a project" in lower_text
             or "make a project" in lower_text

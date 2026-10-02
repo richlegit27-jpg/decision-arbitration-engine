@@ -53,6 +53,10 @@ class ExecutionApprovalService:
     def approve_step(self, step):
         step = dict(step or {})
 
+        step["approval_was_required"] = bool(
+            step.get("approval_was_required")
+            or self.requires_approval(step)
+        )
         step["approved"] = True
         step["approval_required"] = False
         step["requires_approval"] = False

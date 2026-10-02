@@ -204,6 +204,7 @@ class AutoFixService:
 
         try:
             model_response = responses_create(
+                nova_enforce_credits=True,
                 nova_username=(
                     getattr(self, "username", None)
                     or os.getenv("NOVA_DEFAULT_USERNAME")

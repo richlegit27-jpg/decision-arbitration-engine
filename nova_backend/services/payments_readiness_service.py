@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import ast
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
@@ -25,23 +26,53 @@ def _safe_read(path: Path) -> str:
         return ""
 
 
-def _billing_account(username: str) -> Dict[str, Any]:
+def _billing_account(username: str, user_id: str = "") -> Dict[str, Any]:
+    if not str(username or "").strip() and not str(user_id or "").strip():
+        return {
+            "plan": "free",
+            "credits": 10000,
+            "monthly_credits": 10000,
+            "created_at": "",
+            "stripe_customer_id": "",
+        }
+
+    from nova_backend.services.billing_service import get_account
+
+    account = get_account(username=username, user_id=user_id)
+    if not isinstance(account, dict):
+        raise RuntimeError("Billing account data is unavailable.")
+    return dict(account)
+
+
+def _gateway_calls_enforce_credits(path: Path) -> bool:
     try:
-        from nova_backend.services.billing_service import get_account
+        tree = ast.parse(_safe_read(path))
+    except (SyntaxError, ValueError):
+        return False
 
-        account = get_account(username)
-        if isinstance(account, dict):
-            return dict(account)
-    except Exception:
-        pass
+    call_count = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name):
+            name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            name = node.func.attr
+        else:
+            continue
+        if name not in {"responses_create", "chat_completions_create"}:
+            continue
 
-    return {
-        "plan": "free",
-        "credits": 0,
-        "monthly_credits": 0,
-        "created_at": "",
-        "stripe_customer_id": "",
-    }
+        call_count += 1
+        if not any(
+            keyword.arg == "nova_enforce_credits"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value is True
+            for keyword in node.keywords
+        ):
+            return False
+
+    return call_count > 0
 
 
 def _planned_plans() -> List[Dict[str, Any]]:
@@ -117,27 +148,16 @@ def _usage_enforcement_status() -> Dict[str, Any]:
         )
     )
 
-    chat_usage_enforced = (
-        (
-            "responses_create(" in chat_text
-            or "chat_completions_create(" in chat_text
-        )
-        and (
-            "model_gateway_service" in chat_text
-            or "from nova_backend.services.model_gateway_service import" in chat_text
-        )
+    chat_usage_enforced = _gateway_calls_enforce_credits(
+        services / "chat_service.py"
     )
 
-    hosted_web_usage_enforced = (
-        "response = responses_create(" in hosted_web_text
-        and "self.client.responses.create(" not in hosted_web_text
+    hosted_web_usage_enforced = _gateway_calls_enforce_credits(
+        services / "hosted_web_search_service.py"
     )
 
-    image_vision_usage_enforced = (
-        "response = chat_completions_create("
-        in image_vision_text
-        and "client.chat.completions.create("
-        not in image_vision_text
+    image_vision_usage_enforced = _gateway_calls_enforce_credits(
+        services / "image_vision_service.py"
     )
 
     app_vision_usage_enforced = (
@@ -196,9 +216,13 @@ def _usage_enforcement_status() -> Dict[str, Any]:
         ),
     }
 
-def build_payments_readiness(username: str = "richard") -> Dict[str, Any]:
-    clean_username = (username or "richard").strip() or "richard"
-    account = _billing_account(clean_username)
+def build_payments_readiness(
+    username: str = "",
+    user_id: str = "",
+) -> Dict[str, Any]:
+    clean_username = str(username or "").strip()
+    clean_user_id = str(user_id or "").strip()
+    account = _billing_account(clean_username, clean_user_id)
     plans = _planned_plans()
     usage = _usage_enforcement_status()
 

@@ -267,6 +267,14 @@
                 class="mobile-header-btn"
                 type="button"
             >Sessions</button>
+
+            <button
+                id="nova-mobile-projects-toggle"
+                class="mobile-header-btn"
+                type="button"
+                aria-controls="nova-mobile-projects-panel"
+                aria-expanded="false"
+            >Projects</button>
         </div>
         </div>
     </header>
@@ -340,13 +348,6 @@ onclick="
             }
         "
     >Memory</button>
-
-<button
-id="nova-mobile-projects-toggle"
-type="button"
->
-Projects
-</button>
 
     <button
         type="button"
@@ -469,76 +470,61 @@ Close Account
     id="nova-mobile-projects-panel"
     class="mobile-panel hidden"
     aria-label="Mobile projects"
+    aria-hidden="true"
 >
-    <div class="nova-mobile-panel-title">
-        Projects
+    <div class="nova-mobile-projects-header">
+        <div>
+            <p class="nova-mobile-projects-eyebrow">WORKSPACE</p>
+            <h2 class="nova-mobile-panel-title">Projects</h2>
+            <p class="nova-mobile-projects-intro">Turn a goal into trackable work, then return to it as it progresses.</p>
+        </div>
+        <button id="nova-mobile-projects-close" class="nova-mobile-project-close" type="button" aria-label="Close projects">×</button>
     </div>
 
-    <div id="novaMobileProjectList">
-        Loading projects...
-    </div>
-
-    <button
-        type="button"
-        onclick="
-            const panel = document.getElementById('nova-mobile-projects-panel');
-            if (panel) {
-                panel.classList.add('hidden');
-                panel.style.cssText = 'display:none !important;';
-            }
-        "
-    >
-        Close
-    </button>
+    <form id="nova-mobile-project-create-form" class="nova-mobile-project-create">
+        <label for="nova-mobile-project-goal">What would you like to accomplish?</label>
+        <textarea id="nova-mobile-project-goal" rows="2" maxlength="4000" placeholder="Describe the outcome or project goal…" required></textarea>
+        <button id="nova-mobile-project-create-button" type="submit">Create project <span aria-hidden="true">→</span></button>
+    </form>
+    <div id="nova-mobile-project-message" class="nova-mobile-project-message" role="status" aria-live="polite">Loading your projects…</div>
+    <button id="nova-mobile-project-retry" class="nova-mobile-project-retry" type="button" hidden>Try again</button>
+    <div id="novaMobileProjectList" class="nova-mobile-project-list" aria-label="Saved projects"></div>
+</section>
 
 <section
     id="nova-mobile-project-workspace"
-    class="mobile-panel hidden"
+    class="mobile-panel nova-mobile-project-detail hidden"
     aria-label="Project workspace"
+    aria-hidden="true"
 >
-    <h3 id="nova-mobile-project-title">
-        Project
-    </h3>
-
-    <div id="nova-mobile-project-status">
-        Status
+    <button id="nova-mobile-project-back" class="nova-mobile-project-back" type="button">← All projects</button>
+    <div class="nova-mobile-project-detail-heading">
+        <div><p class="nova-mobile-projects-eyebrow">PROJECT</p><h2 id="nova-mobile-project-title">Project</h2><p id="nova-mobile-project-description"></p></div>
+        <span id="nova-mobile-project-status" class="nova-mobile-project-status">Loading</span>
     </div>
-
-<button
-    id="nova-mobile-project-notes"
-    type="button"
->
-    Notes
-</button>
-
-<button
-    id="nova-mobile-project-files"
-    type="button"
->
-    Files
-</button>
-
-<button
-    id="nova-mobile-project-tasks"
-    type="button"
->
-    Tasks
-</button>
-
-    <button
-        type="button"
-        onclick="
-            const panel = document.getElementById('nova-mobile-project-workspace');
-            if (panel) {
-                panel.classList.add('hidden');
-                panel.style.cssText = 'display:none !important;';
-            }
-        "
-    >
-        Close Project
-    </button>
-</section>
-
+    <section class="nova-mobile-project-mission-control" aria-labelledby="nova-mobile-project-control-title">
+        <div class="nova-mobile-project-section-heading"><div><p class="nova-mobile-projects-eyebrow">MISSION CONTROL</p><h3 id="nova-mobile-project-control-title">Execution</h3></div><button id="nova-mobile-project-refresh" type="button" aria-label="Refresh project status">Refresh</button></div>
+        <p id="nova-mobile-project-execution-status" role="status">Loading project status…</p>
+        <div class="nova-mobile-project-actions" role="group" aria-label="Project execution controls">
+            <button id="nova-mobile-project-run" type="button" hidden>Run all</button>
+            <button id="nova-mobile-project-continue" type="button" hidden>Continue</button>
+            <button id="nova-mobile-project-pause" type="button" hidden>Pause</button>
+            <button id="nova-mobile-project-approve" type="button" hidden>Approve step</button>
+            <button id="nova-mobile-project-reset" type="button" hidden>Reset</button>
+        </div>
+    </section>
+    <section class="nova-mobile-project-section" aria-labelledby="nova-mobile-project-phases-heading">
+        <div class="nova-mobile-project-section-heading"><div><p class="nova-mobile-projects-eyebrow">PLAN</p><h3 id="nova-mobile-project-phases-heading">Phases</h3></div></div>
+        <div id="nova-mobile-project-phase-list" class="nova-mobile-project-phase-list"></div>
+    </section>
+    <section class="nova-mobile-project-section" aria-labelledby="nova-mobile-project-tasks-heading">
+        <div class="nova-mobile-project-section-heading"><div><p class="nova-mobile-projects-eyebrow">PLAN</p><h3 id="nova-mobile-project-tasks-heading">Tasks</h3></div><span id="nova-mobile-project-progress"></span></div>
+        <div id="nova-mobile-project-task-list" class="nova-mobile-project-task-list"></div>
+    </section>
+    <section class="nova-mobile-project-section" aria-labelledby="nova-mobile-project-files-heading">
+        <div class="nova-mobile-project-section-heading"><div><p class="nova-mobile-projects-eyebrow">DELIVERABLES</p><h3 id="nova-mobile-project-files-heading">Project files</h3></div></div>
+        <div id="nova-mobile-project-files-list" class="nova-mobile-project-files-list"></div>
+    </section>
 </section>
 
 <section id="nova-mobile-execution-panel" class="mobile-panel hidden" aria-label="Mobile execution">

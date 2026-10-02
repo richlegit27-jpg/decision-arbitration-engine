@@ -156,6 +156,20 @@
     filter:brightness(1.04);
   }
 
+  .google-btn{
+    display:block;
+    min-height:48px;
+    margin-top:14px;
+    padding:14px 16px;
+    border-radius:14px;
+    border:1px solid rgba(120,170,255,0.22);
+    color:#eaf2ff;
+    background:rgba(255,255,255,0.06);
+    text-align:center;
+    text-decoration:none;
+    font-weight:800;
+  }
+
   .message{
     min-height:20px;
     font-size:0.92rem;
@@ -272,6 +286,20 @@
     </button>
 
   </form>
+
+  <a class="google-btn" href="/api/auth/google">Continue with Google</a>
+
+  <div id="mfaLoginPanel" class="panel" aria-live="polite">
+    <form id="mfaLoginForm">
+      <div class="subtext">Enter a current authenticator code or a saved recovery code.</div>
+      <label>
+        Verification code
+        <input id="mfaLoginCode" name="code" inputmode="numeric" autocomplete="one-time-code" required>
+      </label>
+      <div id="mfaLoginMessage" class="message"></div>
+      <button class="submit-btn" type="submit">Verify and continue</button>
+    </form>
+  </div>
 
 </div>
 

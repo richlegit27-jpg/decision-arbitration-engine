@@ -1,412 +1,87 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-
-    <title>
-        Nova | Intelligent Workspace
-    </title>
-
-    <link rel="stylesheet"
-          href="{{ url_for('static',
-          filename='css/nova-command-center.css') }}">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Bring a goal to Nova. Plan the work, follow execution, and keep the results in one workspace.">
+  <meta name="theme-color" content="#08111f">
+  <title>Nova | From idea to finished work</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-outcome-home.css') }}">
 </head>
-
-
 <body>
-
-<div class="nova-shell">
-
-<header class="nova-header">
-
-    <div class="nova-logo">
-        NOVA
-    </div>
-
-    <div class="nova-status">
-
-        <span class="status-dot"></span>
-
-        Systems Online
-
-        <a href="/help">
-            Help
-        </a>
-
-    </div>
-
-</header>
-
-
-<main class="nova-main">
-
-
-<section class="hero">
-
-    <h1>
-        Persistent intelligence for serious projects.
-
-        <br>
-
-        Nova remembers why.
-    </h1>
-
-
-    <p>
-        Nova connects memory, reasoning,
-        planning, and execution into one
-        continuous workspace built for
-        projects that last.
-    </p>
-
-
-    <div class="hero-actions">
-
-        <a href="/login?mode=register"
-           class="nova-button primary">
-
-            Request Access
-
-        </a>
-
-
-        <a href="/app"
-           class="nova-button secondary">
-
-            Open Nova
-
-        </a>
-
-    </div>
-
-</section>
-
-
-
-<section class="identity">
-
-<div class="identity-content">
-
-
-<h2>
-    More than a chatbot.
-
-    <br>
-
-    A project intelligence system.
-</h2>
-
-
-<p>
-    Nova combines memory, reasoning,
-    planning, execution, and learning
-    into one connected workspace.
-
-    It understands ongoing goals,
-    preserves important context,
-    and helps turn ideas into completed work.
-</p>
-
-
-
-<div class="identity-grid">
-
-
-<div class="identity-card">
-
-<h3>
-    Memory
-</h3>
-
-<p>
-    Nova keeps important project context,
-    decisions, and goals available across
-    conversations.
-</p>
-
-</div>
-
-
-
-<div class="identity-card">
-
-<h3>
-    Reasoning
-</h3>
-
-<p>
-    Nova analyzes problems, evaluates options,
-    and helps make better decisions.
-</p>
-
-</div>
-
-
-
-<div class="identity-card">
-
-<h3>
-    Planning
-</h3>
-
-<p>
-    Nova helps choose the next move,
-    organize priorities, and create a path
-    forward.
-</p>
-
-</div>
-
-
-
-<div class="identity-card">
-
-<h3>
-    Execution
-</h3>
-
-<p>
-    Nova turns plans into structured actions,
-    tracks progress, and helps move work
-    forward.
-</p>
-
-</div>
-
-
-
-<div class="identity-card">
-
-<h3>
-    Learning
-</h3>
-
-<p>
-    Nova improves from outcomes,
-    decisions, and completed work.
-</p>
-
-</div>
-
-
-</div>
-
-</div>
-
-</section>
-
-
-
-
-<section class="architecture">
-
-<h2>
-    Nova Architecture
-</h2>
-
-
-<div class="architecture-grid">
-
-
-<div class="architecture-node">
-
-<span class="node-dot"></span>
-
-<h3>
-    Memory Core
-</h3>
-
-<p>
-    Maintains context and knowledge.
-</p>
-
-</div>
-
-
-
-<div class="architecture-node">
-
-<span class="node-dot"></span>
-
-<h3>
-    Project Brain
-</h3>
-
-<p>
-    Tracks goals, decisions, and direction.
-</p>
-
-</div>
-
-
-
-<div class="architecture-node">
-
-<span class="node-dot"></span>
-
-<h3>
-    Reasoning Engine
-</h3>
-
-<p>
-    Analyzes problems and evaluates paths.
-</p>
-
-</div>
-
-
-
-<div class="architecture-node">
-
-<span class="node-dot"></span>
-
-<h3>
-    Execution Layer
-</h3>
-
-<p>
-    Converts plans into structured actions.
-</p>
-
-</div>
-
-
-
-<div class="architecture-node">
-
-<span class="node-dot"></span>
-
-<h3>
-    Learning Loop
-</h3>
-
-<p>
-    Learns from outcomes and decisions
-    to improve future choices.
-</p>
-
-</div>
-
-
-</div>
-
-</section>
-
-
-
-<section class="telemetry">
-
-<h2>
-    Nova System Status
-</h2>
-
-
-<div id="nova-status-grid"
-     class="telemetry-grid">
-
-<div class="telemetry-card">
-
-<h3>
-    Loading
-</h3>
-
-<strong>
-    ...
-</strong>
-
-</div>
-
-</div>
-
-</section>
-
-
-
-
-<section class="capabilities">
-
-
-<div class="cap-card">
-
-<h3>
-    Memory
-</h3>
-
-<p>
-    Context that follows your work.
-</p>
-
-</div>
-
-
-
-<div class="cap-card">
-
-<h3>
-    Reasoning
-</h3>
-
-<p>
-    Understand goals and problems.
-</p>
-
-</div>
-
-
-
-<div class="cap-card">
-
-<h3>
-    Execution
-</h3>
-
-<p>
-    Turn plans into action.
-</p>
-
-</div>
-
-
-
-<div class="cap-card">
-
-<h3>
-    Project Brain
-</h3>
-
-<p>
-    Maintain direction across
-    complex builds.
-</p>
-
-</div>
-
-
-</section>
-
-
-</main>
-
-
-<footer>
-
-    Nova Intelligence Platform
-
-</footer>
-
-
-</div>
-
-
-<script src="{{ url_for('static',
-filename='js/nova-command-center.js') }}">
-</script>
-
-
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Nova home"><span class="brand-mark">N</span><span>Nova</span></a>
+    <nav class="primary-nav" aria-label="Main navigation">
+      <a href="/features">How it works</a>
+      <a href="/about">About</a>
+      <a href="/billing">Plans</a>
+      <a href="/faq">FAQ</a>
+    </nav>
+    <div class="header-actions"><a class="sign-in" href="/login">Sign in</a><a class="button button-small" href="/register">Get started <span aria-hidden="true">→</span></a></div>
+  </header>
+
+  <main>
+    <section class="hero page-width" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="eyebrow-dot"></span> WORKPLACE SOLUTIONS AI · EXECUTION WORKSPACE</p>
+        <h1 id="hero-title">Bring the goal.<br><span>We’ll work through the steps.</span></h1>
+        <p class="hero-lede">Research, plan, build, and deliver real work in one workspace. Follow the progress, inspect the results, and pick up where you left off.</p>
+        <div class="hero-actions">
+          <a class="button" href="/register">Start a project <span aria-hidden="true">→</span></a>
+          <a class="text-link" href="/features">Explore how it works <span aria-hidden="true">↗</span></a>
+        </div>
+        <p class="hero-note">Describe the outcome in your own words. Nova helps turn it into clear, trackable work.</p>
+      </div>
+      <div class="workspace-preview" aria-label="Illustrative Nova project workspace preview">
+        <div class="preview-topbar"><span class="preview-brand"><i>N</i> Nova workspace</span><span class="preview-state"><b></b> Project in progress</span></div>
+        <div class="preview-body">
+          <p class="preview-label">YOUR PROJECT</p>
+          <h2>Launch a new service</h2>
+          <p class="preview-description">A sample view of how Nova organizes a goal into visible work.</p>
+          <div class="progress-row"><span>Project plan</span><span>2 of 4 steps</span></div>
+          <div class="progress-track"><span></span></div>
+          <ol class="step-list">
+            <li class="step-done"><span class="step-icon">✓</span><span><strong>Clarify the goal</strong><small>Completed</small></span></li>
+            <li class="step-done"><span class="step-icon">✓</span><span><strong>Prepare a work plan</strong><small>Completed</small></span></li>
+            <li class="step-active"><span class="step-icon">03</span><span><strong>Work through the tasks</strong><small>In progress</small></span><span class="active-pill">ACTIVE</span></li>
+            <li><span class="step-icon">04</span><span><strong>Review the deliverables</strong><small>Up next</small></span></li>
+          </ol>
+          <div class="preview-foot"><span class="artifact-icon">↗</span><span><strong>Project context stays together</strong><small>Plan, progress, and files in one place</small></span></div>
+        </div>
+        <p class="illustration-note">Illustrative design concept · not a live project</p>
+      </div>
+    </section>
+
+    <section class="how-section" id="how-it-works">
+      <div class="page-width">
+        <div class="section-heading"><p class="eyebrow">A CLEAR PATH FROM REQUEST TO RESULT</p><h2>See the work move forward.</h2><p>Nova is built to make the work understandable while it happens.</p></div>
+        <div class="process-grid">
+          <article class="process-card"><span class="process-number">01</span><h3>Describe the outcome</h3><p>Start with what you want to accomplish, add context, and share relevant files.</p></article>
+          <article class="process-card"><span class="process-number">02</span><h3>Shape a useful plan</h3><p>Turn the goal into steps you can review and track in the project workspace.</p></article>
+          <article class="process-card"><span class="process-number">03</span><h3>Work through tasks</h3><p>Use the capabilities available in Nova and follow task status as work progresses.</p></article>
+          <article class="process-card"><span class="process-number">04</span><h3>Review the results</h3><p>Inspect the saved project, execution state, and available files before continuing.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="outcomes-section page-width">
+      <div class="outcomes-copy"><p class="eyebrow">ONE PLACE FOR ONGOING WORK</p><h2>Keep the goal and the progress connected.</h2><p>Projects keep work organized so you can return to the plan, review what has happened, and continue from the current state.</p><a class="text-link" href="/features">Explore Nova features <span aria-hidden="true">→</span></a></div>
+      <div class="outcomes-list">
+        <article><span class="outcome-mark">⌕</span><div><h3>Research with context</h3><p>Organize research and notes around the project you’re working on.</p></div></article>
+        <article><span class="outcome-mark">▤</span><div><h3>Plan complex work</h3><p>Break a broad goal into tasks that are easier to understand and follow.</p></div></article>
+        <article><span class="outcome-mark">⌘</span><div><h3>Build where supported</h3><p>Use Nova’s configured tools and execution services for supported work.</p></div></article>
+        <article><span class="outcome-mark">↗</span><div><h3>Keep useful outputs</h3><p>Review files and artifacts that Nova actually creates and saves.</p></div></article>
+      </div>
+    </section>
+
+    <section class="control-band">
+      <div class="page-width control-inner"><div><p class="eyebrow">CLEAR STATUS. YOUR PROJECT.</p><h2>Know what’s done—and what still needs attention.</h2></div><p>Review saved plans, task progress, and available project files in the workspace. Nova’s available actions depend on the tools and providers configured for your account.</p></div>
+    </section>
+
+    <section class="closing-cta page-width"><p class="eyebrow">START WITH THE WORK</p><h2>What would you like to accomplish?</h2><p>Create an account to open Nova’s project workspace and explore its available capabilities.</p><a class="button" href="/register">Start a project <span aria-hidden="true">→</span></a></section>
+  </main>
+
+  <footer class="site-footer"><a class="brand" href="/" aria-label="Nova home"><span class="brand-mark">N</span><span>Nova</span></a><p>From idea to finished work.</p><nav aria-label="Footer navigation"><a href="/about">About</a><a href="/features">Features</a><a href="/faq">FAQ</a><a href="/roadmap">Roadmap</a><a href="/billing">Plans</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/login">Sign in</a></nav><small>© {{ now.year if now is defined else 2026 }} WorkPlaceSolutionsAI</small></footer>
 </body>
-
 </html>

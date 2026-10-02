@@ -89,6 +89,16 @@ async function logout() {
     );
 }
 
+async function verifyMfaLogin(code) {
+    return await apiFetch(
+        "/api/auth/mfa/verify-login",
+        {
+            method: "POST",
+            body: JSON.stringify({ code }),
+        }
+    );
+}
+
 async function forgotPassword(email) {
 
     return await apiFetch(
@@ -152,6 +162,8 @@ window.NovaAuth = {
 
     getAuthStatus,
 
+    verifyMfaLogin,
+
 };
 
 
@@ -192,6 +204,18 @@ const el = {
 
     authMessage:
         getEl("authMessage"),
+
+    mfaLoginPanel:
+        getEl("mfaLoginPanel"),
+
+    mfaLoginForm:
+        getEl("mfaLoginForm"),
+
+    mfaLoginCode:
+        getEl("mfaLoginCode"),
+
+    mfaLoginMessage:
+        getEl("mfaLoginMessage"),
 
     registerMessage:
         getEl("registerMessage"),
@@ -310,10 +334,26 @@ if (el.loginForm) {
                         "Signing in...";
                 }
 
-                await login(
+                const result = await login(
                     username,
                     password
                 );
+
+                if (result.mfa_required) {
+                    el.loginForm.hidden = true;
+                    el.mfaLoginPanel?.classList.add("active");
+                    el.mfaLoginCode?.focus();
+                    setMessage(
+                        el.authMessage,
+                        "Enter your second factor to finish signing in.",
+                        "success"
+                    );
+                    return;
+                }
+
+                if (!result.authenticated) {
+                    throw new Error("The sign-in could not be completed.");
+                }
 
                 setMessage(
                     el.authMessage,
@@ -347,6 +387,38 @@ if (el.loginForm) {
             }
         }
     );
+}
+
+if (el.mfaLoginForm) {
+    el.mfaLoginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        clearMessage(el.mfaLoginMessage);
+
+        const code = el.mfaLoginCode?.value.trim() || "";
+        const button = el.mfaLoginForm.querySelector('button[type="submit"]');
+        if (button) button.disabled = true;
+        try {
+            const result = await verifyMfaLogin(code);
+            if (!result.authenticated) {
+                throw new Error("Second-factor verification was not completed.");
+            }
+            window.location.href = "/app";
+        } catch (error) {
+            setMessage(
+                el.mfaLoginMessage,
+                error.message || "Unable to verify the second factor.",
+                "error"
+            );
+        } finally {
+            if (button) button.disabled = false;
+        }
+    });
+}
+
+if (new URLSearchParams(window.location.search).get("mfa") === "required") {
+    if (el.loginForm) el.loginForm.hidden = true;
+    el.mfaLoginPanel?.classList.add("active");
+    el.mfaLoginCode?.focus();
 }
 
 
@@ -494,12 +566,20 @@ if (el.registerForm) {
                 }
 
 
-                await register(
+                const result = await register(
                     username,
                     email,
                     password
                 );
 
+                if (result.email_verification_required) {
+                    setMessage(
+                        el.registerMessage,
+                        "Account created. Verify your email address before signing in.",
+                        "success"
+                    );
+                    return;
+                }
 
                 setMessage(
                     el.registerMessage,

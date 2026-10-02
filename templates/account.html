@@ -111,6 +111,20 @@
     font-weight:800;
     word-break:break-word;
   }
+
+  .security-card{margin-top:18px}
+  .security-card form{display:grid;gap:12px;max-width:520px}
+  .security-card label{display:grid;gap:7px;font-weight:700}
+  .security-card input{min-height:46px;padding:0 12px;border-radius:12px;background:#101d2a;color:#eaf2ff;border:1px solid rgba(120,170,255,.2)}
+  .security-card button{min-height:44px;padding:0 16px;border:0;border-radius:12px;background:linear-gradient(135deg,#7cc7ff,#58f0c7);font-weight:800;cursor:pointer}
+  .security-card button:disabled{opacity:.6;cursor:wait}
+  .security-status{line-height:1.55;margin:10px 0 18px}
+  .security-error{color:#ff9f9f}
+  .security-success{color:#8ff0c7}
+  .mfa-qr{display:block;width:min(260px,100%);height:auto;margin:16px 0;background:white;padding:10px;border-radius:12px}
+  .recovery-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0;list-style:none}
+  .recovery-list li{padding:9px;background:rgba(255,255,255,.06);border-radius:8px;font-family:ui-monospace,monospace}
+  @media(max-width:600px){body{padding:14px}.card{padding:18px}.recovery-list{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -133,10 +147,63 @@
 
         <div class="info-item">
           <div class="info-label">Auth type</div>
-          <div class="info-value">SQLite local user</div>
+          <div class="info-value">{{ auth_provider or "local" }}</div>
         </div>
       </div>
     </div>
+
+    <section class="card security-card" aria-labelledby="securityTitle">
+      <div class="kicker">Account protection</div>
+      <h2 id="securityTitle">Two-factor authentication</h2>
+      <p id="securityStatus" class="security-status" role="status">Checking your security settings…</p>
+
+      <div id="mfaEnableSection" hidden>
+        <form id="mfaSetupForm">
+          <label for="mfaCurrentPassword">Confirm your current password to begin setup</label>
+          <input id="mfaCurrentPassword" type="password" autocomplete="current-password" required>
+          <button type="submit">Set up authenticator app</button>
+        </form>
+      </div>
+
+      <div id="mfaEnrollment" hidden>
+        <p>Scan this QR code with your authenticator app, then enter its current code.</p>
+        <img id="mfaQr" class="mfa-qr" alt="Authenticator setup QR code" hidden>
+        <p id="mfaManualSecret" hidden></p>
+        <form id="mfaVerifySetupForm">
+          <label for="mfaSetupCode">Authenticator code</label>
+          <input id="mfaSetupCode" inputmode="numeric" autocomplete="one-time-code" required>
+          <button type="submit">Verify and enable MFA</button>
+        </form>
+      </div>
+
+      <div id="mfaRecoveryPanel" hidden>
+        <p><strong>Save these recovery codes now.</strong> Each code works once. Nova will not show them again.</p>
+        <ul id="mfaRecoveryCodes" class="recovery-list"></ul>
+        <button id="mfaRecoverySaved" type="button">I saved my recovery codes</button>
+      </div>
+
+      <div id="mfaDisableSection" hidden>
+        <p>MFA is enabled for this account. Verify a current authenticator code to turn it off.</p>
+        <form id="mfaDisableForm">
+          <label for="mfaDisableCode">Authenticator code</label>
+          <input id="mfaDisableCode" inputmode="numeric" autocomplete="one-time-code" required>
+          <button type="submit">Disable MFA</button>
+        </form>
+      </div>
+
+      <hr>
+      <h3>Google sign-in</h3>
+      {% if google_linked %}
+        <p id="googleLinkStatus" class="security-status">A Google identity is linked to this account.</p>
+      {% else %}
+        <p>Link Google only after confirming this account's password. Your Nova user, projects, and billing record stay attached to this account.</p>
+        <form action="/api/auth/google/link" method="post">
+          <label for="googleLinkPassword">Current account password</label>
+          <input id="googleLinkPassword" name="current_password" type="password" autocomplete="current-password" required>
+          <button type="submit">Verify and link Google</button>
+        </form>
+      {% endif %}
+    </section>
   </div>
 
 <script>
@@ -144,6 +211,117 @@
   "use strict";
 
   const logoutBtn = document.getElementById("logoutBtn");
+  const status = document.getElementById("securityStatus");
+  const enableSection = document.getElementById("mfaEnableSection");
+  const enrollment = document.getElementById("mfaEnrollment");
+  const disableSection = document.getElementById("mfaDisableSection");
+  const recoveryPanel = document.getElementById("mfaRecoveryPanel");
+
+  async function authRequest(path, options = {}){
+    const response = await fetch(path, {
+      credentials: "same-origin",
+      headers: {"Content-Type":"application/json", ...(options.headers || {})},
+      ...options
+    });
+    const body = await response.json().catch(() => ({}));
+    if(!response.ok) throw new Error(body.error || "Security request failed.");
+    return body;
+  }
+
+  function showMessage(message, isError = false){
+    if(!status) return;
+    status.textContent = message;
+    status.className = "security-status " + (isError ? "security-error" : "security-success");
+  }
+
+  async function loadSecurityState(){
+    try{
+      const result = await authRequest("/api/auth/status");
+      if(!result.authenticated){
+        window.location.href = "/login";
+        return;
+      }
+      const enabled = Boolean(result.user && result.user.mfa_enabled);
+      enableSection.hidden = enabled;
+      disableSection.hidden = !enabled;
+      showMessage(enabled ? "MFA is enabled." : "MFA is not enabled.");
+    }catch(error){
+      showMessage(error.message || "Unable to load security settings.", true);
+    }
+  }
+
+  document.getElementById("mfaSetupForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector("button[type=submit]");
+    button.disabled = true;
+    try{
+      const result = await authRequest("/api/auth/mfa/setup", {
+        method: "POST",
+        body: JSON.stringify({current_password: document.getElementById("mfaCurrentPassword").value})
+      });
+      const qr = document.getElementById("mfaQr");
+      if(result.qr_data_url){qr.src = result.qr_data_url; qr.hidden = false;}
+      const manual = document.getElementById("mfaManualSecret");
+      manual.textContent = "Manual setup key: " + result.secret;
+      manual.hidden = false;
+      enableSection.hidden = true;
+      enrollment.hidden = false;
+      document.getElementById("mfaCurrentPassword").value = "";
+      showMessage("Scan the code and verify it to finish enrollment.");
+    }catch(error){showMessage(error.message, true);}
+    finally{button.disabled = false;}
+  });
+
+  document.getElementById("mfaVerifySetupForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector("button[type=submit]");
+    button.disabled = true;
+    try{
+      const result = await authRequest("/api/auth/mfa/verify-setup", {
+        method: "POST",
+        body: JSON.stringify({code: document.getElementById("mfaSetupCode").value})
+      });
+      const list = document.getElementById("mfaRecoveryCodes");
+      list.replaceChildren(...result.recovery_codes.map((code) => {
+        const item = document.createElement("li");
+        item.textContent = code;
+        return item;
+      }));
+      document.getElementById("mfaManualSecret").textContent = "";
+      document.getElementById("mfaManualSecret").hidden = true;
+      document.getElementById("mfaQr").removeAttribute("src");
+      document.getElementById("mfaQr").hidden = true;
+      document.getElementById("mfaSetupCode").value = "";
+      enrollment.hidden = true;
+      recoveryPanel.hidden = false;
+      showMessage("MFA is enabled. Save your recovery codes before leaving this page.");
+    }catch(error){showMessage(error.message, true);}
+    finally{button.disabled = false;}
+  });
+
+  document.getElementById("mfaRecoverySaved")?.addEventListener("click", () => {
+    recoveryPanel.hidden = true;
+    disableSection.hidden = false;
+    showMessage("Recovery codes were displayed once. Store them somewhere private.");
+  });
+
+  document.getElementById("mfaDisableForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector("button[type=submit]");
+    button.disabled = true;
+    try{
+      await authRequest("/api/auth/mfa/disable", {
+        method: "POST",
+        body: JSON.stringify({code: document.getElementById("mfaDisableCode").value})
+      });
+      document.getElementById("mfaDisableCode").value = "";
+      await loadSecurityState();
+      showMessage("MFA is disabled.");
+    }catch(error){showMessage(error.message, true);}
+    finally{button.disabled = false;}
+  });
+
+  loadSecurityState();
 
   if(logoutBtn){
     logoutBtn.addEventListener("click", async () => {

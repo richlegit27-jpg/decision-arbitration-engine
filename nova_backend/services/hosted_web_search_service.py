@@ -137,6 +137,7 @@ class HostedWebSearchService:
 
         try:
             response = responses_create(
+                nova_enforce_credits=True,
                 model=self.model,
                 tools=[
                     {

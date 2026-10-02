@@ -1,14 +1,29 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
 import uuid
 
 from datetime import datetime, timezone
+from functools import wraps
 from pathlib import Path
 
 
 _UNSET = object()
+_PROJECT_STORAGE_LOCK = threading.RLock()
 from nova_backend.services.auth_context import get_current_user_id
+
+
+def _synchronized_project_storage(method):
+    """Keep each project read-modify-write transaction atomic in-process."""
+
+    @wraps(method)
+    def synchronized(*args, **kwargs):
+        with _PROJECT_STORAGE_LOCK:
+            return method(*args, **kwargs)
+
+    return synchronized
 
 
 class ProjectWorkspaceService:
@@ -48,10 +63,11 @@ class ProjectWorkspaceService:
             ) or ""
         ).strip()
 
-        # Legacy projects created before owner support
-        # remain accessible to the current Nova installation.
+        # Keep legacy records visible to installation-level callers that have
+        # no authenticated user, but never expose ownerless projects inside an
+        # authenticated user's request context.
         if not project_owner_id:
-            return True
+            return not bool(current_owner_id)
 
         # No authenticated owner context means do not
         # apply owner filtering.
@@ -124,17 +140,25 @@ class ProjectWorkspaceService:
             "complete",
             "done",
             "success",
+            "succeeded",
+            "finished",
         }
 
         failed_statuses = {
             "failed",
             "failure",
             "error",
+            "errored",
+            "exception",
         }
 
         blocked_statuses = {
             "blocked",
             "waiting",
+            "waiting_input",
+            "waiting_approval",
+            "awaiting_approval",
+            "needs_input",
         }
 
         pending_statuses = {
@@ -1071,7 +1095,10 @@ class ProjectWorkspaceService:
             ).strip().lower()
             in {
                 "failed",
+                "failure",
                 "error",
+                "errored",
+                "exception",
             }
         )
 
@@ -1084,12 +1111,19 @@ class ProjectWorkspaceService:
             in {
                 "blocked",
                 "waiting",
+                "waiting_input",
+                "waiting_approval",
+                "awaiting_approval",
+                "needs_input",
             }
         )
 
         if execution_status in {
             "failed",
+            "failure",
             "error",
+            "errored",
+            "exception",
         }:
 
             project["status"] = "failed"
@@ -1097,6 +1131,33 @@ class ProjectWorkspaceService:
         elif execution_status == "blocked":
 
             project["status"] = "blocked"
+
+        elif execution_status in {
+            "waiting_approval",
+            "awaiting_approval",
+        }:
+
+            project["status"] = "waiting_approval"
+
+        elif execution_status in {
+            "waiting",
+            "waiting_input",
+            "needs_input",
+        }:
+
+            project["status"] = "waiting"
+
+        elif execution_status == "paused":
+
+            project["status"] = "paused"
+
+        elif execution_status == "stopped":
+
+            project["status"] = "stopped"
+
+        elif execution_status in {"cancelled", "canceled"}:
+
+            project["status"] = "cancelled"
 
         elif current_project_status in {
             "failed",
@@ -1108,6 +1169,26 @@ class ProjectWorkspaceService:
         elif current_project_status == "blocked" or blocked_count > 0:
 
             project["status"] = "blocked"
+
+        elif execution_status in {
+            "completed",
+            "complete",
+            "done",
+            "success",
+            "succeeded",
+            "finished",
+        }:
+
+            project["status"] = "completed"
+
+        elif execution_status in {
+            "running",
+            "active",
+            "executing",
+            "in_progress",
+        }:
+
+            project["status"] = "in_progress"
 
         elif total_tasks == 0:
 
@@ -1121,9 +1202,17 @@ class ProjectWorkspaceService:
 
             project["status"] = "in_progress"
 
+        elif completed_count > 0:
+
+            project["status"] = "in_progress"
+
         else:
 
             project["status"] = "pending"
+
+        if isinstance(brain.get("health"), dict):
+            brain["health"]["project_status"] = project["status"]
+            brain["health"]["execution_status"] = execution_status
 
         project["brain"] = brain
 
@@ -1166,10 +1255,37 @@ class ProjectWorkspaceService:
                     "complete",
                     "done",
                     "success",
+                    "succeeded",
+                    "finished",
                 }
                 for status in statuses
             ):
                 phase["status"] = "completed"
+
+            elif any(
+                status in {
+                    "failed",
+                    "failure",
+                    "error",
+                    "errored",
+                    "exception",
+                }
+                for status in statuses
+            ):
+                phase["status"] = "failed"
+
+            elif any(
+                status in {
+                    "blocked",
+                    "waiting",
+                    "waiting_input",
+                    "waiting_approval",
+                    "awaiting_approval",
+                    "needs_input",
+                }
+                for status in statuses
+            ):
+                phase["status"] = "blocked"
 
             elif any(
                 status in {
@@ -1181,14 +1297,17 @@ class ProjectWorkspaceService:
             ):
                 phase["status"] = "in_progress"
 
+            elif any(status == "paused" for status in statuses):
+                phase["status"] = "paused"
+
+            elif any(status == "stopped" for status in statuses):
+                phase["status"] = "stopped"
+
             elif any(
-                status in {
-                    "failed",
-                    "error",
-                }
+                status in {"cancelled", "canceled"}
                 for status in statuses
             ):
-                phase["status"] = "failed"
+                phase["status"] = "cancelled"
 
             else:
                 phase["status"] = "planned"
@@ -1213,16 +1332,30 @@ class ProjectWorkspaceService:
 
         changed = False
 
-        terminal_statuses = {
+        successful_statuses = {
             "completed",
             "complete",
             "done",
             "success",
             "succeeded",
+            "finished",
+        }
+        failed_statuses = {
             "failed",
+            "failure",
+            "error",
+            "errored",
+            "exception",
+        }
+        cancelled_statuses = {
             "cancelled",
             "canceled",
         }
+        terminal_statuses = (
+            successful_statuses
+            | failed_statuses
+            | cancelled_statuses
+        )
 
         for project in projects:
             if not isinstance(project, dict):
@@ -1237,6 +1370,31 @@ class ProjectWorkspaceService:
                 if not isinstance(task, dict):
                     continue
 
+                # Nested execution results must have a stable persisted key.
+                # Without one, controller-generated runtime IDs cannot be
+                # matched back to the planned child after execution.
+                for container_name in (
+                    "steps",
+                    "substeps",
+                    "execution_steps",
+                ):
+                    container_steps = task.get(container_name)
+                    if not isinstance(container_steps, list):
+                        continue
+                    for child_index, child in enumerate(container_steps):
+                        if not isinstance(child, dict):
+                            continue
+                        child_id = str(
+                            child.get("id") or child.get("step_id") or ""
+                        ).strip()
+                        if not child_id:
+                            child_id = (
+                                f"step_{uuid.uuid4().hex[:12]}_"
+                                f"{child_index + 1}"
+                            )
+                            child["id"] = child_id
+                            changed = True
+
                 parent_status = str(
                     task.get("status")
                     or task.get("state")
@@ -1247,10 +1405,82 @@ class ProjectWorkspaceService:
                 if parent_status not in terminal_statuses:
                     continue
 
-                steps = task.get("steps")
+                steps = (
+                    task.get("steps")
+                    or task.get("substeps")
+                    or task.get("execution_steps")
+                )
 
                 if not isinstance(steps, list):
                     continue
+
+                child_steps = [
+                    step for step in steps if isinstance(step, dict)
+                ]
+
+                if parent_status in successful_statuses and child_steps:
+                    unfinished_child = False
+                    failed_child = None
+
+                    for child in child_steps:
+                        child_statuses = {
+                            str(child.get(key) or "").strip().lower()
+                            for key in (
+                                "status",
+                                "state",
+                                "completion_status",
+                            )
+                        }
+                        metadata = child.get("execution_metadata")
+
+                        if (
+                            child_statuses & failed_statuses
+                            or (
+                                isinstance(metadata, dict)
+                                and metadata.get("success") is False
+                            )
+                        ):
+                            failed_child = child
+                            break
+
+                        if not child_statuses & successful_statuses:
+                            unfinished_child = True
+
+                    if failed_child is not None:
+                        child_metadata = failed_child.get(
+                            "execution_metadata"
+                        )
+                        child_error = (
+                            failed_child.get("error")
+                            or (
+                                child_metadata.get("error")
+                                if isinstance(child_metadata, dict)
+                                else None
+                            )
+                            or "Nested execution step failed."
+                        )
+                        failed_child["status"] = "failed"
+                        failed_child["state"] = "failed"
+                        failed_child["completion_status"] = "failed"
+                        failed_child["error"] = str(child_error)
+                        task["status"] = "failed"
+                        task["error"] = str(
+                            task.get("error") or child_error
+                        )
+                        parent_status = "failed"
+                        changed = True
+
+                    elif unfinished_child:
+                        # Parent success alone is not evidence that every
+                        # planned child step finished. Keep the child states
+                        # intact and expose the parent as blocked.
+                        task["status"] = "blocked"
+                        task["error"] = str(
+                            task.get("error")
+                            or "Task was marked complete while nested steps remained unfinished."
+                        )
+                        changed = True
+                        continue
 
                 for step in steps:
                     if not isinstance(step, dict):
@@ -1271,16 +1501,33 @@ class ProjectWorkspaceService:
                         or ""
                     ).strip().lower()
 
-                    if (
-                        current_status == "completed"
-                        and current_state == "completed"
-                        and current_completion_status == "completed"
-                    ):
+                    child_statuses = {
+                        current_status,
+                        current_state,
+                        current_completion_status,
+                    }
+
+                    # Preserve concrete child outcomes. A failed parent
+                    # must not turn its failed child into a completed step.
+                    if child_statuses & terminal_statuses:
                         continue
 
-                    step["status"] = "completed"
-                    step["state"] = "completed"
-                    step["completion_status"] = "completed"
+                    if parent_status in successful_statuses:
+                        normalized_status = "completed"
+                    elif parent_status in failed_statuses:
+                        normalized_status = "failed"
+                    else:
+                        normalized_status = "cancelled"
+
+                    step["status"] = normalized_status
+                    step["state"] = normalized_status
+                    step["completion_status"] = normalized_status
+
+                    if normalized_status == "failed":
+                        if not step.get("error"):
+                            step["error"] = (
+                                task.get("error") or "Parent task failed."
+                            )
 
                     changed = True
 
@@ -1289,68 +1536,77 @@ class ProjectWorkspaceService:
     def _load_projects(
         self,
     ):
-        try:
-            data = json.loads(
-                self.projects_file.read_text(
-                    encoding="utf-8-sig"
-                )
-            )
-
-            if not isinstance(data, list):
-                return []
-
-            changed = False
-
-            for project in data:
-                if not isinstance(project, dict):
-                    continue
-
-                if not isinstance(
-                    project.get("execution"),
-                    dict,
-                ):
-                    project["execution"] = (
-                        self._default_execution_state()
+        with _PROJECT_STORAGE_LOCK:
+            try:
+                data = json.loads(
+                    self.projects_file.read_text(
+                        encoding="utf-8-sig"
                     )
+                )
 
+                if not isinstance(data, list):
+                    return []
+
+                changed = False
+
+                for project in data:
+                    if not isinstance(project, dict):
+                        continue
+
+                    if not isinstance(
+                        project.get("execution"),
+                        dict,
+                    ):
+                        project["execution"] = (
+                            self._default_execution_state()
+                        )
+
+                        changed = True
+
+                if self._normalize_terminal_parent_nested_steps(
+                    data
+                ):
                     changed = True
 
-            if self._normalize_terminal_parent_nested_steps(
-                data
-            ):
-                changed = True
+                if changed:
+                    self._save_projects(
+                        data
+                    )
 
-            if changed:
-                self._save_projects(
-                    data
+                return data
+
+            except Exception as e:
+                print(
+                    "[PROJECT LOAD ERROR]",
+                    type(e).__name__,
+                    str(e),
+                    flush=True,
                 )
-
-            return data
-
-        except Exception as e:
-            print(
-                "[PROJECT LOAD ERROR]",
-                type(e).__name__,
-                str(e),
-                flush=True,
-            )
-            raise
+                raise
     def _save_projects(
         self,
         projects,
     ):
-        self._normalize_terminal_parent_nested_steps(
-            projects
-        )
+        with _PROJECT_STORAGE_LOCK:
+            self._normalize_terminal_parent_nested_steps(
+                projects
+            )
 
-        self.projects_file.write_text(
-            json.dumps(
-                projects,
-                indent=2,
-                ensure_ascii=False,
-            ),
-            encoding="utf-8-sig",
-        )
+            temporary_file = self.projects_file.with_name(
+                f".{self.projects_file.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+            )
+            try:
+                temporary_file.write_text(
+                    json.dumps(
+                        projects,
+                        indent=2,
+                        ensure_ascii=False,
+                    ),
+                    encoding="utf-8-sig",
+                )
+                temporary_file.replace(self.projects_file)
+            finally:
+                temporary_file.unlink(missing_ok=True)
 
     def _default_execution_state(
         self,
@@ -1359,6 +1615,7 @@ class ProjectWorkspaceService:
             "status": "idle",
             "current_task_id": None,
             "current_step": None,
+            "current_index": None,
             "current_step_index": None,
             "current_phase_id": None,
             "current_phase_title": None,
@@ -1367,6 +1624,7 @@ class ProjectWorkspaceService:
             "completed_steps": [],
             "completed_tasks": [],
             "failed_tasks": [],
+            "control_request": None,
             "last_action": None,
             "updated_at": datetime.now(
                 timezone.utc
@@ -1588,6 +1846,17 @@ class ProjectWorkspaceService:
                         ),
                     }
 
+                    planned_approval_required = bool(
+                        item.get("approval_required")
+                        or item.get("requires_approval")
+                    )
+                    task["approval_required"] = planned_approval_required
+                    task["requires_approval"] = planned_approval_required
+                    task["approval_was_required"] = planned_approval_required
+                    task["approval_status"] = (
+                        "pending" if planned_approval_required else None
+                    )
+
                     task["execution_mode"] = str(
                         item.get(
                             "execution_mode",
@@ -1699,21 +1968,26 @@ class ProjectWorkspaceService:
                         else []
                     )
 
+                    planned_steps = (
+                        item.get("steps")
+                        or item.get("substeps")
+                        or item.get("execution_steps")
+                        or []
+                    )
                     task["steps"] = (
-                        list(
-                            item.get(
-                                "steps",
-                                [],
-                            )
-                            or []
-                        )
-                        if isinstance(
-                            item.get(
-                                "steps",
-                                [],
-                            ),
-                            list,
-                        )
+                        [
+                            {
+                                **step,
+                                "id": str(
+                                    step.get("id")
+                                    or step.get("step_id")
+                                    or f"step_{uuid.uuid4().hex[:12]}_{index + 1}"
+                                ),
+                            }
+                            for index, step in enumerate(planned_steps)
+                            if isinstance(step, dict)
+                        ]
+                        if isinstance(planned_steps, list)
                         else []
                     )
 
@@ -1874,6 +2148,7 @@ class ProjectWorkspaceService:
 
         return visible_projects
 
+    @_synchronized_project_storage
     def get_project(
         self,
         project_id,
@@ -1904,33 +2179,6 @@ class ProjectWorkspaceService:
 
             if refreshed_project is not project:
                 project = refreshed_project
-
-            execution_state = project.get(
-                "execution",
-                {},
-            )
-
-            execution_status = str(
-                execution_state.get(
-                    "status",
-                    "",
-                )
-            ).strip().lower()
-
-            if execution_status in {
-                "failed",
-                "error",
-            }:
-
-                project["status"] = "failed"
-
-            elif execution_status == "blocked":
-
-                project["status"] = "blocked"
-
-            elif execution_status == "completed":
-
-                project["status"] = "completed"
 
             self._save_projects(
                 projects
@@ -2268,6 +2516,7 @@ class ProjectWorkspaceService:
 
         return True
 
+    @_synchronized_project_storage
     def get_execution_state(
         self,
         project_id,
@@ -2305,6 +2554,7 @@ class ProjectWorkspaceService:
 
         return None
 
+    @_synchronized_project_storage
     def update_execution_state(
         self,
         project_id,
@@ -2319,6 +2569,7 @@ class ProjectWorkspaceService:
         completed_steps=_UNSET,
         completed_tasks=_UNSET,
         failed_tasks=_UNSET,
+        control_request=_UNSET,
         last_action=_UNSET,
         steps=_UNSET,
         ):
@@ -2351,12 +2602,14 @@ class ProjectWorkspaceService:
                 execution["current_step"] = current_step
 
             if current_step_index is not _UNSET:
-                execution["current_step_index"] = (
+                normalized_step_index = (
                     current_step_index
                     if isinstance(current_step_index, int)
                     and current_step_index >= 0
                     else None
                 )
+                execution["current_step_index"] = normalized_step_index
+                execution["current_index"] = normalized_step_index
 
             if current_phase_id is not _UNSET:
                 execution["current_phase_id"] = current_phase_id
@@ -2401,6 +2654,9 @@ class ProjectWorkspaceService:
                     else []
                 )
 
+            if control_request is not _UNSET:
+                execution["control_request"] = control_request
+
             if last_action is not _UNSET:
                 execution["last_action"] = (
                     str(last_action).strip()
@@ -2417,6 +2673,8 @@ class ProjectWorkspaceService:
 
             project["execution"] = execution
             project["updated_at"] = execution["updated_at"]
+            project = self._refresh_phase_status(project)
+            project = self._refresh_project_brain_state(project)
 
             self._save_projects(projects)
 
@@ -2424,6 +2682,7 @@ class ProjectWorkspaceService:
 
         return None
 
+    @_synchronized_project_storage
     def reset_execution_state(
         self,
         project_id,
@@ -2431,6 +2690,7 @@ class ProjectWorkspaceService:
         execution = (
             self._default_execution_state()
         )
+        execution["status"] = "ready"
 
         projects = self._load_projects()
 
@@ -2453,6 +2713,18 @@ class ProjectWorkspaceService:
                     continue
 
                 task["status"] = "open"
+                task.pop("state", None)
+                task.pop("completion_status", None)
+                task.pop("blocked_reason", None)
+
+                task_approval_required = bool(
+                    task.get("approval_was_required")
+                    or task.get("approval_required")
+                    or task.get("requires_approval")
+                )
+                task.pop("approved", None)
+                task["approval_required"] = task_approval_required
+                task["requires_approval"] = task_approval_required
 
                 for key in (
                     "error",
@@ -2461,41 +2733,89 @@ class ProjectWorkspaceService:
                     "completed_at",
                     "failed_at",
                     "failure_reason",
+                    "execution_metadata",
+                    "runtime_result",
+                    "next_action",
+                    "waiting",
+                    "complete",
+                    "needs_clarification",
+                    "clarification",
+                    "mutation_ready",
+                    "payload_required",
+                    "approval_status",
+                    "approved_at",
+                    "retry_count",
                 ):
                     task.pop(
                         key,
                         None,
                     )
 
-                steps = task.get("steps") or []
+                for container_name in (
+                    "steps",
+                    "substeps",
+                    "execution_steps",
+                ):
+                    steps = task.get(container_name) or []
 
-                for step in steps:
-                    if not isinstance(
-                        step,
-                        dict,
-                    ):
+                    if not isinstance(steps, list):
                         continue
 
-                    step["status"] = "pending"
-                    step["state"] = "pending"
-                    step["completion_status"] = "pending"
+                    for step in steps:
+                        if not isinstance(
+                            step,
+                            dict,
+                        ):
+                            continue
 
-                    for key in (
-                        "error",
-                        "result",
-                        "output",
-                        "completed_at",
-                        "failed_at",
-                        "failure_reason",
-                    ):
-                        step.pop(
-                            key,
-                            None,
+                        step["status"] = "pending"
+                        step["state"] = "pending"
+                        step["completion_status"] = "pending"
+
+                        step_approval_required = bool(
+                            step.get("approval_was_required")
+                            or step.get("approval_required")
+                            or step.get("requires_approval")
                         )
+                        step.pop("approved", None)
+                        step["approval_required"] = step_approval_required
+                        step["requires_approval"] = step_approval_required
 
-            project["status"] = "draft"
-            project["active"] = False
+                        for key in (
+                            "error",
+                            "result",
+                            "output",
+                            "completed_at",
+                            "failed_at",
+                            "failure_reason",
+                            "execution_metadata",
+                            "runtime_result",
+                            "next_action",
+                            "waiting",
+                            "complete",
+                            "needs_clarification",
+                            "clarification",
+                            "mutation_ready",
+                            "payload_required",
+                            "approval_status",
+                            "approved_at",
+                            "retry_count",
+                        ):
+                            step.pop(
+                                key,
+                                None,
+                            )
+
+                        if step_approval_required:
+                            step["approval_status"] = "pending"
+
+                if task_approval_required:
+                    task["approval_status"] = "pending"
+
             project["execution"] = execution
+            project["status"] = "pending"
+            project = self._refresh_phase_status(project)
+            project = self._refresh_project_brain_state(project)
             project["updated_at"] = (
                 execution["updated_at"]
             )
@@ -3010,15 +3330,6 @@ class ProjectWorkspaceService:
             or str(command or "").strip()
             or str(description or "").strip()
         ):
-            print(
-                "[PROJECT TASK REJECTED: NO EXECUTABLE DETAILS]",
-                {
-                    "title": title,
-                    "action": action,
-                    "description": description,
-                },
-                flush=True,
-            )
             return None
 
         projects = self._load_projects()
@@ -3066,7 +3377,18 @@ class ProjectWorkspaceService:
                 ).strip(),
                 "status": "open",
                 "steps": (
-                    steps
+                    [
+                        {
+                            **step,
+                            "id": str(
+                                step.get("id")
+                                or step.get("step_id")
+                                or f"step_{uuid.uuid4().hex[:12]}_{index + 1}"
+                            ),
+                        }
+                        for index, step in enumerate(steps)
+                        if isinstance(step, dict)
+                    ]
                     if isinstance(
                         steps,
                         list,
@@ -3106,12 +3428,16 @@ class ProjectWorkspaceService:
                     expected_output or ""
                 ).strip(),
                 "completion_criteria": (
-                    list(completion_criteria)
+                    "\n".join(
+                        str(item).strip()
+                        for item in completion_criteria
+                        if str(item or "").strip()
+                    )
                     if isinstance(
                         completion_criteria,
                         list,
                     )
-                    else []
+                    else str(completion_criteria or "").strip()
                 ),
 
                 "target_file": str(
@@ -3145,6 +3471,9 @@ class ProjectWorkspaceService:
                     requires_approval
                 ),
                 "approval_required": bool(
+                    requires_approval
+                ),
+                "approval_was_required": bool(
                     requires_approval
                 ),
                 "approval_status": (
@@ -3339,11 +3668,14 @@ class ProjectWorkspaceService:
 
         return None
 
+    @_synchronized_project_storage
     def update_task_status(
         self,
         project_id,
         task_id,
         status,
+        result=None,
+        error=None,
     ):
         projects = self._load_projects()
 
@@ -3383,6 +3715,19 @@ class ProjectWorkspaceService:
                     status
                 ).strip()
 
+                if result is not None:
+                    task["result"] = result
+
+                if error is not None:
+                    task["error"] = error
+                elif str(status).strip().lower() in {
+                    "completed",
+                    "complete",
+                    "done",
+                    "success",
+                }:
+                    task.pop("error", None)
+
                 project = self._refresh_phase_status(
                     project
                 )
@@ -3405,6 +3750,7 @@ class ProjectWorkspaceService:
 
         return None
 
+    @_synchronized_project_storage
     def update_nested_step_status(
         self,
         project_id,
@@ -3515,6 +3861,8 @@ class ProjectWorkspaceService:
                 }
 
                 if normalized_status in terminal_statuses:
+                    target_step.pop("error", None)
+                    target_step.pop("failure_reason", None)
 
                     all_steps_complete = all(
                         isinstance(
@@ -3530,36 +3878,35 @@ class ProjectWorkspaceService:
                         for nested_step in nested_steps
                     )
 
-                    print(
-                        "[TASK COMPLETION CHECK]",
-                        {
-                            "task_id": task.get("id"),
-                            "task_status_before": task.get("status"),
-                            "steps": [
-                                {
-                                    "id": s.get("id"),
-                                    "status": s.get("status"),
-                                    "state": s.get("state"),
-                                }
-                                for s in nested_steps
-                                if isinstance(s, dict)
-                            ],
-                            "all_steps_complete": all_steps_complete,
-                        },
-                        flush=True,
-                    )
-
                     if all_steps_complete:
                         task["status"] = "completed"
-
-                    if all_steps_complete:
-                        task["status"] = "completed"
+                        task.pop("error", None)
+                        task.pop("failure_reason", None)
 
                 elif normalized_status in {
                     "failed",
                     "blocked",
                 }:
                     task["status"] = normalized_status
+                    task["error"] = str(
+                        error
+                        or target_step.get("error")
+                        or (
+                            "Nested execution step is blocked."
+                            if normalized_status == "blocked"
+                            else "Nested execution step failed."
+                        )
+                    )
+
+                elif normalized_status in {
+                    "cancelled",
+                    "canceled",
+                }:
+                    task["status"] = "cancelled"
+
+                project = self._refresh_phase_status(
+                    project
+                )
 
                 project = self._refresh_project_brain_state(
                     project
@@ -3581,6 +3928,7 @@ class ProjectWorkspaceService:
         return None
 
 
+    @_synchronized_project_storage
     def update_project_tasks(
         self,
         project_id,

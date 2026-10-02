@@ -773,9 +773,24 @@ app.secret_key = os.environ.get(
     "NOVA_SECRET_KEY"
 )
 
+_nova_railway_environment = str(
+    os.getenv("RAILWAY_ENVIRONMENT") or ""
+).strip().lower()
+_nova_is_production = (
+    str(os.getenv("FLASK_ENV") or "").strip().lower() == "production"
+    or _nova_railway_environment == "production"
+)
+if _nova_is_production and (
+    not app.secret_key or len(app.secret_key) < 32
+):
+    raise RuntimeError(
+        "NOVA_SECRET_KEY must contain at least 32 characters in production."
+    )
+
 app.config["TEMPLATES_AUTO_RELOAD"] = True
-app.config["SESSION_COOKIE_SECURE"] = False
+app.config["SESSION_COOKIE_SECURE"] = _nova_is_production
 app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_NAME"] = "nova_session"
 
 CORS(app)
@@ -1260,7 +1275,7 @@ def index():
 
 @app.get("/preview")
 def preview():
-    return render_template("preview_index.html")
+    return redirect("/app")
 
 @app.get("/mobile")
 def mobile():
@@ -1516,21 +1531,32 @@ def about():
 def faq():
     return render_template("nova_faq.html")
 
+@app.get("/roadmap")
+def nova_roadmap_page():
+    return render_template("nova_roadmap.html")
+
 @app.route("/api/models", methods=["GET"])
 def api_models_route():
     from nova_backend.model_registry import (
         get_default_model_alias,
-        get_model_details,
-        get_public_models,
+    )
+    from nova_backend.services.provider_gateway_service import (
+        get_invocable_model_details,
     )
 
-    models = get_public_models()
-    default_model = get_default_model_alias()
+    model_details = get_invocable_model_details()
+    models = [item["id"] for item in model_details]
+    configured_default = get_default_model_alias()
+    default_model = (
+        configured_default
+        if configured_default in models
+        else (models[0] if models else "")
+    )
 
     return {
         "ok": True,
         "models": models,
-        "model_details": get_model_details(),
+        "model_details": model_details,
         "default_model": default_model,
         "selected_model": default_model,
     }
@@ -1539,7 +1565,9 @@ def api_models_route():
 def api_models_select_route():
     from nova_backend.model_registry import (
         get_default_model_alias,
-        get_public_models,
+    )
+    from nova_backend.services.provider_gateway_service import (
+        select_invocable_model,
     )
 
     data = request.get_json(silent=True) or {}
@@ -1548,10 +1576,10 @@ def api_models_select_route():
         data.get("model") or ""
     ).strip()
 
-    available_models = get_public_models()
-
-    if requested_model not in available_models:
-        requested_model = get_default_model_alias()
+    requested_model = select_invocable_model(
+        requested_model,
+        get_default_model_alias(),
+    )
 
     return {
         "ok": True,
@@ -1744,6 +1772,22 @@ def api_projects():
         }
     )
 
+@app.before_request
+def nova_project_api_auth_guard():
+    from nova_backend.services.auth_context import project_api_auth_required
+
+    if project_api_auth_required(
+        request.path,
+        get_current_user_id(),
+    ):
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Authentication required.",
+            }
+        ), 401
+    return None
+
 @app.route("/api/debug/chat-route", methods=["GET"])
 def api_debug_chat_route():
     rules = []
@@ -1823,30 +1867,9 @@ def api_project_get(
     methods=["POST"],
 )
 def api_projects_new():
-    print(
-        "[PROJECTS NEW DEBUG] content_type=",
-        request.content_type,
-        flush=True,
-    )
-
-    print(
-        "[PROJECTS NEW DEBUG] raw_body=",
-        request.get_data(
-            cache=True,
-            as_text=True,
-        ),
-        flush=True,
-    )
-
     data = request.get_json(
         silent=True
     ) or {}
-
-    print(
-        "[PROJECTS NEW DEBUG] parsed_data=",
-        data,
-        flush=True,
-    )
 
     name = str(
         data.get("name") or ""
@@ -4429,28 +4452,8 @@ def api_project_execution_state(
 def api_project_execution_control(
     project_id,
 ):
-    raw_body = request.get_data(
-        cache=True,
-        as_text=True,
-    )
-
-    print(
-        "[PROJECT EXECUTION DEBUG] RAW BODY:",
-        repr(raw_body),
-    )
-
-    print(
-        "[PROJECT EXECUTION DEBUG] CONTENT TYPE:",
-        request.content_type,
-    )
-
     data = request.get_json(
         silent=True
-    )
-
-    print(
-        "[PROJECT EXECUTION DEBUG] JSON:",
-        repr(data),
     )
 
     if not isinstance(data, dict):
@@ -4460,19 +4463,11 @@ def api_project_execution_control(
         data.get("action") or ""
     ).strip().lower()
 
-    print(
-        "[PROJECT EXECUTION DEBUG] ACTION:",
-        repr(action),
-    )
-
     if not action:
         return jsonify(
             {
                 "ok": False,
                 "error": "Missing execution action.",
-                "debug_raw_body": raw_body,
-                "debug_content_type": request.content_type,
-                "debug_json": data,
             }
         ), 400
 
@@ -4488,6 +4483,9 @@ def api_project_execution_control(
                 "error": "Project or execution action not found.",
             }
         ), 404
+
+    if result.get("status") == "invalid_action":
+        return jsonify(result), 400
 
     return jsonify(
         {
@@ -5090,6 +5088,20 @@ def nova_session_put_messages_compat_20260829(session_id):
     })
 
 # NOVA_APP_ROUTE_AUTH_PROTECTED_20260908
+@app.get("/super-ai")
+def nova_super_ai_page():
+    auth_user_id = str(
+        session.get("nova_user_id")
+        or session.get("user_id")
+        or ""
+    ).strip()
+
+    if not auth_user_id:
+        return redirect("/login")
+
+    return render_template("super_ai.html")
+
+
 @app.get("/app")
 def nova_desktop_app_fixed_20260610():
 

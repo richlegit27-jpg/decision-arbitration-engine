@@ -28,6 +28,7 @@ def get_stripe_client():
 def create_customer(
     email=None,
     username=None,
+    user_id=None,
 ):
     stripe = get_stripe_client()
 
@@ -36,10 +37,13 @@ def create_customer(
     if email:
         params["email"] = email
 
+    metadata = {}
     if username:
-        params["metadata"] = {
-            "nova_username": str(username)
-        }
+        metadata["nova_username"] = str(username)
+    if user_id:
+        metadata["nova_user_id"] = str(user_id)
+    if metadata:
+        params["metadata"] = metadata
 
     return stripe.Customer.create(
         **params
@@ -52,6 +56,7 @@ def create_checkout_session(
     cancel_url,
     customer_id=None,
     username=None,
+    user_id=None,
 ):
     stripe = get_stripe_client()
 
@@ -69,10 +74,12 @@ def create_checkout_session(
         "metadata": {
             "nova_price_id": str(price_id),
             "nova_username": str(username or ""),
+            "nova_user_id": str(user_id or ""),
         },
         "subscription_data": {
             "metadata": {
                 "nova_username": str(username or ""),
+                "nova_user_id": str(user_id or ""),
             },
         },
     }

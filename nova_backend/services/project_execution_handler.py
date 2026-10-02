@@ -158,8 +158,13 @@ class ProjectExecutionHandler:
 
             return NextMove(
                 id=step_id or "project-execution",
-                type="execute",
-                payload=payload,
+                # Keep command and file execution on the project step
+                # pipeline.  run_next_step() routes run_step moves with a
+                # nested step through ExecutionStepService; sending
+                # "execute" directly to default_executor produces
+                # "Unknown move type: execute".
+                type="run_step",
+                payload={"step": payload},
             )
 
 

@@ -1,6 +1,8 @@
 class LoginPageRouteService:
 
     def install_routes(self, app):
+        import json
+        from pathlib import Path
         from flask import render_template, redirect, request, session
 
         def route_exists(rule):
@@ -41,6 +43,44 @@ class LoginPageRouteService:
                 "reset_password.html",
             )
 
+        def account_page():
+            user_id = str(session.get("nova_user_id") or "").strip()
+            if not user_id:
+                return redirect("/login")
+
+            users_path = (
+                Path(
+                    app.config.get("NOVA_AUTH_USERS_PATH")
+                    or (
+                        Path(__file__).resolve().parents[2]
+                        / "data"
+                        / "nova_auth_users.json"
+                    )
+                )
+            )
+            try:
+                users = json.loads(users_path.read_text(encoding="utf-8")).get(
+                    "users", []
+                )
+            except (OSError, ValueError, AttributeError):
+                users = []
+
+            user = next(
+                (item for item in users if str(item.get("id") or "") == user_id),
+                None,
+            )
+            if not user:
+                session.clear()
+                return redirect("/login")
+
+            return render_template(
+                "account.html",
+                username=str(user.get("username") or "User"),
+                auth_provider=str(user.get("auth_provider") or "local"),
+                mfa_enabled=bool(user.get("mfa_enabled", False)),
+                google_linked=bool(user.get("google_sub")),
+            )
+
         if not route_exists("/login"):
             app.add_url_rule(
                 "/login",
@@ -70,6 +110,14 @@ class LoginPageRouteService:
                 "/reset-password",
                 "nova_reset_password_page_20260908",
                 reset_password_page,
+                methods=["GET"],
+            )
+
+        if not route_exists("/account"):
+            app.add_url_rule(
+                "/account",
+                "nova_account_security_page_20261002",
+                account_page,
                 methods=["GET"],
             )
 

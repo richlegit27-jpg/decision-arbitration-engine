@@ -1124,14 +1124,25 @@ async function sendNow(event) {
 
     if (!text) return false;
 
+    const modelSelector = $("nova-mobile-model");
+    const selectedModel = String(modelSelector?.value || "").trim();
+    if (modelSelector && (modelSelector.disabled || !selectedModel)) {
+        modelSelector.title = "Wait for an available model before sending.";
+        return false;
+    }
+
     const sessionId = getSessionId();
 const attachments = currentAttachmentsForSend();
+const attachmentInput = $("nova-mobile-file-input");
+const wasAttachmentInputDisabled = attachmentInput?.disabled || false;
+const abortController = new AbortController();
 
 console.log("[Nova Send Final Owner] sending attachments", attachments);
 
-clearAttachmentsAfterSend();
-
     sending = true;
+    if (attachmentInput) attachmentInput.disabled = true;
+    window.NovaMobileAbortController = abortController;
+    window.__novaMobileAbortController = abortController;
 
     input.value = "";
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1143,6 +1154,7 @@ clearAttachmentsAfterSend();
     try {
         const res = await fetch("/api/chat", {
             method: "POST",
+            signal: abortController.signal,
             credentials: "same-origin",
             cache: "no-store",
             headers: {
@@ -1154,6 +1166,7 @@ clearAttachmentsAfterSend();
                 user_text: text,
                 session_id: sessionId,
                 sessionId: sessionId,
+                model: selectedModel,
                 attachments: attachments
             })
         });
@@ -1216,9 +1229,11 @@ try {
 
         console.log("[Nova Send Final Owner] raw response", data);
 
-        if (!res.ok) {
+        if (!res.ok || data?.ok === false) {
             throw new Error(data?.error || data?.message || "Chat request failed");
         }
+
+        clearAttachmentsAfterSend();
 
 const reply = messageTextFromResponse(data, text) || "No response text returned.";
 
@@ -1252,11 +1267,25 @@ if (!finalImageUrl) {
     } catch (error) {
         console.error("[Nova Send Final Owner] send failed", error);
 
+        if (!String(input.value || "").trim()) {
+            input.value = text;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
         if (assistantBubble) {
-            assistantBubble.textContent = "Send failed: " + (error?.message || "unknown error");
+            assistantBubble.textContent = error?.name === "AbortError"
+                ? "Request stopped. Check the conversation before retrying."
+                : "Send failed: " + (error?.message || "unknown error");
         }
     } finally {
         sending = false;
+        if (attachmentInput) attachmentInput.disabled = wasAttachmentInputDisabled;
+        if (window.NovaMobileAbortController === abortController) {
+            window.NovaMobileAbortController = null;
+        }
+        if (window.__novaMobileAbortController === abortController) {
+            window.__novaMobileAbortController = null;
+        }
     }
 
     return false;
@@ -1300,6 +1329,89 @@ function wireSend() {
     });
 }
 
+async function loadMobileModels() {
+    const selector = $("nova-mobile-model");
+    if (!selector) return;
+
+    selector.disabled = true;
+    if (sendButton()) sendButton().disabled = true;
+    selector.replaceChildren(new Option("Loading available models…", ""));
+
+    try {
+        const response = await fetch("/api/models", {
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.ok === false) {
+            throw new Error(payload?.error || "Could not load available models.");
+        }
+
+        const models = Array.isArray(payload.models) ? payload.models : [];
+        const details = Array.isArray(payload.model_details) ? payload.model_details : [];
+        selector.replaceChildren();
+
+        if (!models.length) {
+            selector.appendChild(new Option("No model provider available", ""));
+            selector.title = "Configure a supported provider to enable chat.";
+            return;
+        }
+
+        for (const id of models) {
+            const detail = details.find((item) => item.id === id);
+            const option = new Option(detail?.label || id, id);
+            option.title = detail?.description || id;
+            selector.appendChild(option);
+        }
+
+        const saved = localStorage.getItem("NOVA_MODEL") ||
+            localStorage.getItem("nova_selected_model") || "";
+        const initial = models.includes(saved)
+            ? saved
+            : (payload.selected_model || payload.default_model || models[0]);
+        selector.value = models.includes(initial) ? initial : models[0];
+        localStorage.setItem("NOVA_MODEL", selector.value);
+        selector.title = "Select an available Nova model.";
+        if (sendButton()) sendButton().disabled = false;
+        let confirmedModel = selector.value;
+
+        if (selector.dataset.novaProviderModelPickerBound !== "1") {
+            selector.dataset.novaProviderModelPickerBound = "1";
+            selector.addEventListener("change", async () => {
+                const requested = selector.value;
+                selector.disabled = true;
+                try {
+                    const result = await fetch("/api/models/select", {
+                        method: "POST",
+                        credentials: "same-origin",
+                        cache: "no-store",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ model: requested })
+                    });
+                    const selection = await result.json().catch(() => ({}));
+                    if (!result.ok || selection?.ok === false || !selection.selected_model) {
+                        throw new Error(selection?.error || "Model selection failed.");
+                    }
+                    selector.value = selection.selected_model;
+                    confirmedModel = selector.value;
+                    localStorage.setItem("NOVA_MODEL", selector.value);
+                } catch (error) {
+                    selector.title = error?.message || "Model selection failed.";
+                    selector.value = confirmedModel;
+                } finally {
+                    selector.disabled = false;
+                }
+            });
+        }
+    } catch (error) {
+        selector.replaceChildren(new Option("Models unavailable", ""));
+        selector.title = error?.message || "Could not load available models.";
+        console.error("[Nova Mobile] model list unavailable", error);
+    } finally {
+        selector.disabled = selector.options.length === 0 || !selector.value;
+    }
+}
+
 window.NovaMobileSendNow = sendNow;
 
 window.NovaMobileSendText = function (text) {
@@ -1317,6 +1429,7 @@ window.NovaMobileSendText = function (text) {
 window.sendText = window.NovaMobileSendText;
 
 wireSend();
+loadMobileModels();
 
 setTimeout(wireSend, 50);
 setTimeout(wireSend, 250);

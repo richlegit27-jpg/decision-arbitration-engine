@@ -1,9 +1,12 @@
 import json
 import secrets
+import base64
+from io import BytesIO
 from datetime import datetime, timezone
 from pathlib import Path
 
 import bcrypt
+from filelock import FileLock, Timeout
 from nova_backend.services.email_verification_service import (
     EmailVerificationService,
 )
@@ -42,7 +45,12 @@ class LocalAuthRouteService:
         from nova_backend.services.mfa_service import (
             generate_secret,
             build_provisioning_uri,
-            verify_code,
+            consume_recovery_code,
+            decrypt_totp_secret,
+            encrypt_totp_secret,
+            generate_recovery_codes,
+            hash_recovery_code,
+            verify_code_counter,
         )
         email_verification_service = (
             EmailVerificationService()
@@ -198,19 +206,31 @@ class LocalAuthRouteService:
             if not user:
                 return None
 
+            try:
+                from nova_backend.services.billing_service import get_account
+
+                billing_account = get_account(
+                    username=user.get("username"),
+                    user_id=user.get("id"),
+                )
+            except Exception:
+                billing_account = None
+
             return {
                 "id": user.get("id"),
                 "username": user.get(
                     "username"
                 ),
                 "email": user.get("email"),
-                "plan": user.get(
-                    "plan",
-                    "free",
+                "plan": (
+                    billing_account.get("plan")
+                    if isinstance(billing_account, dict)
+                    else None
                 ),
-                "credits": user.get(
-                    "credits",
-                    0,
+                "credits": (
+                    billing_account.get("credits")
+                    if isinstance(billing_account, dict)
+                    else None
                 ),
                 "subscription_status": user.get(
                     "subscription_status",
@@ -288,6 +308,7 @@ class LocalAuthRouteService:
             ]
 
             session["authenticated"] = True
+            session["username"] = str(user.get("username") or "")
 
             session["auth_mode"] = (
                 user.get("auth_provider")
@@ -422,17 +443,28 @@ class LocalAuthRouteService:
 
             save_users(data)
 
-            establish_session(user)
-
             return jsonify({
                 "ok": True,
-                "authenticated": True,
+                "authenticated": False,
                 "email_verification_required": True,
-                "verification_url": (
-                    "/verify-email?token="
-                    + verification["token"]
-                ),
                 "user": public_user(user),
+                **(
+                    {
+                        "verification_url": (
+                            "/verify-email?token="
+                            + verification["token"]
+                        )
+                    }
+                    if app.testing
+                    or (
+                        app.debug
+                        and app.config.get(
+                            "NOVA_EXPOSE_EMAIL_VERIFICATION_TOKEN",
+                            False,
+                        )
+                    )
+                    else {}
+                ),
             })
 
         def auth_verify_email():
@@ -571,6 +603,16 @@ class LocalAuthRouteService:
                     ),
                 }), 401
 
+            if (
+                "email_verified" in user
+                and not bool(user.get("email_verified"))
+            ):
+                return jsonify({
+                    "ok": False,
+                    "error": "Verify your email address before signing in.",
+                    "email_verification_required": True,
+                }), 403
+
             if migrate_password:
 
                 data = load_users()
@@ -663,9 +705,10 @@ class LocalAuthRouteService:
 
             token = secrets.token_urlsafe(32)
 
-            user[
-                "password_reset_token"
-            ] = token
+            user["password_reset_token_hash"] = (
+                email_verification_service.hash_token(token)
+            )
+            user.pop("password_reset_token", None)
 
             user[
                 "password_reset_expires"
@@ -696,11 +739,9 @@ class LocalAuthRouteService:
                 ),
             }
 
-            if app.config.get(
-                "TESTING"
-            ) or app.config.get(
-                "NOVA_EXPOSE_RESET_TOKEN",
-                False,
+            if app.testing or (
+                app.debug
+                and app.config.get("NOVA_EXPOSE_RESET_TOKEN", False)
             ):
                 response["token"] = token
 
@@ -734,12 +775,21 @@ class LocalAuthRouteService:
 
             for user in data["users"]:
 
-                if (
-                    user.get(
-                        "password_reset_token"
+                stored_hash = str(
+                    user.get("password_reset_token_hash") or ""
+                )
+                token_matches = bool(stored_hash) and secrets.compare_digest(
+                    email_verification_service.hash_token(token),
+                    stored_hash,
+                )
+                if not stored_hash:
+                    # One-time compatibility for unexpired tokens issued before
+                    # reset tokens were changed to hashed-at-rest storage.
+                    token_matches = secrets.compare_digest(
+                        str(user.get("password_reset_token") or ""),
+                        token,
                     )
-                    != token
-                ):
+                if not token_matches:
                     continue
 
                 expires = float(
@@ -776,9 +826,8 @@ class LocalAuthRouteService:
                     None,
                 )
 
-                user[
-                    "password_reset_token"
-                ] = ""
+                user.pop("password_reset_token", None)
+                user.pop("password_reset_token_hash", None)
 
                 user[
                     "password_reset_expires"
@@ -825,6 +874,8 @@ class LocalAuthRouteService:
                     ),
                 }), 401
 
+            payload = request.get_json(silent=True) or {}
+            current_password = str(payload.get("current_password") or "")
             data = load_users()
 
             for user in data.get(
@@ -835,29 +886,58 @@ class LocalAuthRouteService:
                 if user.get("id") != user_id:
                     continue
 
+                password_valid, _ = verify_password(current_password, user)
+                if not password_valid:
+                    return jsonify({
+                        "ok": False,
+                        "error": "Confirm your current password before changing MFA settings.",
+                    }), 403
+
+                if bool(user.get("mfa_enabled", False)):
+                    return jsonify({
+                        "ok": False,
+                        "error": "MFA is already enabled. Verify an existing factor before changing it.",
+                    }), 409
+
                 secret = generate_secret()
+                try:
+                    encrypted_secret = encrypt_totp_secret(secret)
+                except Exception:
+                    return jsonify({
+                        "ok": False,
+                        "error": "MFA setup is unavailable until Nova's encryption key is configured.",
+                    }), 503
 
-                user["mfa_secret"] = secret
-
-                user[
-                    "mfa_enabled"
-                ] = False
+                user["mfa_pending_secret"] = encrypted_secret
+                user["mfa_pending_expires_at"] = (
+                    datetime.now(timezone.utc).timestamp() + 600
+                )
 
                 save_users(data)
 
-                return jsonify({
+                provisioning_uri = build_provisioning_uri(
+                    user.get("username", "Nova"),
+                    secret,
+                )
+                enrollment_payload = {
                     "ok": True,
                     "secret": secret,
-                    "uri": (
-                        build_provisioning_uri(
-                            user.get(
-                                "username",
-                                "Nova",
-                            ),
-                            secret,
-                        )
-                    ),
-                })
+                    "uri": provisioning_uri,
+                }
+                try:
+                    import qrcode
+
+                    image = qrcode.make(provisioning_uri)
+                    image_bytes = BytesIO()
+                    image.save(image_bytes, format="PNG")
+                    enrollment_payload["qr_data_url"] = (
+                        "data:image/png;base64,"
+                        + base64.b64encode(image_bytes.getvalue()).decode("ascii")
+                    )
+                except Exception:
+                    app.logger.warning("QR generation is unavailable for MFA setup.")
+
+                return jsonify(enrollment_payload)
 
             return jsonify({
                 "ok": False,
@@ -898,29 +978,49 @@ class LocalAuthRouteService:
                 if user.get("id") != user_id:
                     continue
 
-                if not verify_code(
-                    user.get(
-                        "mfa_secret",
-                        "",
-                    ),
-                    code,
-                ):
+                pending_expires_at = float(
+                    user.get("mfa_pending_expires_at", 0) or 0
+                )
+                if pending_expires_at < datetime.now(timezone.utc).timestamp():
                     return jsonify({
                         "ok": False,
-                        "error": (
-                            "Invalid MFA code."
-                        ),
+                        "error": "MFA enrollment expired. Start setup again.",
                     }), 400
 
+                try:
+                    pending_secret = decrypt_totp_secret(
+                        user.get("mfa_pending_secret", "")
+                    )
+                except Exception:
+                    return jsonify({
+                        "ok": False,
+                        "error": "MFA setup could not be verified. Start setup again.",
+                    }), 503
+
+                counter = verify_code_counter(pending_secret, code)
+                if counter is None:
+                    return jsonify({
+                        "ok": False,
+                        "error": "Invalid MFA code.",
+                    }), 400
+
+                recovery_codes = generate_recovery_codes()
+                user["mfa_secret"] = user.pop("mfa_pending_secret")
+                user.pop("mfa_pending_expires_at", None)
+                user["mfa_last_counter"] = counter
                 user[
                     "mfa_enabled"
                 ] = True
+                user["mfa_recovery_code_hashes"] = [
+                    hash_recovery_code(item) for item in recovery_codes
+                ]
 
                 save_users(data)
 
                 return jsonify({
                     "ok": True,
                     "mfa_enabled": True,
+                    "recovery_codes": recovery_codes,
                 })
 
             return jsonify({
@@ -974,61 +1074,68 @@ class LocalAuthRouteService:
                 payload.get("code")
             )
 
-            data = load_users()
+            authenticated_user = None
+            failure_status = 401
+            failure_message = "Invalid MFA code."
+            try:
+                with FileLock(str(self.users_path) + ".lock", timeout=5):
+                    data = load_users()
+                    for user in data.get("users", []):
+                        if user.get("id") != user_id:
+                            continue
+                        if not bool(user.get("mfa_enabled", False)):
+                            session.clear()
+                            return jsonify({
+                                "ok": False,
+                                "error": "MFA is not enabled.",
+                            }), 400
 
-            for user in data.get(
-                "users",
-                [],
-            ):
-
-                if user.get("id") != user_id:
-                    continue
-
-                if not bool(
-                    user.get(
-                        "mfa_enabled",
-                        False,
-                    )
-                ):
-                    session.clear()
-
-                    return jsonify({
-                        "ok": False,
-                        "error": (
-                            "MFA is not enabled."
-                        ),
-                    }), 400
-
-                if not verify_code(
-                    user.get(
-                        "mfa_secret",
-                        "",
-                    ),
-                    code,
-                ):
-                    return jsonify({
-                        "ok": False,
-                        "error": (
-                            "Invalid MFA code."
-                        ),
-                    }), 401
-
-                establish_session(user)
-
+                        stored_secret = str(user.get("mfa_secret", "") or "")
+                        try:
+                            active_secret = decrypt_totp_secret(stored_secret)
+                        except Exception:
+                            active_secret = ""
+                        counter = verify_code_counter(
+                            active_secret,
+                            code,
+                            last_counter=user.get("mfa_last_counter", -1),
+                        )
+                        accepted = counter is not None
+                        if accepted:
+                            user["mfa_last_counter"] = counter
+                            if not stored_secret.startswith("fernet:"):
+                                try:
+                                    user["mfa_secret"] = encrypt_totp_secret(stored_secret)
+                                except Exception:
+                                    pass
+                        else:
+                            accepted = consume_recovery_code(user, code)
+                        if not accepted:
+                            break
+                        save_users(data)
+                        authenticated_user = dict(user)
+                        break
+                    else:
+                        failure_status = 404
+                        failure_message = "User not found."
+            except Timeout:
                 return jsonify({
-                    "ok": True,
-                    "authenticated": True,
-                    "user": public_user(user),
-                })
+                    "ok": False,
+                    "error": "MFA verification is temporarily busy. Please retry.",
+                }), 503
 
-            session.clear()
+            if not authenticated_user:
+                return jsonify({
+                    "ok": False,
+                    "error": failure_message,
+                }), failure_status
 
+            establish_session(authenticated_user)
             return jsonify({
-                "ok": False,
-                "error": (
-                    "User not found."
-                ),
-            }), 404
+                "ok": True,
+                "authenticated": True,
+                "user": public_user(authenticated_user),
+            })
 
         def auth_mfa_disable():
 
@@ -1062,19 +1169,30 @@ class LocalAuthRouteService:
                 if user.get("id") != user_id:
                     continue
 
-                if not verify_code(
-                    user.get(
-                        "mfa_secret",
-                        "",
-                    ),
+                try:
+                    active_secret = decrypt_totp_secret(
+                        user.get("mfa_secret", "")
+                    )
+                except Exception:
+                    return jsonify({
+                        "ok": False,
+                        "error": "MFA is temporarily unavailable. Check Nova's encryption configuration.",
+                    }), 503
+
+                counter = verify_code_counter(
+                    active_secret,
                     code,
-                ):
+                    last_counter=user.get("mfa_last_counter", -1),
+                )
+                if counter is None:
                     return jsonify({
                         "ok": False,
                         "error": (
                             "Invalid MFA code."
                         ),
                     }), 400
+
+                user["mfa_last_counter"] = counter
 
                 user[
                     "mfa_enabled"
@@ -1083,6 +1201,8 @@ class LocalAuthRouteService:
                 user[
                     "mfa_secret"
                 ] = ""
+                user["mfa_recovery_code_hashes"] = []
+                user.pop("mfa_last_counter", None)
 
                 save_users(data)
 
@@ -1145,7 +1265,7 @@ class LocalAuthRouteService:
                 "/api/auth/mfa/setup",
                 "nova_auth_mfa_setup_20260908",
                 auth_mfa_setup,
-                ["GET"],
+                ["POST"],
             ),
             (
                 "/api/auth/mfa/verify-setup",

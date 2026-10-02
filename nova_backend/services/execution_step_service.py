@@ -1,4 +1,6 @@
-﻿import re
+﻿import builtins
+import os
+import re
 from pathlib import Path
 
 from nova_backend.services.execution_approval_service import (
@@ -8,6 +10,12 @@ from nova_backend.services.execution_approval_service import (
 from nova_backend.services.ai_execution_service import (
     AIExecutionService,
 )
+
+
+def _execution_debug(*args, **kwargs):
+    enabled = str(os.environ.get("NOVA_EXECUTION_DEBUG") or "").lower()
+    if enabled in {"1", "true", "yes", "on"}:
+        builtins.print(*args, **kwargs)
 
 
 class ExecutionStepService:
@@ -1071,7 +1079,7 @@ class ExecutionStepService:
             step.get("action")
         ).lower().strip()
 
-        print(
+        _execution_debug(
             "[DEBUG STEP BEFORE NORMALIZE]",
             {
                 "title": step.get("title"),
@@ -1087,7 +1095,7 @@ class ExecutionStepService:
             step
         )
 
-        print(
+        _execution_debug(
             "[DEBUG STEP AFTER NORMALIZE]",
             {
                 "title": step.get("title"),
@@ -1182,15 +1190,15 @@ class ExecutionStepService:
                     ).strip():
                         content = (
                             "def http_execution_acceptance():\n"
-                            f'    return "{return_marker}"\n'
+                            f'    return "{marker}"\n'
                         )
 
                         step["content"] = content
                         step["file_content"] = content
                         step["generated_content"] = content
-                        step["expected_output"] = return_marker
+                        step["expected_output"] = marker
 
-                        print(
+                        _execution_debug(
                             "[PYTHON CONTENT NORMALIZED]",
                             {
                                 "target_file": target_file,
@@ -1215,7 +1223,7 @@ class ExecutionStepService:
                 and content
             ):
 
-                print(
+                _execution_debug(
                     "[DEBUG DIRECT WRITE FINAL]",
                     {
                         "action": action,
@@ -1227,13 +1235,42 @@ class ExecutionStepService:
                 )
 
                 try:
-                    with open(
-                        target_file,
-                        "w",
-                        encoding="utf-8",
-                    ) as f:
-                        f.write(content)
+                    step = self._execute_file_implementation(
+                        step=step,
+                        target_file=target_file,
+                        content=content,
+                    )
+                    # Never overwrite a file-writer failure with completed.
+                    step_status = str(
+                        step.get("status") or ""
+                    ).strip().lower()
 
+                    step_metadata = step.get("execution_metadata")
+
+                    if (
+                        step_status in {
+                            "failed",
+                            "failure",
+                            "error",
+                            "errored",
+                            "blocked",
+                        }
+                        or (
+                            isinstance(step_metadata, dict)
+                            and step_metadata.get("success") is False
+                        )
+                    ):
+                        step["status"] = "failed"
+                        step["state"] = "failed"
+                        step["completion_status"] = "failed"
+                        step.setdefault(
+                            "error",
+                            step.get("result") or "File implementation failed.",
+                        )
+                        step["complete"] = False
+                        return step
+
+                    target_file = step.get("target_file") or target_file
                     mutation_action = (
                         "modify_file"
                         if action == "modify_file"
@@ -1583,7 +1620,7 @@ class ExecutionStepService:
             ):
                 mutation_actions = mutation_actions
 
-            print(
+            _execution_debug(
                 "[NOVA EXPLICIT WRITE READINESS]",
                 {
                     "action": step.get("action"),
@@ -1676,7 +1713,7 @@ class ExecutionStepService:
                     step["generated_content"] = content
                     step["expected_output"] = return_marker
 
-                    print(
+                    _execution_debug(
                         "[PYTHON CONTENT NORMALIZED]",
                         {
                             "target_file": target_file,
@@ -1775,6 +1812,35 @@ class ExecutionStepService:
                     content=content,
                 )
 
+                # Preserve file-writer failures; never mark them completed.
+                step_status = str(
+                    step.get("status") or ""
+                ).strip().lower()
+                step_metadata = step.get("execution_metadata")
+
+                if (
+                    step_status in {
+                        "failed",
+                        "failure",
+                        "error",
+                        "errored",
+                        "blocked",
+                    }
+                    or (
+                        isinstance(step_metadata, dict)
+                        and step_metadata.get("success") is False
+                    )
+                ):
+                    step["status"] = "failed"
+                    step["state"] = "failed"
+                    step["completion_status"] = "failed"
+                    step.setdefault(
+                        "error",
+                        step.get("result") or "File implementation failed.",
+                    )
+                    step["complete"] = False
+                    return step
+
                 step["status"] = "completed"
                 step["action"] = step.get("action") or step_action
                 step["next_action"] = None
@@ -1845,24 +1911,22 @@ class ExecutionStepService:
                     "expected_output": step.get("expected_output"),
                 }
 
-            elif execution_file:
+            elif execution_file and step_action in self.RUN_ACTIONS:
+                if not execution_file.lower().endswith(".py"):
+                    step["status"] = "failed"
+                    step["error"] = (
+                        "Non-Python execution file requested. "
+                        "Convert execution artifact to Python first."
+                    )
+                    return step
 
-                self._execute_project_python_file(
+                # Script execution is terminal for this step. Do not fall
+                # through and dispatch the same request again as a terminal
+                # tool command after the Python subprocess has completed.
+                return self._execute_project_python_file(
                     step=step,
                     execution_file=execution_file,
                 )
-
-            if (
-                step_action == "execute"
-                and execution_file
-                and not execution_file.lower().endswith(".py")
-            ):
-                step["status"] = "failed"
-                step["error"] = (
-                    "Non-Python execution file requested. "
-                    "Convert execution artifact to Python first."
-                )
-                return step
 
             # -------------------------------------------------
             # VERIFICATION INTENT NORMALIZATION
@@ -2180,7 +2244,11 @@ class ExecutionStepService:
 
             if result_status in {
                 "failed",
+                "failure",
                 "error",
+                "errored",
+                "exception",
+                "blocked",
             }:
                 raise RuntimeError(
                     self._safe_str(
@@ -2194,6 +2262,21 @@ class ExecutionStepService:
                 "waiting_approval",
             }:
                 return step
+
+            execution_metadata = step.get(
+                "execution_metadata"
+            )
+            if (
+                isinstance(execution_metadata, dict)
+                and execution_metadata.get("success") is False
+            ):
+                raise RuntimeError(
+                    self._safe_str(
+                        step.get("error")
+                        or execution_metadata.get("error")
+                        or "Execution step reported failure."
+                    )
+                )
 
             step["status"] = "completed"
             step["waiting"] = False
@@ -2219,7 +2302,7 @@ class ExecutionStepService:
                 exc
             )
 
-            print(
+            _execution_debug(
                 "EXECUTION STEP FAILED DEBUG =",
                 {
                     "step_id": step.get("id"),

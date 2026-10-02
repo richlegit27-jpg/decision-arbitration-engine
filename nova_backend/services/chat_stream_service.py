@@ -1,7 +1,8 @@
 ﻿import json
 import traceback
+import re
 
-from flask import Response, request, stream_with_context
+from flask import Response, stream_with_context
 
 
 class ChatStreamService:
@@ -98,188 +99,74 @@ class ChatStreamService:
             + "\n\n"
         )
 
+    def _extract_status(self, result):
+        if isinstance(result, tuple):
+            for item in result:
+                if isinstance(item, int):
+                    return item
+            for item in result:
+                status = self._extract_status(item)
+                if status is not None:
+                    return status
+
+        status = getattr(result, "status_code", None)
+        return status if isinstance(status, int) else None
+
+    def _completion_metadata(self, payload):
+        metadata = {}
+        assistant = payload.get("assistant_message")
+        if isinstance(assistant, dict):
+            for key in ("attachments", "image_url"):
+                if assistant.get(key):
+                    metadata[key] = assistant[key]
+        for key in ("attachments", "image_url"):
+            if payload.get(key) and key not in metadata:
+                metadata[key] = payload[key]
+        return metadata
+
     def stream(self, api_chat):
 
         @stream_with_context
         def generate():
-
             try:
-
-                done_payload = {
-                    "type": "done",
-                    "done": True,
-                }
-
-                if isinstance(payload, dict):
-                    assistant_message = payload.get(
-                        "assistant_message"
-                    )
-
-                    if isinstance(assistant_message, dict):
-                        if assistant_message.get("image_url"):
-                            done_payload["assistant_message"] = {
-                                "text": assistant_message.get(
-                                    "text",
-                                    ""
-                                ),
-                                "image_url": assistant_message.get(
-                                    "image_url"
-                                ),
-                                "attachments": assistant_message.get(
-                                    "attachments",
-                                    []
-                                ),
-                            }
-
-                        elif assistant_message.get("attachments"):
-                            done_payload["assistant_message"] = {
-                                "text": assistant_message.get(
-                                    "text",
-                                    ""
-                                ),
-                                "attachments": assistant_message.get(
-                                    "attachments"
-                                ),
-                            }
-
-                    if payload.get("image_url"):
-                        done_payload["image_url"] = payload.get(
-                            "image_url"
-                        )
-
-                    if payload.get("attachments"):
-                        done_payload["attachments"] = payload.get(
-                            "attachments"
-                        )
-
-                yield self._event(done_payload)
-
-                raw_before_api_chat = request.get_data(
-                    cache=True,
-                    as_text=True,
-                )
-
-                print(
-                    "[CHAT STREAM REQUEST BODY BEFORE API CHAT]",
-                    raw_before_api_chat,
-                    flush=True,
-                )
-
-                json_before_api_chat = request.get_json(
-                    silent=True,
-                    cache=True,
-                )
-
-                print(
-                    "[CHAT STREAM JSON BEFORE API CHAT]",
-                    json_before_api_chat,
-                    flush=True,
-                )
-
                 result = api_chat()
-
-                print(
-                    "[CHAT STREAM RAW RESULT]",
-                    type(result),
-                    repr(result)[:2000],
-                    flush=True,
-                )
-
-                yield self._event({
-                    "type": "debug",
-                    "result_type": str(type(result)),
-                    "result_repr": repr(result)[:3000],
-                })
-
                 payload = self._extract_payload(
                     result
                 )
 
-                print(
-                    "[CHAT STREAM PAYLOAD]",
-                    repr(payload)[:3000],
-                    flush=True,
+                status = self._extract_status(result)
+                failed = (
+                    (status is not None and status >= 400)
+                    or payload.get("ok") is False
+                    or bool(payload.get("error"))
                 )
 
-                yield self._event({
-                    "type": "debug",
-                    "payload": payload,
-                })
+                if failed:
+                    message = str(
+                        payload.get("error")
+                        or payload.get("message")
+                        or "Nova could not complete this request."
+                    )
+                    yield self._event({
+                        "type": "error",
+                        "content": message,
+                    })
+                    yield self._event({"type": "done", "done": True})
+                    return
 
                 text = self._extract_text(
                     payload
                 )
 
                 if not text:
+                    yield self._event({
+                        "type": "error",
+                        "content": "Nova returned an empty response.",
+                    })
+                    yield self._event({"type": "done", "done": True})
+                    return
 
-                    error_message = (
-                        payload.get("error")
-                        or payload.get("message")
-                        or "No response generated."
-                    )
-
-                yield self._event({
-                    "type": "message",
-                    "content": full.strip(),
-                })
-
-                done_payload = {
-                    "type": "done",
-                    "done": True,
-                }
-
-                if isinstance(payload, dict):
-                    assistant_message = payload.get(
-                        "assistant_message"
-                    )
-
-                    if isinstance(assistant_message, dict):
-                        if assistant_message.get("image_url"):
-                            done_payload["assistant_message"] = {
-                                "text": assistant_message.get(
-                                    "text",
-                                    ""
-                                ),
-                                "image_url": assistant_message.get(
-                                    "image_url"
-                                ),
-                                "attachments": assistant_message.get(
-                                    "attachments",
-                                    []
-                                ),
-                            }
-
-                        elif assistant_message.get("attachments"):
-                            done_payload["assistant_message"] = {
-                                "text": assistant_message.get(
-                                    "text",
-                                    ""
-                                ),
-                                "attachments": assistant_message.get(
-                                    "attachments"
-                                ),
-                            }
-
-                    if payload.get("image_url"):
-                        done_payload["image_url"] = payload.get(
-                            "image_url"
-                        )
-
-                    if payload.get("attachments"):
-                        done_payload["attachments"] = payload.get(
-                            "attachments"
-                        )
-
-                yield self._event(done_payload)
-
-                full = ""
-
-                for word in text.split():
-
-                    chunk = word + " "
-
-                    full += chunk
-
+                for chunk in re.findall(r"\S+\s*|\s+", text):
                     yield self._event({
                         "type": "token",
                         "content": chunk,
@@ -287,18 +174,18 @@ class ChatStreamService:
 
                 yield self._event({
                     "type": "message",
-                    "content": full.strip(),
+                    "content": text,
                 })
 
-                yield self._event({
+                done_payload = {
                     "type": "done",
                     "done": True,
-                })
+                }
+                done_payload.update(self._completion_metadata(payload))
+                yield self._event(done_payload)
 
             except Exception as error:
-
                 traceback.print_exc()
-
                 yield self._event({
                     "type": "error",
                     "content": str(error),

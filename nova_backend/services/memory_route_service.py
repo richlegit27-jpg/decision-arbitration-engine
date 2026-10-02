@@ -1,9 +1,9 @@
 from nova_backend.utils.api_response import ok_response, error_response
 from nova_backend.utils.request_utils import get_json_body, get_str
 from nova_backend.utils.route_guard import guarded_json_route
-from nova_backend.utils.time_utils import iso_now
 
-from flask import request
+from flask import jsonify, request
+from nova_backend.services.auth_context import get_current_user_id
 
 
 class MemoryRouteService:
@@ -12,6 +12,17 @@ class MemoryRouteService:
         self.memory_service = memory_service
 
     def install_routes(self, app):
+
+        @app.before_request
+        def require_authenticated_memory_api_owner():
+            path = str(request.path or "")
+            if path == "/api/memory" or path.startswith("/api/memory/"):
+                if not get_current_user_id():
+                    return jsonify({
+                        "ok": False,
+                        "error": "Authentication required.",
+                    }), 401
+            return None
 
         @app.get("/api/memory")
         @guarded_json_route
@@ -103,6 +114,12 @@ class MemoryRouteService:
                 pinned=pinned,
             )
 
+            if not item:
+                return error_response(
+                    error="Memory not found",
+                    code="not_found",
+                ), 404
+
             memory = self.memory_service.all()
 
             return ok_response(
@@ -144,11 +161,12 @@ class MemoryRouteService:
 
         @app.post("/api/memory/clear")
         def api_memory_clear():
-            self.memory_service.clear()
+            cleared = self.memory_service.clear()
 
             return {
                 "ok": True,
-                "message": "All memories cleared.",
+                "cleared": cleared,
+                "message": "Your memories were cleared.",
             }
 
         @app.post("/api/memory/update")
@@ -170,42 +188,30 @@ class MemoryRouteService:
 
             if not memory_id:
                 return error_response(
-                    "Missing memory id",
+                    error="Missing memory id",
                     code="missing_id",
                 ), 400
 
             if not text:
                 return error_response(
-                    "Missing memory text",
+                    error="Missing memory text",
                     code="missing_text",
                 ), 400
 
-            items = self.memory_service.all()
-
-            updated = None
-
-            for item in items:
-                if str(item.get("id")) == memory_id:
-                    item["text"] = text
-                    item["kind"] = kind
-                    item["updated_at"] = iso_now()
-                    updated = item
-                    break
+            updated = self.memory_service.update_memory(
+                memory_id,
+                text,
+                kind,
+            )
 
             if not updated:
                 return error_response(
-                    "Memory not found",
+                    error="Memory not found",
                     code="not_found",
                 ), 404
 
-            self.memory_service._write_store(
-                {
-                    "memory": items
-                }
-            )
-
             return ok_response(
-                item=updated,
+                data={"item": updated},
                 message="Memory updated.",
             )
 

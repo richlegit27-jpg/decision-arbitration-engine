@@ -7,6 +7,7 @@ Central provider dispatch layer for model execution.
 from __future__ import annotations
 
 import os
+import importlib.util
 from typing import Any
 
 
@@ -52,6 +53,54 @@ def provider_is_configured(provider: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def _provider_client_available(provider: str) -> bool:
+    module_by_provider = {
+        "openai": "openai",
+        "anthropic": "anthropic",
+        "google": "google.genai",
+        "xai": "openai",
+        "deepseek": "openai",
+    }
+    module_name = module_by_provider.get(
+        str(provider or "").strip().lower()
+    )
+    if not module_name:
+        return False
+
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except (ImportError, ModuleNotFoundError, ValueError):
+        return False
+
+
+def get_invocable_model_details() -> list[dict[str, str]]:
+    """Return registry models whose gateway provider can be called here."""
+    from nova_backend.model_registry import get_model_details
+
+    return [
+        item
+        for item in get_model_details()
+        if provider_is_configured(item.get("provider", ""))
+        and _provider_client_available(item.get("provider", ""))
+    ]
+
+
+def select_invocable_model(requested: str, default: str) -> str:
+    """Resolve a requested alias to one Nova can invoke in this process."""
+    available = [
+        item.get("id")
+        for item in get_invocable_model_details()
+        if item.get("id")
+    ]
+    requested = str(requested or "").strip()
+    default = str(default or "").strip()
+    if requested in available:
+        return requested
+    if default in available:
+        return default
+    return available[0] if available else ""
 
 
 def create_openai_client():

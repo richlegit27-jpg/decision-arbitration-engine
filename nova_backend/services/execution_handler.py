@@ -410,6 +410,8 @@ Rules:
 
         try:
             response = chat_completions_create(
+                nova_user_id=getattr(self, "current_user_id", None),
+                nova_enforce_credits=True,
                 model="gpt-4.1-mini",
                 messages=[
                     {
@@ -1429,6 +1431,8 @@ No explanation.
 
         try:
             response = chat_completions_create(
+                nova_user_id=getattr(self, "current_user_id", None),
+                nova_enforce_credits=True,
                 model="gpt-4.1-mini",
                 messages=[
                     {

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import builtins
+import os
+
 import json
 import re
 from typing import Any
@@ -7,6 +10,12 @@ from typing import Any
 from nova_backend.services.model_gateway_service import (
     chat_completions_create,
 )
+
+
+def _execution_debug(*args, **kwargs):
+    enabled = str(os.environ.get("NOVA_EXECUTION_DEBUG") or "").lower()
+    if enabled in {"1", "true", "yes", "on"}:
+        builtins.print(*args, **kwargs)
 
 
 class ProjectPlanningAIService:
@@ -185,7 +194,9 @@ GENERAL PLANNING RULES:
     target_files, content, command, execution_file, or other execution metadata
     whenever it can be determined from the request.
 - For every executable file mutation step, populate the step's concrete
-  execution metadata directly.
+  execution metadata directly, including an explicit target_file or a
+  non-empty target_files entry. A file mutation without a target is not an
+  executable plan.
 - If the step creates or overwrites a file, provide the exact target_file
   and exact content to write.
 - If the step appends to a file, provide the exact target_file and exact
@@ -360,6 +371,7 @@ idea through planning, execution, adaptation, and completion.
             )
 
         response = chat_completions_create(
+            nova_enforce_credits=True,
             model=model,
             messages=[
                 {
@@ -386,12 +398,12 @@ idea through planning, execution, adaptation, and completion.
             content
         )
 
-        print(
+        _execution_debug(
             "\n===== RAW PLANNER PLAN =====",
             flush=True,
         )
 
-        print(
+        _execution_debug(
             json.dumps(
                 plan,
                 indent=2,
@@ -399,12 +411,12 @@ idea through planning, execution, adaptation, and completion.
             flush=True,
         )
 
-        print(
+        _execution_debug(
             "===== END RAW PLANNER PLAN =====\n",
             flush=True,
         )
 
-        print(
+        _execution_debug(
             "[NOVA DEBUG PRE NORMALIZE TASK COUNT]",
             len(plan.get("tasks", []))
             if isinstance(plan.get("tasks", []), list)
@@ -719,24 +731,6 @@ idea through planning, execution, adaptation, and completion.
                     or ""
                 ).strip()
 
-                if (
-                    action in {
-                        "create",
-                        "write",
-                    }
-                    and execution_mode == "ai"
-                    and not target_file
-                    and not task.get("target_files")
-                ):
-                    title_slug = (
-                        str(task.get("title") or "artifact")
-                        .strip()
-                        .lower()
-                        .replace(" ", "_")
-                    )
-
-                    target_file = f"{title_slug}.md"
-
                 content = str(
                     task.get(
                         "content",
@@ -871,16 +865,6 @@ idea through planning, execution, adaptation, and completion.
                 ):
                     action = "write"
 
-                    if not target_file:
-                        title_slug = (
-                            str(task.get("title") or "artifact")
-                            .strip()
-                            .lower()
-                            .replace(" ", "_")
-                        )
-
-                        target_file = f"{title_slug}.md"
-
                 if not expected_output:
                     expected_output = (
                         f"Concrete result for: {title}"
@@ -928,7 +912,7 @@ idea through planning, execution, adaptation, and completion.
                 ):
                     execution_mode = "hybrid"
 
-                print(
+                _execution_debug(
                     "DEBUG FINAL TASK BEFORE APPEND",
                     {
                         "title": title,
@@ -1045,8 +1029,48 @@ idea through planning, execution, adaptation, and completion.
                             ).strip(),
                             "action": normalized_step_action,
                             "target_file": normalized_step_target_file,
+                            "target_files": self._string_list(
+                                step.get("target_files", [])
+                            ),
+                            "target_function": str(
+                                step.get("target_function") or ""
+                            ).strip(),
+                            "execution_file": str(
+                                step.get("execution_file")
+                                or step.get("run_file")
+                                or step.get("script_file")
+                                or step.get("test_script")
+                                or step.get("test_file")
+                                or ""
+                            ).strip(),
+                            "execution_mode": str(
+                                step.get("execution_mode")
+                                or execution_mode
+                                or ""
+                            ).strip(),
                             "content": normalized_step_content,
+                            "file_content": str(
+                                step.get("file_content") or ""
+                            ),
+                            "code": str(step.get("code") or ""),
+                            "replacement": str(
+                                step.get("replacement") or ""
+                            ),
                             "command": normalized_step_command,
+                            "payload": (
+                                dict(step.get("payload"))
+                                if isinstance(step.get("payload"), dict)
+                                else {}
+                            ),
+                            "tool_name": str(
+                                step.get("tool_name")
+                                or step.get("tool")
+                                or ""
+                            ).strip(),
+                            "approval_required": bool(
+                                step.get("approval_required")
+                                or step.get("requires_approval")
+                            ),
                             "expected_output": str(
                                 step.get(
                                     "expected_output",
@@ -1064,6 +1088,53 @@ idea through planning, execution, adaptation, and completion.
                         }
                     )
 
+                file_mutation_actions = {
+                    "implement",
+                    "create",
+                    "write",
+                    "edit",
+                    "modify",
+                    "patch",
+                    "fix",
+                    "delete",
+                }
+                task_target_files = list(target_files)
+                if target_file and target_file not in task_target_files:
+                    task_target_files.insert(0, target_file)
+
+                for normalized_step in normalized_steps:
+                    if normalized_step.get("action") not in file_mutation_actions:
+                        continue
+
+                    step_target_files = self._string_list(
+                        normalized_step.get("target_files", [])
+                    )
+                    if (
+                        not normalized_step.get("target_file")
+                        and not step_target_files
+                        and not task_target_files
+                    ):
+                        raise ValueError(
+                            "Project planner returned a file operation without "
+                            "a target_file: task "
+                            f"'{title}', step "
+                            f"'{normalized_step.get('title')}'. Supply "
+                            "target_file or a non-empty target_files entry "
+                            "in the plan."
+                        )
+
+                if (
+                    not normalized_steps
+                    and action in file_mutation_actions
+                    and not target_file
+                    and not target_files
+                ):
+                    raise ValueError(
+                        "Project planner returned a file operation without "
+                        f"a target_file: task '{title}'. Supply target_file "
+                        "or a non-empty target_files entry in the plan."
+                    )
+
                 normalized_tasks.append(
                         {
                             "title": title,
@@ -1079,12 +1150,7 @@ idea through planning, execution, adaptation, and completion.
                                     [],
                                 )
                             ),
-                            "dependencies": self._string_list(
-                                task.get(
-                                    "dependencies",
-                                    [],
-                                )
-                            ),
+                            "dependencies": dependencies,
                             "steps": normalized_steps,
                             "expected_output": str(
                                 task.get(
@@ -1117,7 +1183,7 @@ idea through planning, execution, adaptation, and completion.
                         }
                     )
 
-        print(
+        _execution_debug(
             "[NOVA DEBUG NORMALIZED PLAN TASK COUNT]",
             len(normalized_tasks),
             flush=True,

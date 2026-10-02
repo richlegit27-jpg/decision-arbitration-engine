@@ -1,7 +1,15 @@
 ﻿from __future__ import annotations
 
+import builtins
 import mimetypes
+import os
 from pathlib import Path
+
+
+def _execution_debug(*args, **kwargs):
+    enabled = str(os.environ.get("NOVA_EXECUTION_DEBUG") or "").lower()
+    if enabled in {"1", "true", "yes", "on"}:
+        builtins.print(*args, **kwargs)
 
 
 class ExecutionOrchestratorService:
@@ -52,7 +60,7 @@ class ExecutionOrchestratorService:
         execution_state,
         step,
     ):
-        print(
+        _execution_debug(
             "[PROJECT FILE REGISTRATION CHECK]",
             {
                 "project_id": (
@@ -195,6 +203,17 @@ class ExecutionOrchestratorService:
         return len(steps)
 
     def _unfinished_project_tasks(self, execution_state):
+        # ProjectExecutionController owns the project-level task queue and
+        # invokes the canonical orchestrator with one selected task at a
+        # time.  The controller persists that task's terminal status after
+        # this call returns, so consulting the whole project's still-open
+        # task list here would prevent this task from ever completing.
+        if (
+            isinstance(execution_state, dict)
+            and execution_state.get("project_controller_managed") is True
+        ):
+            return []
+
         if (
             isinstance(execution_state, dict)
             and not execution_state.get("project_id")
@@ -253,7 +272,7 @@ class ExecutionOrchestratorService:
                 project_id
             )
 
-        print(
+        _execution_debug(
             "[ORCHESTRATOR FRESH PROJECT TASKS]",
             [
                 {
@@ -287,7 +306,7 @@ class ExecutionOrchestratorService:
                 task.get("status") or ""
             ).strip().lower()
 
-            print(
+            _execution_debug(
                 "[ORCHESTRATOR TASK STATUS CHECK]",
                 {
                     "title": task.get("title"),
@@ -324,7 +343,7 @@ class ExecutionOrchestratorService:
             )
 
             if not has_execution_payload:
-                print(
+                _execution_debug(
                     "[IGNORING NON-EXECUTABLE PROJECT TASK]",
                     {
                         "title": title,
@@ -673,25 +692,18 @@ class ExecutionOrchestratorService:
         ):
             return step
 
-        title = str(
-            step.get("title")
-            or step.get("description")
-            or ""
-        ).lower()
+        target_files = step.get("target_files") or []
+        if isinstance(target_files, str):
+            target_files = [target_files]
 
-        if "homepage" in title:
-            step["target_file"] = (
-                "templates/index.html"
-            )
-
-        elif "contact" in title:
-            step["target_file"] = (
-                "templates/contact.html"
-            )
-
-        elif "navigation" in title:
-            step["target_file"] = (
-                "templates/base.html"
+        if isinstance(target_files, list):
+            step["target_file"] = next(
+                (
+                    str(candidate).strip()
+                    for candidate in target_files
+                    if str(candidate or "").strip()
+                ),
+                "",
             )
 
         return step
@@ -954,7 +966,7 @@ class ExecutionOrchestratorService:
                     preserved_index
                 )
 
-                print(
+                _execution_debug(
                     "[CONTINUE APPROVAL STATE PRESERVED]",
                     {
                         "status": execution_state.get(
@@ -980,7 +992,7 @@ class ExecutionOrchestratorService:
                 )
                 is True
             ):
-                print(
+                _execution_debug(
                     "[CONTINUE REQUEST STATE PRESERVED]",
                     {
                         "status": execution_state.get("status"),
@@ -1201,7 +1213,7 @@ class ExecutionOrchestratorService:
                 )
                 execution_state["command"] = "run_step"
 
-                print(
+                _execution_debug(
                     "[APPROVAL RELEASE SAME STEP]",
                     {
                         "approved_index": current_index,
@@ -1642,7 +1654,7 @@ class ExecutionOrchestratorService:
                 or step_target
                 or step_command
             ):
-                print(
+                _execution_debug(
                     "[ORCHESTRATOR SKIP INVALID STEP]",
                     {
                         "id": step.get("id"),
@@ -1870,7 +1882,11 @@ class ExecutionOrchestratorService:
                 step.get("status")
             ).lower().strip()
 
-            if explicit_file_mutation_ready:
+            if (
+                explicit_file_mutation_ready
+                and step.get("requires_approval") is not True
+                and step.get("approval_required") is not True
+            ):
                 step["requires_approval"] = False
                 step["approval_required"] = False
                 step["approval_status"] = None
@@ -1926,7 +1942,7 @@ class ExecutionOrchestratorService:
                 step["approval_required"] = False
                 step["approval_status"] = "approved"
 
-            print(
+            _execution_debug(
                 "[APPROVAL GATE FINAL CHECK]",
                 {
                     "command": execution_state.get("command"),
@@ -1976,10 +1992,41 @@ class ExecutionOrchestratorService:
                     "step_output": "",
                 }
 
+            original_step = dict(step)
             result = self.execution_step_service.execute_step_logic(
                 session_id=session_id,
                 step=step,
             )
+
+            # Executors may return a replacement step instead of mutating
+            # the object they received. Merge every returned field before
+            # deciding whether to complete, wait, or fail; otherwise the
+            # stale "running" status can be advanced as successful work.
+            if isinstance(result, dict):
+                merged_step = dict(original_step)
+                merged_step.update(result)
+
+                for preserved_key in (
+                    "action",
+                    "description",
+                    "execution_file",
+                    "target_file",
+                    "target_files",
+                    "command",
+                    "content",
+                    "code",
+                    "replacement",
+                    "tool_name",
+                ):
+                    if (
+                        not merged_step.get(preserved_key)
+                        and original_step.get(preserved_key)
+                    ):
+                        merged_step[preserved_key] = original_step[
+                            preserved_key
+                        ]
+
+                step = merged_step
 
             # A successful executor result takes precedence over
             # stale approval state left on the original step.
@@ -2149,12 +2196,33 @@ class ExecutionOrchestratorService:
                     "step_output": "",
                 }
 
-            if step_status in {
-                "failed",
-                "blocked",
-            }:
+            execution_metadata = step.get(
+                "execution_metadata"
+            )
+
+            step_execution_failed = (
+                step_status in {
+                    "failed",
+                    "failure",
+                    "error",
+                    "errored",
+                    "exception",
+                    "blocked",
+                }
+                or (
+                    isinstance(execution_metadata, dict)
+                    and execution_metadata.get("success") is False
+                )
+            )
+
+            if step_execution_failed:
                 step_error = self._safe_str(
                     step.get("error")
+                    or (
+                        execution_metadata.get("error")
+                        if isinstance(execution_metadata, dict)
+                        else ""
+                    )
                     or "Execution step failed."
                 )
                 step_title = self._safe_str(
@@ -2453,7 +2521,7 @@ class ExecutionOrchestratorService:
                     }
                     and incoming_status == "pending"
                 ):
-                    print(
+                    _execution_debug(
                         "BLOCKED STATE DOWNGRADE =",
                         {
                             "existing": existing_status,
@@ -2471,7 +2539,7 @@ class ExecutionOrchestratorService:
                     step,
                 )
             except Exception as exc:
-                print(
+                _execution_debug(
                     "PROJECT FILE REGISTRATION FAILED:",
                     exc,
                     flush=True,
@@ -2508,7 +2576,7 @@ class ExecutionOrchestratorService:
                 )
             )
 
-            print(
+            _execution_debug(
                 "DEBUG BEFORE ADVANCE AFTER STEP COMPLETION",
                 {
                     "current_index": current_index,
@@ -2645,7 +2713,7 @@ class ExecutionOrchestratorService:
                     steps[next_index] = next_step
                     execution_state["steps"] = steps
 
-                    print(
+                    _execution_debug(
                         "DEBUG NEXT STEP AFTER CONTEXT COPY =",
                         next_step,
                         flush=True,
@@ -2663,7 +2731,7 @@ class ExecutionOrchestratorService:
                     steps[next_index] = next_step
                     execution_state["steps"] = steps
 
-                    print(
+                    _execution_debug(
                         "DEBUG NEXT STEP AFTER CONTEXT COPY =",
                         next_step,
                         flush=True,
@@ -2710,6 +2778,18 @@ class ExecutionOrchestratorService:
             current_state = execution_state
 
             for _ in range(100):
+                before_signature = (
+                    int(current_state.get("current_index", 0) or 0),
+                    self._safe_str(current_state.get("status")).strip().lower(),
+                    tuple(
+                        (
+                            self._safe_str(step.get("id")),
+                            self._safe_str(step.get("status")).strip().lower(),
+                        )
+                        for step in (current_state.get("steps") or [])
+                        if isinstance(step, dict)
+                    ),
+                )
                 result = self._process_execution_command(
                     command="run_step",
                     session_id=session_id,
@@ -2723,6 +2803,46 @@ class ExecutionOrchestratorService:
 
                 if isinstance(next_state, dict):
                     current_state = next_state
+
+                after_signature = (
+                    int(current_state.get("current_index", 0) or 0),
+                    self._safe_str(current_state.get("status")).strip().lower(),
+                    tuple(
+                        (
+                            self._safe_str(step.get("id")),
+                            self._safe_str(step.get("status")).strip().lower(),
+                        )
+                        for step in (current_state.get("steps") or [])
+                        if isinstance(step, dict)
+                    ),
+                )
+
+                if after_signature == before_signature:
+                    no_progress_error = (
+                        "Execution stopped because no progress was possible."
+                    )
+                    current_state["status"] = "blocked"
+                    current_state["complete"] = False
+                    current_state["waiting"] = False
+                    current_state["error"] = no_progress_error
+                    current_steps = current_state.get("steps") or []
+                    current_index = int(
+                        current_state.get("current_index", 0) or 0
+                    )
+                    if (
+                        isinstance(current_steps, list)
+                        and 0 <= current_index < len(current_steps)
+                        and isinstance(current_steps[current_index], dict)
+                    ):
+                        current_steps[current_index]["status"] = "blocked"
+                        current_steps[current_index]["error"] = no_progress_error
+                    self._save_execution_state(session_id, current_state)
+                    result = {
+                        "ok": False,
+                        "error": no_progress_error,
+                        "execution": current_state,
+                    }
+                    break
 
                 status = self._safe_str(
                     current_state.get("status")

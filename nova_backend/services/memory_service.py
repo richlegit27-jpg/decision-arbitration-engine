@@ -193,12 +193,15 @@ class MemoryService:
             (item or {}).get("owner_id") or ""
         ).strip()
 
-        # No authenticated owner:
-        # treat anonymous/manual memory as same owner
-        if not owner_id and not item_owner:
-            return True
+        # Ownerless legacy records remain stored but are not assigned to a
+        # user implicitly. Callers must have an authenticated owner.
+        return bool(owner_id and item_owner and item_owner == owner_id)
 
-        return item_owner == owner_id
+    def _require_owner_id(self) -> str:
+        owner_id = str(self._current_owner_id() or "").strip()
+        if not owner_id:
+            raise PermissionError("Authentication is required for memory access.")
+        return owner_id
 
     def __init__(self, memory_file: str):
         self.memory_file = Path(memory_file)
@@ -228,21 +231,28 @@ class MemoryService:
 
         for item in memory:
             fact_key = item.get("fact_key")
+            item_owner_id = str(item.get("owner_id") or "").strip()
 
-            if fact_key:
-                if fact_key in seen_fact_keys:
-                    existing = seen_fact_keys[fact_key]
+            # Without an owner, deduplication could collapse distinct users'
+            # legacy records. Preserve those entries verbatim for migration.
+            if fact_key and item_owner_id:
+                fact_owner_key = (
+                    item_owner_id,
+                    str(fact_key),
+                )
+                if fact_owner_key in seen_fact_keys:
+                    existing = seen_fact_keys[fact_owner_key]
 
                     if (
                         int(item.get("count") or 1)
                         >
                         int(existing.get("count") or 1)
                     ):
-                        seen_fact_keys[fact_key] = item
+                        seen_fact_keys[fact_owner_key] = item
 
                     continue
 
-                seen_fact_keys[fact_key] = item
+                seen_fact_keys[fact_owner_key] = item
 
             cleaned_memory.append(item)
 
@@ -251,13 +261,39 @@ class MemoryService:
             + [
                 item
                 for item in cleaned_memory
-                if not item.get("fact_key")
+                if not item.get("fact_key") or not str(item.get("owner_id") or "").strip()
             ]
         )
 
         return data
 
     def _write_store(self, data: Dict[str, Any]) -> None:
+        owner_id = self._require_owner_id()
+        current = self._read_store()
+        current_items = current.get("memory", [])
+        incoming_items = data.get("memory", []) if isinstance(data, dict) else []
+
+        if not isinstance(current_items, list):
+            current_items = []
+        if not isinstance(incoming_items, list):
+            incoming_items = []
+
+        # Treat this as an owner-scoped replacement. Preserve other users'
+        # and legacy ownerless records from the canonical store.
+        preserved_items = [
+            item
+            for item in current_items
+            if not self._same_memory_owner(item)
+        ]
+        owner_items = [
+            dict(item)
+            for item in incoming_items
+            if isinstance(item, dict)
+            and str(item.get("owner_id") or "").strip() == owner_id
+        ]
+        payload = dict(data) if isinstance(data, dict) else {}
+        payload["memory"] = preserved_items + owner_items
+
         print(
             "DEBUG MEMORY WRITE PATH =",
             self.memory_file,
@@ -275,7 +311,7 @@ class MemoryService:
 
             save_json_file(
                 self.memory_file,
-                data,
+                payload,
             )
 
             print(
@@ -365,14 +401,14 @@ class MemoryService:
             return []
 
         owner_id = self._current_owner_id()
+        if not owner_id:
+            return []
 
-        if owner_id:
-            items = [
-                item
-                for item in items
-                if not item.get("owner_id")
-                or item.get("owner_id") == owner_id
-            ]
+        items = [
+            item
+            for item in items
+            if str(item.get("owner_id") or "").strip() == owner_id
+        ]
 
         items = [
             self._apply_memory_decay(dict(x or {}))
@@ -457,6 +493,11 @@ class MemoryService:
         )
 
     def add_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        owner_id = self._require_owner_id()
+        item = dict(item or {})
+        # Ownership always comes from the authenticated server session.
+        item["owner_id"] = owner_id
+
         print(
             "[MEMORY ADD HIT]",
             {
@@ -482,7 +523,11 @@ class MemoryService:
             return item
 
         data = self._read_store()
-        memory = data.get("memory", [])
+        memory = [
+            existing
+            for existing in data.get("memory", [])
+            if self._same_memory_owner(existing)
+        ]
 
         item = dict(item or {})
         now = iso_now()
@@ -560,6 +605,8 @@ class MemoryService:
                     ).strip().lower()
 
                     if (
+                        self._same_memory_owner(existing)
+                        and
                         key in existing_text
                         and existing_kind == new_kind
                     ):
@@ -694,10 +741,7 @@ class MemoryService:
         if not item.get("id"):
             item["id"] = f"memory_{uuid.uuid4().hex}"
 
-        owner_id = self._current_owner_id()
-
-        if owner_id:
-            item["owner_id"] = owner_id
+        item["owner_id"] = owner_id
 
         item["updated_at"] = now
         item["created_at"] = item.get("created_at") or now
@@ -945,6 +989,7 @@ class MemoryService:
         return item
 
     def pin_memory(self, memory_id: str, pinned: bool = True) -> dict | None:
+        owner_id = self._require_owner_id()
         target = str(memory_id or "").strip()
         if not target:
             return None
@@ -952,19 +997,11 @@ class MemoryService:
         data = self._read_store()
         memory = data.get("memory", [])
 
-        owner_id = self._current_owner_id()
-
-        data = self._read_store()
-        memory = data.get("memory", [])
-
-        owner_id = self._current_owner_id()
-
         for i, item in enumerate(memory):
             item = dict(item or {})
 
-            if owner_id:
-                if item.get("owner_id") and item.get("owner_id") != owner_id:
-                    continue
+            if str(item.get("owner_id") or "").strip() != owner_id:
+                continue
 
             if str(item.get("id") or "").strip() == target:
                 item["pinned"] = bool(pinned)
@@ -979,6 +1016,7 @@ class MemoryService:
         return None
 
     def delete_memory(self, memory_id: str) -> bool:
+        owner_id = self._require_owner_id()
         target = str(memory_id or "").strip()
         if not target:
             return False
@@ -986,7 +1024,6 @@ class MemoryService:
         data = self._read_store()
         memory = data.get("memory", [])
 
-        owner_id = str(self._current_owner_id() or "").strip()
         kept = []
 
         for item in memory:
@@ -998,16 +1035,9 @@ class MemoryService:
 
             item_owner_id = str(item.get("owner_id") or "").strip()
 
-            # Delete legacy memories without an owner.
-            if not item_owner_id:
-                continue
-
-            # Delete memories belonging to the current owner.
-            if owner_id and item_owner_id == owner_id:
-                continue
-
-            # Local development mode without auth context.
-            if not owner_id:
+            # Legacy ownerless entries are hidden and preserved until an
+            # explicit migration assigns an owner.
+            if item_owner_id == owner_id:
                 continue
 
             # Preserve memories belonging to another owner.
@@ -1019,8 +1049,47 @@ class MemoryService:
         data["memory"] = kept
         self._write_store(data)
         return True
-    def clear(self) -> None:
-        self._write_store({"memory": []})
+    def clear(self) -> int:
+        owner_id = self._require_owner_id()
+        data = self._read_store()
+        owned = [
+            item
+            for item in data.get("memory", [])
+            if str(item.get("owner_id") or "").strip() == owner_id
+        ]
+        data["memory"] = [
+            item
+            for item in data.get("memory", [])
+            if str(item.get("owner_id") or "").strip() != owner_id
+        ]
+        self._write_store(data)
+        return len(owned)
+
+    def update_memory(
+        self,
+        memory_id: str,
+        text: str,
+        kind: str = "note",
+    ) -> Dict[str, Any] | None:
+        owner_id = self._require_owner_id()
+        target = str(memory_id or "").strip()
+        if not target:
+            return None
+
+        data = self._read_store()
+        for item in data.get("memory", []):
+            if (
+                isinstance(item, dict)
+                and str(item.get("id") or "").strip() == target
+                and str(item.get("owner_id") or "").strip() == owner_id
+            ):
+                item["text"] = str(text or "").strip()
+                item["kind"] = str(kind or "note").strip() or "note"
+                item["updated_at"] = iso_now()
+                self._write_store(data)
+                return item
+
+        return None
 
     def cleanup_memories(self) -> Dict[str, Any]:
         junk_patterns = (
@@ -1172,8 +1241,9 @@ class MemoryService:
         }
 
     def promote_memories(self) -> Dict[str, Any]:
+        self._require_owner_id()
         data = self._read_store()
-        memory = data.get("memory", [])
+        memory = self.all()
 
         promoted = 0
         updated_items = []

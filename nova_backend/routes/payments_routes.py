@@ -1,6 +1,9 @@
 ﻿from flask import jsonify, request
 
 
+from urllib.parse import urlsplit
+
+
 def register_payments_routes(app):
 
     try:
@@ -385,6 +388,45 @@ def register_payments_routes(app):
                         500,
                     )
 
+                public_base_url = str(
+                    os.environ.get("NOVA_PUBLIC_URL")
+                    or app.config.get("NOVA_PUBLIC_URL")
+                    or ""
+                ).strip().rstrip("/")
+                is_production = (
+                    str(os.environ.get("FLASK_ENV") or "").lower() == "production"
+                    or str(os.environ.get("RAILWAY_ENVIRONMENT") or "").lower() == "production"
+                )
+                if not public_base_url:
+                    if is_production:
+                        return _nova_payments_json(
+                            {
+                                "ok": False,
+                                "error": "Billing return URL is not configured.",
+                            },
+                            503,
+                        )
+                    public_base_url = str(request.host_url).rstrip("/")
+
+                parsed_public_url = urlsplit(public_base_url)
+                if (
+                    parsed_public_url.scheme not in ("http", "https")
+                    or not parsed_public_url.netloc
+                    or parsed_public_url.username
+                    or parsed_public_url.password
+                    or parsed_public_url.query
+                    or parsed_public_url.fragment
+                    or parsed_public_url.path not in ("", "/")
+                    or (is_production and parsed_public_url.scheme != "https")
+                ):
+                    return _nova_payments_json(
+                        {
+                            "ok": False,
+                            "error": "Billing return URL configuration is invalid.",
+                        },
+                        503,
+                    )
+
                 customer_id = str(
                     account.get(
                         "stripe_customer_id",
@@ -396,6 +438,7 @@ def register_payments_routes(app):
 
                     customer = create_customer(
                         username=username,
+                        user_id=user_id,
                     )
 
                     customer_id = str(
@@ -420,25 +463,13 @@ def register_payments_routes(app):
                         customer_id=customer_id,
                     )
 
-                origin = str(
-                    request.headers.get(
-                        "Origin",
-                        "",
-                    )
-                ).strip()
-
-                if not origin:
-                    origin = str(
-                        request.host_url
-                    ).rstrip("/")
-
                 success_url = (
-                    origin
+                    public_base_url
                     + "/billing?checkout=success"
                 )
 
                 cancel_url = (
-                    origin
+                    public_base_url
                     + "/billing?checkout=cancelled"
                 )
 
@@ -448,6 +479,7 @@ def register_payments_routes(app):
                     cancel_url=cancel_url,
                     customer_id=customer_id,
                     username=username,
+                    user_id=user_id,
                 )
 
                 checkout_url = str(
@@ -485,9 +517,9 @@ def register_payments_routes(app):
                 import json
 
                 from nova_backend.services.billing_service import (
-                    cancel_subscription,
                     plan_from_price_id,
-                    set_subscription,
+                    process_stripe_subscription_event,
+                    stripe_event_was_processed,
                 )
 
                 from nova_backend.services.stripe_service import (
@@ -539,6 +571,24 @@ def register_payments_routes(app):
                         400,
                     )
 
+                event_id = str(event.get("id") or "").strip()
+                if not event_id:
+                    return _nova_payments_json(
+                        {
+                            "ok": False,
+                            "error": "Stripe event ID is missing.",
+                        },
+                        400,
+                    )
+
+                if stripe_event_was_processed(event_id):
+                    return _nova_payments_json({
+                        "ok": True,
+                        "received": True,
+                        "duplicate": True,
+                        "event_type": str(event.get("type") or ""),
+                    })
+
                 event_type = str(
                     event.get("type") or ""
                 ).strip()
@@ -582,10 +632,24 @@ def register_payments_routes(app):
                         "",
                     )
                 ).strip()
+                user_id = str(
+                    metadata.get("nova_user_id", "")
+                ).strip()
+                event_action = "ignore"
+                subscription_id = ""
+                plan = ""
 
-                if event_type == (
-                    "checkout.session.completed"
+                if event_type in (
+                    "checkout.session.completed",
+                    "checkout.session.async_payment_succeeded",
                 ):
+
+                    payment_status = str(
+                        event_object.get("payment_status") or ""
+                    ).strip().lower()
+                    mode = str(
+                        event_object.get("mode") or ""
+                    ).strip().lower()
 
                     if not username:
                         username = str(
@@ -614,22 +678,15 @@ def register_payments_routes(app):
                     )
 
                     if (
-                        username
+                        mode == "subscription"
+                        and payment_status in ("paid", "no_payment_required")
+                        and
+                        (user_id or username)
                         and subscription_id
                         and plan in ("plus", "pro")
                     ):
 
-                        set_subscription(
-                            username,
-                            subscription_id,
-                            plan,
-                        )
-
-                        print(
-                            "[NOVA STRIPE SUBSCRIPTION ACTIVATED]",
-                            username,
-                            plan,
-                        )
+                        event_action = "activate"
 
 
                 elif event_type in (
@@ -644,25 +701,66 @@ def register_payments_routes(app):
                         )
                     ).strip()
 
-                    if username:
+                    if user_id or username:
 
-                        cancel_subscription(
-                            username,
-                            subscription_id=subscription_id,
-                        )
+                        event_action = "cancel"
 
-                        print(
-                            "[NOVA STRIPE SUBSCRIPTION CANCELLED]",
-                            username,
-                            subscription_id,
-                        )
+                elif event_type == "customer.subscription.updated":
+                    subscription_id = str(
+                        event_object.get("id") or ""
+                    ).strip()
+                    subscription_status = str(
+                        event_object.get("status") or ""
+                    ).strip().lower()
+                    items = event_object.get("items")
+                    item_data = (
+                        items.get("data", [])
+                        if isinstance(items, dict)
+                        else []
+                    )
+                    first_item = (
+                        item_data[0]
+                        if isinstance(item_data, list) and item_data
+                        and isinstance(item_data[0], dict)
+                        else {}
+                    )
+                    price = first_item.get("price")
+                    price_id = str(
+                        price.get("id") or ""
+                        if isinstance(price, dict)
+                        else price or ""
+                    ).strip()
+                    plan = plan_from_price_id(price_id)
+
+                    if (
+                        user_id or username
+                    ) and subscription_id:
+                        if subscription_status == "active" and plan in ("plus", "pro"):
+                            event_action = "activate"
+                        elif subscription_status in {
+                            "canceled",
+                            "unpaid",
+                            "paused",
+                            "incomplete_expired",
+                        }:
+                            event_action = "cancel"
 
 
+                event_result = process_stripe_subscription_event(
+                    event_id=event_id,
+                    action=event_action,
+                    username=username,
+                    user_id=user_id,
+                    plan=plan,
+                    subscription_id=subscription_id,
+                )
                 return _nova_payments_json(
                     {
                         "ok": True,
                         "received": True,
                         "event_type": event_type,
+                        "processed": event_result["processed"],
+                        "duplicate": event_result["duplicate"],
                     }
                 )
 

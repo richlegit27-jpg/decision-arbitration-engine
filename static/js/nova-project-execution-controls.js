@@ -135,7 +135,7 @@ function wireExecutionButtons() {
 
     bindButton(
         "novaLeftNextTask",
-        "next_task"
+        "next_step"
     );
 
     bindButton(

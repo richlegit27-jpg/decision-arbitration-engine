@@ -1,4 +1,4 @@
-﻿
+
 <!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
 <!doctype html>
 <html lang="en">
@@ -1126,6 +1126,13 @@ observer.observe(document.documentElement, {
 >
   <button
     type="button"
+    onclick="window.location.href='/super-ai'"
+  >
+    Super AI
+  </button>
+
+  <button
+    type="button"
     onclick="window.location.href='/account'"
   >
     Account
@@ -1163,44 +1170,34 @@ observer.observe(document.documentElement, {
 
 </div>
         </div>
-        <p class="brand-copy">Desktop workspace for streaming chat, session memory, summaries, and execution.</p>
+        
       </div>
 
-      <!-- NOVA_DESKTOP_WORKSPACE_PANEL_REORG_20260610 -->
-      <section class="workspace-section">
-        <div class="section-title-row">
-          <div>
-            <h2>Sessions</h2>
-            <p>Pick up, start, or organize conversations.</p>
-          </div>
-        </div>
-
-        <button class="primary-side-button" id="newSessionBtn" type="button">
-          <span>New Chat</span>
-          <span>+</span>
-        </button>
-
-        <div class="session-current-card">
-          <div class="session-label">Current Session</div>
-          <input id="sid" spellcheck="false" />
-        </div>
-
-<div class="session-list-shell">
-    <div class="session-label">Recent</div>
-
-    <div
-        id="desktopSessionList"
-        class="desktop-session-list"
-    >
-        <div class="session-placeholder">
-            Loading sessions...
-        </div>
+ <!-- NOVA_DESKTOP_WORKSPACE_PANEL_REORG_20260610 -->
+<section class="workspace-section">
+  <div class="section-title-row">
+    <div>
+      <h2>Sessions</h2>
     </div>
+  </div>
 
-</div>
-      </section>
+  <button class="primary-side-button" id="newSessionBtn" type="button">
+    <span>New Chat</span>
+    <span>+</span>
+  </button>
 
-      <!-- NOVA_WORKPLACE_PROJECTS_PANEL_V1 -->
+  <div class="session-current-card">
+    <input id="sid" spellcheck="false" aria-label="Active session ID" />
+  </div>
+
+  <div class="session-list-shell">
+    <div class="session-label">Recent</div>
+    <div id="desktopSessionList" class="desktop-session-list">
+      <div class="session-placeholder">Loading sessions...</div>
+    </div>
+  </div>
+</section>
+<!-- NOVA_WORKPLACE_PROJECTS_PANEL_V1 -->
       <section class="workspace-section">
         <div class="section-title-row">
           <div>

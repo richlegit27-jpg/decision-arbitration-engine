@@ -16,9 +16,14 @@ class PythonRunnerService:
         self,
         sandbox_dir=None,
     ):
+        default_sandbox = (
+            Path(__file__).resolve().parents[1]
+            / "sandbox"
+        )
         self.sandbox_dir = Path(
             sandbox_dir
-            or r"C:\Users\Owner\nova"
+            or os.environ.get("NOVA_EXECUTION_SANDBOX_DIR")
+            or default_sandbox
         ).resolve()
 
         self.sandbox_dir.mkdir(

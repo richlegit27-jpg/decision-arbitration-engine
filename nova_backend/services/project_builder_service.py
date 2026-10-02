@@ -1,5 +1,8 @@
 ﻿from __future__ import annotations
 
+import builtins
+import os
+
 from datetime import datetime, timezone
 from typing import Any
 from pathlib import Path
@@ -8,6 +11,12 @@ import re
 from nova_backend.services.project_planning_ai_service import (
     project_planning_ai_service,
 )
+
+
+def _execution_debug(*args, **kwargs):
+    enabled = str(os.environ.get("NOVA_EXECUTION_DEBUG") or "").lower()
+    if enabled in {"1", "true", "yes", "on"}:
+        builtins.print(*args, **kwargs)
 
 
 class ProjectBuilderService:
@@ -159,7 +168,7 @@ class ProjectBuilderService:
 
         planned_tasks = plan.get("tasks")
 
-        print(
+        _execution_debug(
             "[NOVA DEBUG BUILDER PLAN TASK COUNT]",
             len(planned_tasks) if isinstance(planned_tasks, list) else "NOT_LIST",
             flush=True,
@@ -946,7 +955,6 @@ class ProjectBuilderService:
 
                 canonical_task["command"] = str(
                     canonical_task.get("command")
-                    or task.get("command")
                     or ""
                 ).strip()
 
@@ -1014,7 +1022,6 @@ class ProjectBuilderService:
                 canonical_step["command"] = str(
                     canonical_step.get("command")
                     or canonical_task.get("command")
-                    or task.get("command")
                     or ""
                 ).strip()
 
@@ -1445,7 +1452,7 @@ class ProjectBuilderService:
                         "phase_documentation"
                     )
 
-            print(
+            _execution_debug(
                 "[PHASE RESOLUTION DEBUG]",
                 {
                     "task_index": task_index,
@@ -1531,7 +1538,7 @@ class ProjectBuilderService:
                     "Task did not contain a valid phase_id"
                 )
 
-            print(
+            _execution_debug(
                 "NOVA DEBUG persistent_phase_id:",
                 repr(persistent_phase_id),
                 type(persistent_phase_id).__name__,
@@ -1580,6 +1587,7 @@ class ProjectBuilderService:
 
                 step["content"] = (
                     step.get("content")
+                    or task_spec.get("content")
                     or ""
                 )
 
@@ -1614,9 +1622,27 @@ class ProjectBuilderService:
                     or "pending"
                 )
 
-            normalized_steps.append(
-                step
-            )
+                for field_name in (
+                    "target_file",
+                    "target_files",
+                    "target_function",
+                    "execution_file",
+                    "run_file",
+                    "script_file",
+                    "test_script",
+                    "test_file",
+                    "command",
+                    "replacement",
+                    "execution_mode",
+                    "payload",
+                    "tool_name",
+                ):
+                    if not step.get(field_name) and task_spec.get(field_name):
+                        step[field_name] = task_spec.get(field_name)
+
+                normalized_steps.append(
+                    step
+                )
 
 
             # Repair planner steps that exist but contain no executable payload.
@@ -1892,7 +1918,7 @@ class ProjectBuilderService:
 
 
 
-            print(
+            _execution_debug(
                 "[CONTENT TRACE BEFORE EXTRACTION]",
                 {
                     "action": normalized_action,
@@ -2126,7 +2152,7 @@ class ProjectBuilderService:
             approval_text_lower = approval_text.lower()
             request_text_lower = clean_request.lower()
 
-            print(
+            _execution_debug(
                 "[NOVA DEBUG REQUEST APPROVAL TEXT]",
                 {
                     "clean_request": clean_request,
@@ -2237,7 +2263,7 @@ class ProjectBuilderService:
                     else None
                 )
 
-            print(
+            _execution_debug(
                 "[NOVA DEBUG TASK APPROVAL]",
                 {
                     "requires_approval": requires_approval,
@@ -2246,13 +2272,13 @@ class ProjectBuilderService:
                 flush=True,
             )
 
-            print(
+            _execution_debug(
                 "[NOVA DEBUG TASK STEPS BEFORE PERSIST]",
                 task_steps,
                 flush=True,
             )
 
-            print(
+            _execution_debug(
                 "[NOVA DEBUG TASK EXECUTION CONTRACT]",
                 {
                     "title": task_title,
@@ -2280,7 +2306,7 @@ class ProjectBuilderService:
                 or task_spec.get("command")
             ):
 
-                print(
+                _execution_debug(
                     "[PROJECT TASK REJECTED: NO EXECUTABLE CONTENT]",
                     {
                         "title": task_title,
@@ -2365,7 +2391,7 @@ class ProjectBuilderService:
                 )
             )
 
-            print(
+            _execution_debug(
                 "[NOVA DEBUG CREATED TASK RETURN]",
                 {
                     "type": type(created_task).__name__,
@@ -2519,7 +2545,11 @@ class ProjectBuilderService:
                         )
                     )
 
-                if resolved_dependency_id:
+                if (
+                    resolved_dependency_id
+                    and resolved_dependency_id != persistent_task_id
+                    and resolved_dependency_id not in resolved_dependencies
+                ):
                     resolved_dependencies.append(
                         resolved_dependency_id
                     )
@@ -2558,7 +2588,7 @@ class ProjectBuilderService:
             plan=plan,
         )
 
-        print(
+        _execution_debug(
             "[NOVA PROJECT BUILDER] "
             f"Created {len(created_phases)} phases and "
             f"{len(created_tasks)} tasks."
@@ -2605,7 +2635,7 @@ class ProjectBuilderService:
                 )
             )
 
-            print(
+            _execution_debug(
                 "[NOVA DEBUG AI PLAN PHASES]",
                 {
                     "has_phases": (
@@ -2635,13 +2665,13 @@ class ProjectBuilderService:
                 flush=True,
             )
 
-            print(
+            _execution_debug(
                 "[NOVA DEBUG RAW AI PLAN TASKS]",
                 ai_plan.get("tasks"),
                 flush=True,
             )
 
-            print(
+            _execution_debug(
                 "[NOVA DEBUG RAW AI PLAN TASKS]",
                 ai_plan.get("tasks"),
                 flush=True,
@@ -2936,7 +2966,7 @@ class ProjectBuilderService:
 
                 ai_plan["tasks"] = collapsed_tasks
 
-                print(
+                _execution_debug(
                     "[NOVA PROJECT PLANNER] "
                     "AI plan generated successfully.",
                     flush=True,
@@ -2987,7 +3017,7 @@ class ProjectBuilderService:
             )
 
         except Exception as error:
-            print(
+            _execution_debug(
                 "[NOVA PROJECT PLANNER] "
                 f"AI planning unavailable, using fallback: {error}",
                 flush=True,
