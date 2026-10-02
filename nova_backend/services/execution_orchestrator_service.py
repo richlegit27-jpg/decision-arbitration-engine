@@ -657,6 +657,45 @@ class ExecutionOrchestratorService:
             execution_state=execution_state,
         )
 
+    def _normalize_project_step_target(
+        self,
+        step,
+    ):
+
+        if not isinstance(
+            step,
+            dict,
+        ):
+            return step
+
+        if step.get(
+            "target_file"
+        ):
+            return step
+
+        title = str(
+            step.get("title")
+            or step.get("description")
+            or ""
+        ).lower()
+
+        if "homepage" in title:
+            step["target_file"] = (
+                "templates/index.html"
+            )
+
+        elif "contact" in title:
+            step["target_file"] = (
+                "templates/contact.html"
+            )
+
+        elif "navigation" in title:
+            step["target_file"] = (
+                "templates/base.html"
+            )
+
+        return step
+
     def _process_execution_command(
         self,
         command="",
@@ -1743,6 +1782,11 @@ class ExecutionOrchestratorService:
             # =========================
             # NORMALIZE CREATE MUTATION
             # =========================
+
+            step = self._normalize_project_step_target(
+                step
+            )
+
             if (
                 self._safe_str(
                     step.get("action")
@@ -2493,6 +2537,30 @@ class ExecutionOrchestratorService:
             )
 
             if next_index >= len(steps):
+
+                refreshed_execution = (
+                    self.execution_state_service.get_execution_state(
+                        execution_state.get("session_id")
+                    )
+                    or {}
+                )
+
+                remaining_steps = (
+                    refreshed_execution.get("steps")
+                    if isinstance(
+                        refreshed_execution,
+                        dict,
+                    )
+                    else []
+                )
+
+                if remaining_steps:
+                    execution_state["steps"] = remaining_steps
+                    execution_state["current_index"] = 0
+
+                    steps = remaining_steps
+                    next_index = 0
+
                 if (
                     isinstance(
                         execution_state,
@@ -2509,27 +2577,30 @@ class ExecutionOrchestratorService:
                             project_id
                         )
 
-                unfinished_tasks = self._unfinished_project_tasks(
-                    execution_state
-                )
-                if unfinished_tasks:
-                    execution_state["status"] = "in_progress"
-                    execution_state["complete"] = False
+                if next_index >= len(steps):
 
-                    return {
-                        "ok": False,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": (
-                                "Execution steps are exhausted, but "
-                                "project tasks remain unfinished: "
-                                + ", ".join(unfinished_tasks)
-                                + ". Add executable steps or complete "
-                                "the remaining tasks."
-                            ),
-                        },
-                        "execution": execution_state,
-                    }
+                    unfinished_tasks = self._unfinished_project_tasks(
+                        execution_state
+                    )
+
+                    if unfinished_tasks:
+                        execution_state["status"] = "in_progress"
+                        execution_state["complete"] = False
+
+                        return {
+                            "ok": False,
+                            "assistant_message": {
+                                "role": "assistant",
+                                "text": (
+                                    "Execution steps are exhausted, but "
+                                    "project tasks remain unfinished: "
+                                    + ", ".join(unfinished_tasks)
+                                    + ". Add executable steps or complete "
+                                    "the remaining tasks."
+                                ),
+                            },
+                            "execution": execution_state,
+                        }
 
                 execution_state = (
                     self.execution_mutation_service.mark_complete(
@@ -2701,10 +2772,7 @@ class ExecutionOrchestratorService:
                 )
 
                 waiting_for_approval = (
-                    current_state.get("waiting_for_approval") is True
-                    or current_state.get("awaiting_approval") is True
-                    or current_state.get("approval_required") is True
-                    or current_step.get("waiting_for_approval") is True
+                    current_step.get("waiting_for_approval") is True
                     or current_step.get("awaiting_approval") is True
                     or current_step.get("approval_required") is True
                     or execution_metadata.get("waiting_approval") is True
