@@ -502,6 +502,10 @@ def register_project_routes(
                     "action",
                     "",
                 ),
+                owner=data.get(
+                    "owner",
+                    "NOVA",
+                ),
                 execution_mode=data.get(
                     "execution_mode",
                     "",

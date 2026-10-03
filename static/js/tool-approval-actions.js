@@ -223,6 +223,7 @@ async function approve(
         updateApprovalCard(
             button,
             "approved",
+            result?.continued_text ||
             result?.formatted ||
             result?.message ||
             "Tool approved and executed."

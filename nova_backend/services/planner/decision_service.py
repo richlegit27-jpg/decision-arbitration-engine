@@ -1,3 +1,6 @@
+import re
+
+
 class DecisionService:
 
     def __init__(self, chat_service):
@@ -277,6 +280,44 @@ class DecisionService:
 
         user_text = self.safe_str(user_text)
         lower_text = user_text.lower()
+
+        image_attachments = [item for item in (attachments or []) if isinstance(item, dict) and (
+            str(item.get("mime_type") or item.get("content_type") or item.get("mime") or item.get("type") or "").lower().startswith("image")
+            or str(item.get("original_filename") or item.get("filename") or item.get("name") or "").lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
+        )]
+        if image_attachments and re.search(
+            r"\b(?:animate|make\s+(?:this|it)\s+move|turn\s+(?:this|it)\s+into\s+(?:a\s+)?video|make\s+(?:a\s+)?video|bring\s+(?:this|it)\s+to\s+life)\b",
+            lower_text,
+        ):
+            return {
+                "route": "video_generation",
+                "mode": "video_generation",
+                "intent": "video_generation",
+                "confidence": 1.0,
+                "reasons": ["image_to_video_request"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+                "prompt": user_text,
+            }
+
+        # Explicit video generation is a standalone chat command. Claim it
+        # before pending project execution or repository-intent routing.
+        if lower_text.startswith("/video") and (
+            len(lower_text) == len("/video")
+            or lower_text[len("/video")].isspace()
+        ):
+            return {
+                "route": "video_generation",
+                "mode": "video_generation",
+                "intent": "video_generation",
+                "confidence": 1.0,
+                "reasons": ["explicit_video_command"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+                "prompt": user_text,
+            }
 
         # Repository questions and Git mutation requests must be claimed
         # before pending execution or generic command routing. The dedicated

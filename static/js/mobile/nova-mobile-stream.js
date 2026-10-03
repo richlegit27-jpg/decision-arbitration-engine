@@ -20,7 +20,9 @@
             if (content) {
                 content.innerHTML = `
                     <div class="nova-streaming-text">
-                        ${window.NovaMobileBridge.renderMarkdown(textOutRef.value)}
+                        ${window.NovaAnswerPayload && typeof window.NovaAnswerPayload.renderAnswerPayload === "function"
+                            ? window.NovaAnswerPayload.renderAnswerPayload(textOutRef.value)
+                            : window.NovaMobileCore.renderMarkdown(textOutRef.value)}
                         <span class="nova-stream-cursor"></span>
                     </div>
                 `;
@@ -28,10 +30,14 @@
 
             if (thinking) {
                 thinking.classList.add("nova-streaming-active");
-                window.NovaMobileBridge.enhanceCodeBlocks(thinking);
+                if (window.NovaMobileCodeUI && typeof window.NovaMobileCodeUI.enhanceCodeBlocks === "function") {
+                    window.NovaMobileCodeUI.enhanceCodeBlocks(thinking);
+                }
             }
 
-            window.NovaMobileBridge.scrollBottom(false);
+            if (window.NovaMobileCore && typeof window.NovaMobileCore.scrollBottom === "function") {
+                window.NovaMobileCore.scrollBottom(false);
+            }
 
             textOutRef.renderScheduled = false;
         });

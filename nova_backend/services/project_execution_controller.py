@@ -467,6 +467,10 @@ class ProjectExecutionController:
                 )
             ).strip().lower()
 
+            owner = str(task.get("owner") or "NOVA").strip().upper()
+            if owner in {"USER", "COLLABORATIVE"}:
+                continue
+
             nested_steps = (
                 task.get("steps")
                 or task.get("substeps")

@@ -125,6 +125,7 @@ class ProjectWorkspaceService:
         active_tasks = []
         failed_tasks = []
         blocked_tasks = []
+        waiting_tasks = []
         pending_tasks = []
 
         active_statuses = {
@@ -154,6 +155,9 @@ class ProjectWorkspaceService:
 
         blocked_statuses = {
             "blocked",
+        }
+
+        waiting_statuses = {
             "waiting",
             "waiting_input",
             "waiting_approval",
@@ -211,6 +215,9 @@ class ProjectWorkspaceService:
                     task
                 )
 
+            elif status in waiting_statuses:
+                waiting_tasks.append(task)
+
             elif status in pending_statuses:
 
                 pending_tasks.append(
@@ -238,6 +245,8 @@ class ProjectWorkspaceService:
         blocked_count = len(
             blocked_tasks
         )
+
+        waiting_count = len(waiting_tasks)
 
         pending_count = len(
             pending_tasks
@@ -303,12 +312,59 @@ class ProjectWorkspaceService:
 
         next_actions = []
 
-        prioritized_task_groups = [
-            failed_tasks,
-            blocked_tasks,
-            active_tasks,
-            pending_tasks,
-        ]
+        def _dependency_key(value):
+            return " ".join(
+                str(value or "").strip().lower().replace("_", " ").replace("-", " ").split()
+            )
+
+        def _dependency_variants(value):
+            key = _dependency_key(value)
+            variants = {key} if key else set()
+            no_article = " ".join(word for word in key.split() if word != "the")
+            if no_article:
+                variants.add(no_article)
+            return variants
+
+        completed_references = set()
+        for task in completed_tasks:
+            for reference in (task.get("id"), task.get("title"), task.get("name")):
+                if reference:
+                    completed_references.update(_dependency_variants(reference))
+
+        ready_tasks = []
+        dependency_blocked_tasks = []
+        for task in active_tasks + pending_tasks:
+            dependencies = task.get("dependencies") or task.get("depends_on") or []
+            if isinstance(dependencies, str):
+                dependencies = [dependencies]
+            if not isinstance(dependencies, list):
+                dependencies = []
+            if all(
+                not str(dependency or "").strip()
+                or bool(_dependency_variants(dependency) & completed_references)
+                for dependency in dependencies
+            ):
+                ready_tasks.append(task)
+            elif any(str(dependency or "").strip() for dependency in dependencies):
+                dependency_blocked_tasks.append(task)
+        dependency_blocked_count = len(dependency_blocked_tasks)
+        blocked_count += dependency_blocked_count
+        ready_tasks.sort(
+            key=lambda task: {"high": 0, "medium": 1, "low": 2}.get(
+                str(task.get("priority") or "medium").strip().lower(), 1
+            )
+        )
+        current_focus = [
+            str(task.get("title") or task.get("name") or "").strip()
+            for task in active_tasks
+            if str(task.get("title") or task.get("name") or "").strip()
+        ] or [
+            str(task.get("title") or task.get("name") or "").strip()
+            for task in ready_tasks
+            if str(task.get("title") or task.get("name") or "").strip()
+        ][:5]
+
+        prioritized_task_groups = [ready_tasks]
 
         for task_group in prioritized_task_groups:
 
@@ -349,6 +405,57 @@ class ProjectWorkspaceService:
                 next_actions
             ) >= 5:
                 break
+
+        user_waiting_tasks = [
+            task for task in waiting_tasks
+            if isinstance(task, dict)
+            and str(task.get("owner") or "").strip().upper() in {"USER", "COLLABORATIVE"}
+            and all(
+                not str(dependency or "").strip()
+                or bool(_dependency_variants(dependency) & completed_references)
+                for dependency in (
+                    task.get("dependencies")
+                    if isinstance(task.get("dependencies"), list)
+                    else ([task.get("dependencies")] if task.get("dependencies") else [])
+                )
+            )
+        ]
+        for task in user_waiting_tasks:
+            title = str(task.get("title") or "").strip()
+            if title and title not in next_actions and len(next_actions) < 5:
+                next_actions.append(title)
+        next_task = next(
+            (task for task in ready_tasks if isinstance(task, dict)),
+            None,
+        ) or next((task for task in user_waiting_tasks if isinstance(task, dict)), None)
+        next_task_title = str((next_task or {}).get("title") or "").strip()
+        next_task_owner = str((next_task or {}).get("owner") or "NOVA").strip().upper()
+        if next_task_title:
+            next_move = {
+                "title": next_task_title,
+                "owner": next_task_owner,
+                "action": (
+                    "Your next step"
+                    if next_task_owner in {"USER", "COLLABORATIVE"}
+                    else "Nova's next step"
+                ),
+                "task_id": (next_task or {}).get("id"),
+                "estimated_effort": str((next_task or {}).get("estimated_effort") or "").strip() or None,
+            }
+        else:
+            next_move = {
+                "title": (
+                    "Resolve a prerequisite for " + str(dependency_blocked_tasks[0].get("title") or "the next task")
+                    if dependency_blocked_tasks
+                    else "Review the recorded blockers"
+                    if blocked_tasks or failed_tasks
+                    else "All planned tasks are complete"
+                ),
+                "owner": "USER" if blocked_tasks or failed_tasks or dependency_blocked_tasks else "NOVA",
+                "action": "Attention needed" if blocked_tasks or failed_tasks else "Complete",
+                "task_id": None,
+                "estimated_effort": None,
+            }
 
         project_files = project.get(
             "files",
@@ -444,6 +551,10 @@ class ProjectWorkspaceService:
 
             project_status = "blocked"
 
+        elif waiting_count > 0:
+
+            project_status = "waiting"
+
         elif total_tasks == 0:
 
             project_status = "not_started"
@@ -494,6 +605,10 @@ class ProjectWorkspaceService:
 
             health_status = "blocked"
 
+        elif waiting_count > 0 or execution_status in {"waiting", "waiting_input", "waiting_approval"}:
+
+            health_status = "waiting"
+
         elif (
             active_count > 0
             or execution_status in {
@@ -519,7 +634,10 @@ class ProjectWorkspaceService:
             "in_progress_tasks": active_count,
             "failed_tasks": failed_count,
             "blocked_tasks": blocked_count,
+            "waiting_tasks": waiting_count,
             "pending_tasks": pending_count,
+            "remaining_tasks": max(total_tasks - completed_count, 0),
+            "ready_tasks": len(ready_tasks),
             "completion_percentage": (
                 completion_percentage
             ),
@@ -533,6 +651,80 @@ class ProjectWorkspaceService:
         brain["next_actions"] = (
             next_actions
         )
+        brain["next_move"] = next_move
+        brain["next_move_owner"] = next_move["owner"]
+        brain["current_action"] = next(
+            (str(task.get("title") or "").strip() for task in active_tasks if str(task.get("title") or "").strip()),
+            next_move["title"],
+        )
+        brain["completed_work"] = [
+            str(task.get("title") or task.get("name") or "").strip()
+            for task in completed_tasks
+            if str(task.get("title") or task.get("name") or "").strip()
+        ]
+        brain["current_work"] = [
+            str(task.get("title") or task.get("name") or "").strip()
+            for task in active_tasks
+            if str(task.get("title") or task.get("name") or "").strip()
+        ]
+        dependency_blocker_by_id = {
+            task.get("id"): [
+                str(dependency).strip()
+                for dependency in (
+                    task.get("dependencies")
+                    if isinstance(task.get("dependencies"), list)
+                    else ([task.get("dependencies")] if task.get("dependencies") else [])
+                )
+                if str(dependency or "").strip()
+                and not (_dependency_variants(dependency) & completed_references)
+            ]
+            for task in dependency_blocked_tasks
+        }
+        brain["blocked_work"] = [
+            {
+                "title": str(task.get("title") or task.get("name") or "").strip(),
+                "owner": str(task.get("owner") or "NOVA").strip().upper(),
+                "reason": str(
+                    task.get("blocked_reason")
+                    or task.get("error")
+                    or task.get("failure_reason")
+                    or (
+                        "Waiting for: " + ", ".join(dependency_blocker_by_id.get(task.get("id"), []))
+                        if task in dependency_blocked_tasks
+                        else ""
+                    )
+                ).strip(),
+            }
+            for task in blocked_tasks + dependency_blocked_tasks
+            if str(task.get("title") or task.get("name") or "").strip()
+        ]
+        brain["remaining_work"] = [
+            str(task.get("title") or task.get("name") or "").strip()
+            for task in pending_tasks
+            if str(task.get("title") or task.get("name") or "").strip()
+        ] + [
+            str(task.get("title") or task.get("name") or "").strip()
+            for task in waiting_tasks
+            if str(task.get("title") or task.get("name") or "").strip()
+        ]
+        brain["nova_ready_work"] = [
+            str(task.get("title") or task.get("name") or "").strip()
+            for task in ready_tasks
+            if str(task.get("owner") or "NOVA").strip().upper() == "NOVA"
+            and str(task.get("title") or task.get("name") or "").strip()
+        ]
+        brain["user_work"] = [
+            str(task.get("title") or task.get("name") or "").strip()
+            for task in user_waiting_tasks
+            if str(task.get("owner") or "").strip().upper() == "USER"
+            and str(task.get("title") or task.get("name") or "").strip()
+        ]
+        brain["collaborative_work"] = [
+            str(task.get("title") or task.get("name") or "").strip()
+            for task in user_waiting_tasks
+            if str(task.get("owner") or "").strip().upper() == "COLLABORATIVE"
+            and str(task.get("title") or task.get("name") or "").strip()
+        ]
 
         brain["health"] = {
             "status": health_status,
@@ -543,18 +735,26 @@ class ProjectWorkspaceService:
             "in_progress_tasks": active_count,
             "failed_tasks": failed_count,
             "blocked_tasks": blocked_count,
+            "waiting_tasks": waiting_count,
             "pending_tasks": pending_count,
         }
 
+        goal_text = str(brain.get("goal") or project.get("request") or project.get("description") or "").strip()
         brain["planning_summary"] = (
-            f"Tasks: {total_tasks} total, "
-            f"{active_count} active, "
-            f"{completed_count} completed, "
-            f"{failed_count} failed, "
-            f"{blocked_count} blocked, "
-            f"{pending_count} pending. "
-            f"Project status: {project_status}."
+            (f"Goal: {goal_text}. " if goal_text else "")
+            + f"Progress: {completed_count} of {total_tasks} tasks complete; "
+            + f"{max(total_tasks - completed_count, 0)} remain. "
+            + f"{active_count} active, {waiting_count} waiting, {failed_count} failed, {blocked_count} blocked. "
+            + f"Next: {next_move['action'].lower()} — {next_move['title']}. "
+            + f"Project status: {project_status}."
         )
+        if total_tasks > 0 and completed_count > 0 and completed_count < total_tasks:
+            brain["contextual_motivation"] = (
+                f"{completed_count} of {total_tasks} planned tasks are complete. "
+                f"The next useful step is: {next_move['title']}."
+            )
+        else:
+            brain["contextual_motivation"] = ""
 
         project_health = "not_started"
         attention_required = False
@@ -3346,7 +3546,17 @@ class ProjectWorkspaceService:
         replacement="",
         command="",
         requires_approval=False,
+        owner="NOVA",
     ):
+
+        resolved_owner = str(owner or "NOVA").strip().upper()
+        if resolved_owner not in {"NOVA", "USER", "COLLABORATIVE"}:
+            raise ValueError("Task owner must be NOVA, USER, or COLLABORATIVE.")
+        if (
+            resolved_owner == "NOVA"
+            and str(action or "").strip().lower() in {"manual", "user_action"}
+        ):
+            raise ValueError("Manual user actions cannot be assigned to Nova.")
 
         if not (
             str(action or "").strip()
@@ -3406,7 +3616,12 @@ class ProjectWorkspaceService:
                 "priority": str(
                     priority or "medium"
                 ).strip(),
-                "status": "open",
+                "owner": resolved_owner,
+                "status": (
+                    "waiting_input"
+                    if resolved_owner in {"USER", "COLLABORATIVE"}
+                    else "open"
+                ),
                 "steps": (
                     [
                         {
@@ -3439,7 +3654,9 @@ class ProjectWorkspaceService:
                 ).strip().lower(),
 
                 "execution_mode": str(
-                    execution_mode or ""
+                    "manual"
+                    if resolved_owner in {"USER", "COLLABORATIVE"}
+                    else execution_mode or ""
                 ).strip().lower(),
 
                 "execution_file": str(

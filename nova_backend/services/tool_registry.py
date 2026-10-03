@@ -22,36 +22,42 @@ class ToolRegistry:
             "category": "internal",
             "requires_confirmation": False,
             "aliases": ["chat"],
+            "implemented": True,
         },
         "session.rename": {
             "name": "session.rename",
             "category": "internal",
             "requires_confirmation": False,
             "aliases": ["rename"],
+            "implemented": True,
         },
         "session.pin": {
             "name": "session.pin",
             "category": "internal",
             "requires_confirmation": False,
             "aliases": ["pin"],
+            "implemented": True,
         },
         "session.delete": {
             "name": "session.delete",
             "category": "internal",
             "requires_confirmation": False,
             "aliases": ["delete"],
+            "implemented": True,
         },
         "attachment.upload": {
             "name": "attachment.upload",
             "category": "internal",
             "requires_confirmation": False,
             "aliases": ["upload"],
+            "implemented": True,
         },
         "attachment.analyze": {
             "name": "attachment.analyze",
             "category": "internal",
             "requires_confirmation": False,
             "aliases": ["analyze"],
+            "implemented": True,
         },
     }
 
@@ -94,7 +100,23 @@ class ToolRegistry:
 
     def _register_internal_tools(self):
         for name, metadata in self.INTERNAL_TOOLS.items():
-            self._tools[name] = dict(metadata)
+            item = dict(metadata)
+            from nova_backend.tools.risk_policy import tool_risk_metadata
+            risk = tool_risk_metadata(name)
+            item["requires_confirmation"] = risk["requires_approval"]
+            item["risk_class"] = risk["risk_class"]
+            schemas = {
+                "chat.send": {"message": {"type": "string"}},
+                "session.rename": {"session_id": {"type": "string"}, "title": {"type": "string"}},
+                "session.pin": {"session_id": {"type": "string"}, "pinned": {"type": "boolean"}},
+                "session.delete": {"session_id": {"type": "string"}},
+                "attachment.upload": {"session_id": {"type": "string"}, "filename": {"type": "string"}},
+                "attachment.analyze": {"attachment_id": {"type": "string"}, "question": {"type": "string"}},
+            }
+            item["parameter_schema"] = {
+                "type": "object", "properties": schemas.get(name, {}), "additionalProperties": False,
+            }
+            self._tools[name] = item
 
     def _register_external_tools(self):
         for name, metadata in self.EXTERNAL_TOOLS.items():
@@ -138,6 +160,9 @@ class ToolRegistry:
                     False,
                 )
             )
+            from nova_backend.tools.risk_policy import tool_risk_metadata
+            metadata = tool.get_metadata() if callable(getattr(tool, "get_metadata", None)) else {}
+            risk = tool_risk_metadata(tool_name, tool)
 
             category = getattr(
                 tool,
@@ -145,16 +170,45 @@ class ToolRegistry:
                 "nova",
             )
 
+            parameter_schema = metadata.get("parameter_schema")
+            if not self._is_valid_object_schema(parameter_schema):
+                # A registered implementation without a usable contract must
+                # never be advertised to a model as executable.
+                continue
+
             self._tools[tool_name] = {
                 "name": tool_name,
+                "description": str(metadata.get("description") or "").strip(),
                 "category": category,
-                "requires_confirmation": (
-                    requires_confirmation
-                ),
+                "requires_confirmation": risk["requires_approval"] or requires_confirmation,
+                "requires_approval": risk["requires_approval"] or requires_confirmation,
+                "risk_class": risk["risk_class"],
+                "parameter_schema": parameter_schema,
                 "aliases": list(aliases),
-                "implemented": True,
+                "implemented": bool(metadata.get("implemented", True)),
+                "available": tool_name not in {"shell_command", "terminal_execute", "python_run", "process_start"},
                 "source": "nova",
             }
+
+    @staticmethod
+    def _is_valid_object_schema(schema):
+        if not isinstance(schema, dict) or schema.get("type") != "object":
+            return False
+        properties = schema.get("properties")
+        required = schema.get("required", [])
+        if schema.get("additionalProperties") is not False:
+            return False
+        if not isinstance(properties, dict) or not isinstance(required, list):
+            return False
+        if any(not isinstance(key, str) or key not in properties for key in required):
+            return False
+        allowed_types = {"string", "integer", "number", "boolean", "array", "object"}
+        for key, definition in properties.items():
+            if not isinstance(key, str) or not isinstance(definition, dict):
+                return False
+            if definition.get("type") not in allowed_types:
+                return False
+        return True
 
     # =========================================================
     # DISCOVERY
@@ -168,17 +222,47 @@ class ToolRegistry:
             name: dict(metadata)
             for name, metadata
             in self._tools.items()
+            if metadata.get("implemented", True) is True
+            and metadata.get("available", True) is True
         }
+
+    def get_model_tool_definitions(self, surface="chat"):
+        """Return model contracts only for executable canonical Nova tools."""
+        if surface not in {"chat", "project", "super_ai"} or self.tool_executor is None:
+            return []
+        definitions = []
+        for name, metadata in sorted(self.get_available_tools().items()):
+            if metadata.get("source") != "nova":
+                continue
+            schema = metadata.get("parameter_schema")
+            if not self._is_valid_object_schema(schema):
+                continue
+            description = str(metadata.get("description") or "").strip()
+            if not description:
+                continue
+            definitions.append({
+                "name": name,
+                "description": description,
+                "parameters": schema,
+                "risk_level": metadata.get("risk_class", "WRITE"),
+                "requires_approval": bool(metadata.get("requires_approval")),
+                "implemented": True,
+                "available": True,
+            })
+        return definitions
+
 
     def list_tool_names(self) -> list[str]:
 
         return sorted(
-            self._tools.keys()
+            name for name, metadata in self._tools.items()
+            if metadata.get("implemented", True) is True
+            and metadata.get("available", True) is True
         )
 
     def get_tool_count(self) -> int:
 
-        return len(self._tools)
+        return len(self.list_tool_names())
 
     def get_tool(
         self,
@@ -194,7 +278,7 @@ class ToolRegistry:
 
         tool = self._tools.get(normalized)
 
-        if not tool:
+        if not tool or tool.get("implemented", True) is not True or tool.get("available", True) is not True:
             return None
 
         return dict(tool)
@@ -219,6 +303,9 @@ class ToolRegistry:
             return normalized
 
         for name, metadata in self._tools.items():
+
+            if metadata.get("implemented", True) is not True:
+                continue
 
             aliases = (
                 metadata.get("aliases")

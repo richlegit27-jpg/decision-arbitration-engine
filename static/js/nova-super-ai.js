@@ -120,7 +120,12 @@
     $("conversationTitle").textContent = session.title || session.name || "Conversation";
     $("messageList").replaceChildren();
     const messages = Array.isArray(session.messages) ? session.messages : [];
-    for (const message of messages) renderMessage({ ...message, content: message.content ?? message.text });
+    for (const message of messages) {
+      const rendered = renderMessage({ ...message, content: message.content ?? message.text });
+      if (message.status === "tool_approval_required") {
+        renderToolApprovalControls(rendered.content, message);
+      }
+    }
     state.lastPrompt = [...messages].reverse().find((message) => message.role === "user")?.content || [...messages].reverse().find((message) => message.role === "user")?.text || "";
     if (!messages.length) showEmptyState();
     await loadSessionList();
@@ -211,6 +216,9 @@
       } else if (event.type === "done") {
         gotDone = true;
         if (!assistantContent.textContent && event.assistant_message?.text) assistantContent.textContent = event.assistant_message.text;
+        if (event.assistant_message?.status === "tool_approval_required") {
+          renderToolApprovalControls(assistantContent, event.assistant_message);
+        }
       }
     };
     while (!gotDone) {
@@ -227,6 +235,58 @@
     }
     if (gotError) throw new Error(gotError);
     if (!gotDone) throw new Error("Nova's response stream ended before completion.");
+  }
+
+  function renderToolApprovalControls(content, message) {
+    const pending = message?.pending_tool || {};
+    const toolName = String(pending.tool || "requested tool");
+    const card = document.createElement("div");
+    card.className = "tool-approval-controls";
+    const description = document.createElement("p");
+    description.textContent = `Nova needs your approval to run ${toolName}.`;
+    const details = document.createElement("pre");
+    details.textContent = JSON.stringify(pending.payload || {}, null, 2);
+    const approve = document.createElement("button");
+    approve.type = "button";
+    approve.textContent = "Approve";
+    const deny = document.createElement("button");
+    deny.type = "button";
+    deny.textContent = "Deny";
+    const status = document.createElement("span");
+    status.setAttribute("role", "status");
+    approve.addEventListener("click", async () => {
+      approve.disabled = deny.disabled = true;
+      status.textContent = "Approving…";
+      try {
+        const { data } = await api("/api/tools/approve", {
+          method: "POST",
+          body: JSON.stringify({ session_id: state.sessionId }),
+        });
+        status.textContent = data.continued_text || data.message || "Approved and completed.";
+        if (data.continued_text) content.textContent = data.continued_text;
+        await loadSession(state.sessionId);
+      } catch (error) {
+        approve.disabled = deny.disabled = false;
+        status.textContent = error.message || "Approval failed.";
+      }
+    });
+    deny.addEventListener("click", async () => {
+      approve.disabled = deny.disabled = true;
+      status.textContent = "Cancelling…";
+      try {
+        const { data } = await api("/api/tools/deny", {
+          method: "POST",
+          body: JSON.stringify({ session_id: state.sessionId }),
+        });
+        status.textContent = data.message || "Tool action cancelled.";
+        await loadSession(state.sessionId);
+      } catch (error) {
+        approve.disabled = deny.disabled = false;
+        status.textContent = error.message || "Unable to cancel the action.";
+      }
+    });
+    card.append(description, details, approve, deny, status);
+    content.parentElement?.appendChild(card);
   }
 
   async function sendMessage(prompt, regenerate = false) {
@@ -251,7 +311,7 @@
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-        body: JSON.stringify({ content: text, session_id: state.sessionId, model: state.model, regenerate }),
+        body: JSON.stringify({ content: text, session_id: state.sessionId, model: state.model, regenerate, surface: "super_ai" }),
         signal: state.abortController.signal,
       });
       content.textContent = "";

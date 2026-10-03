@@ -12,11 +12,8 @@ class ExecutionApprovalService:
     def requires_approval(self, step):
         if not isinstance(step, dict):
             return False
-
-        return bool(
-            step.get("requires_approval")
-            or step.get("approval_required")
-        )
+        from nova_backend.tools.risk_policy import step_requires_approval
+        return step_requires_approval(step)
 
     def is_approved(self, step):
         if not isinstance(step, dict):

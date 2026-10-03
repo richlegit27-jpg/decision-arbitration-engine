@@ -908,13 +908,15 @@ reply = await streamService.send({
         clearThinkingIndicator()
         handleResolvedChatId(reply, chatId)
 
+  const approvalReply = reply?.assistant_message || {};
+  const pendingToolReply = reply?.pending_tool || approvalReply.pending_tool;
   if(
-    reply?.status === "tool_approval_required" &&
-    reply?.pending_tool
+    (reply?.status === "tool_approval_required" || approvalReply.status === "tool_approval_required") &&
+    pendingToolReply
   ){
 
     const pendingTool =
-      reply.pending_tool
+      pendingToolReply
 
     const toolName =
       String(
@@ -1039,6 +1041,7 @@ if(streamText.trim()){
                 thinking: false,
                 isThinking: false,
                 attachments: responseAttachments,
+                meta: assistantResponse.meta || {},
                 ...imageOutput,
             }
         )
@@ -1053,6 +1056,7 @@ const appended = appendAssistantMessage(
     streamText,
     responseAttachments,
     {
+        meta: assistantResponse.meta || {},
         execution: reply?.execution || null,
         execution_state: reply?.execution_state || null,
         ...imageOutput,

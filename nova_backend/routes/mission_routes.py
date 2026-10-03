@@ -1,213 +1,23 @@
-from flask import jsonify, request
-
-from nova_backend.services.mission_service import (
-    mission_service,
-)
+from flask import jsonify
 
 
-def register_mission_routes(
-    app,
-    execution_state_service=None,
-    mission_orchestrator=None,
-):
+def register_mission_routes(app, execution_state_service=None, mission_orchestrator=None):
+    """Retire the unauthenticated legacy Mission API.
 
-    def persist_mission_state(session_id, mission):
-        if execution_state_service and session_id:
-            execution_state_service.save_execution_state(
-                session_id,
-                {
-                    "id": mission.get("id"),
-                    "mission_id": mission.get("id"),
-                    "goal": (
-                        mission.get("goal")
-                        or mission.get("title")
-                        or "Untitled mission"
-                    ),
-                    "status": mission.get(
-                        "status",
-                        "running",
-                    ),
-                    "task_type": "general",
-                    "context": {
-                        "source": "mission_routes",
-                        "mission": mission,
-                    },
-                    "execution_decision": {},
-                    "steps": mission.get(
-                        "steps",
-                        [],
-                    ),
-                    "current_index": mission.get(
-                        "current_step",
-                        0,
-                    ),
-                    "current_step_index": mission.get(
-                        "current_step",
-                        0,
-                    ),
-                    "history": [],
-                    "waiting": True,
-                    "complete": False,
-                    "error": None,
-                },
-            )
-    @app.get("/api/missions")
-    def list_missions():
+    Project execution is the supported user-facing workflow. These legacy
+    endpoints operated on a process-wide mission store and bypassed its
+    authenticated project execution and approval boundaries.
+    """
 
-        return jsonify(
-            {
-                "ok": True,
-                "missions": mission_service.list_missions(),
-            }
-        )
+    def disabled(*args, **kwargs):
+        return jsonify({
+            "ok": False,
+            "error": "legacy_missions_disabled",
+            "message": "Use Nova Projects for authenticated task execution.",
+        }), 410
 
-    @app.get("/api/missions/<mission_id>")
-    def get_mission(mission_id):
-
-        mission = mission_service.get_mission(
-            mission_id
-        )
-
-        if not mission:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": "mission_not_found",
-                }
-            ), 404
-
-        return jsonify(
-            {
-                "ok": True,
-                "mission": mission,
-            }
-        )
-
-    @app.post("/api/missions/<mission_id>/start")
-    def start_mission(mission_id):
-
-        data = request.get_json(
-            silent=True
-        ) or {}
-
-        session_id = str(
-            data.get("session_id")
-            or data.get("active_session_id")
-            or ""
-        ).strip()
-
-        mission = mission_service.start_mission(
-            mission_id
-        )
-
-        if not mission:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": "mission_not_found",
-                }
-            ), 404
-
-        if mission_orchestrator:
-
-            orchestration_result = (
-                mission_orchestrator.run_mission(
-                    {
-                        "mission_id": mission.get("id"),
-                        "goal": mission.get("goal"),
-                        "steps": mission.get("steps", []),
-                    }
-                )
-            )
-
-            mission["orchestration"] = (
-                orchestration_result
-            )
-
-        persist_mission_state(
-            session_id,
-            mission,
-        )
-
-        return jsonify(
-            {
-                "ok": True,
-                "mission": mission,
-            }
-        )
-
-    @app.post("/api/missions/<mission_id>/advance")
-    def advance_mission(mission_id):
-
-        data = request.get_json(
-            silent=True
-        ) or {}
-
-        session_id = str(
-            data.get("session_id")
-            or data.get("active_session_id")
-            or ""
-        ).strip()
-
-        mission = mission_service.advance_step(
-            mission_id
-        )
-
-        if not mission:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": "mission_not_found",
-                }
-            ), 404
-
-        persist_mission_state(
-            session_id,
-            mission,
-        )
-
-        return jsonify(
-            {
-                "ok": True,
-                "mission": mission,
-            }
-        )
-
-    @app.post("/api/missions/<mission_id>/status")
-    def update_mission_status(mission_id):
-
-        data = request.get_json(
-            silent=True
-        ) or {}
-
-        status = str(
-            data.get("status", "")
-        ).strip()
-
-        if not status:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": "missing_status",
-                }
-            ), 400
-
-        mission = mission_service.update_status(
-            mission_id,
-            status,
-        )
-
-        if not mission:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": "mission_not_found",
-                }
-            ), 404
-
-        return jsonify(
-            {
-                "ok": True,
-                "mission": mission,
-            }
-        )
+    app.add_url_rule("/api/missions", "list_missions", disabled, methods=["GET"])
+    app.add_url_rule("/api/missions/<mission_id>", "get_mission", disabled, methods=["GET"])
+    app.add_url_rule("/api/missions/<mission_id>/start", "start_mission", disabled, methods=["POST"])
+    app.add_url_rule("/api/missions/<mission_id>/advance", "advance_mission", disabled, methods=["POST"])
+    app.add_url_rule("/api/missions/<mission_id>/status", "update_mission_status", disabled, methods=["POST"])

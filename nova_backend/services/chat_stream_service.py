@@ -116,6 +116,7 @@ class ChatStreamService:
         metadata = {}
         assistant = payload.get("assistant_message")
         if isinstance(assistant, dict):
+            metadata["assistant_message"] = assistant
             for key in ("attachments", "image_url"):
                 if assistant.get(key):
                     metadata[key] = assistant[key]

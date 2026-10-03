@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import logging
+import ipaddress
 import os
 import re
+import socket
 from typing import Any, Dict, List
 from urllib.parse import urljoin, urlparse
 
@@ -1550,12 +1553,30 @@ class WebService:
             return self.cache[key]
 
         try:
-            response = requests.get(
-                url,
-                timeout=self.timeout,
-                headers=self._headers(),
-                allow_redirects=True,
-            )
+            current_url = url
+            response = None
+            for _redirect in range(6):
+                self._validate_public_fetch_url(current_url)
+                response = requests.get(
+                    current_url,
+                    timeout=self.timeout,
+                    headers=self._headers(),
+                    allow_redirects=False,
+                )
+                if int(getattr(response, "status_code", 200)) not in {301, 302, 303, 307, 308}:
+                    break
+                location = str((getattr(response, "headers", {}) or {}).get("Location") or "").strip()
+                if not location:
+                    raise ValueError("Web page returned an invalid redirect.")
+                current_url = urljoin(current_url, location)
+                close = getattr(response, "close", None)
+                if callable(close):
+                    close()
+            else:
+                raise ValueError("Web page redirected too many times.")
+
+            if response is None:
+                raise ValueError("Web page could not be fetched.")
             response.raise_for_status()
 
             html = response.text
@@ -1563,25 +1584,30 @@ class WebService:
 
             result = {
                 "ok": True,
-                "url": url,
-                "domain": urlparse(url).netloc,
+                "url": str(getattr(response, "url", "") or current_url),
+                "domain": urlparse(current_url).netloc,
                 "title": self._extract_title(html),
                 "content": text,
                 "summary": self._summarize(text),
                 "bullets": self._bullets(text),
-                "links": self._extract_links(html, url),
-                "images": self._extract_images(html, url),
-                "page_type": self._detect_type(text, url),
+                "links": self._extract_links(html, current_url),
+                "images": self._extract_images(html, current_url),
+                "page_type": self._detect_type(text, current_url),
             }
 
             self.cache[key] = result
             return result
 
         except Exception as e:
+            logging.getLogger("nova.web").error(
+                "web page fetch failed",
+                extra={"error_type": type(e).__name__},
+            )
             return {
                 "ok": False,
                 "url": url,
-                "error": str(e),
+                "error": "web_fetch_failed",
+                "message": "Nova could not fetch that page. Check the address and try again.",
                 "summary": "",
                 "content": "",
                 "bullets": [],
@@ -1589,6 +1615,39 @@ class WebService:
                 "images": [],
                 "page_type": "web_page",
             }
+
+    @staticmethod
+    def _validate_public_fetch_url(url: str) -> None:
+        parsed = urlparse(str(url or ""))
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("Only public HTTP and HTTPS pages can be fetched.")
+        if parsed.username or parsed.password:
+            raise ValueError("URLs with embedded credentials cannot be fetched.")
+        host = parsed.hostname.rstrip(".").lower()
+        if host in {"localhost", "metadata.google.internal"} or host.endswith((".localhost", ".local", ".internal", ".intranet")):
+            raise ValueError("Local and internal destinations cannot be fetched.")
+        try:
+            port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+        except ValueError as exc:
+            raise ValueError("Invalid web destination port.") from exc
+        if not 1 <= port <= 65535:
+            raise ValueError("Invalid web destination port.")
+        try:
+            literal = ipaddress.ip_address(host)
+            addresses = {literal}
+        except ValueError:
+            try:
+                records = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+            except OSError as exc:
+                raise ValueError("Web destination could not be resolved.") from exc
+            addresses = set()
+            for record in records:
+                try:
+                    addresses.add(ipaddress.ip_address(record[4][0].split("%", 1)[0]))
+                except (ValueError, IndexError, TypeError):
+                    continue
+        if not addresses or any(not address.is_global for address in addresses):
+            raise ValueError("Private, local, and reserved destinations cannot be fetched.")
 
     # -----------------------
     # ARTIFACT PAYLOADS

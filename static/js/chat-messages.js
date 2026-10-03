@@ -41,33 +41,88 @@ let eventsBound = false
 let copiedMessageId = ""
 let copyFailedMessageId = ""
 let copyFeedbackTimer = null
-const videoPollsInFlight = new Set()
+const activeVideoPollers = new Map()
+const TERMINAL_VIDEO_STATES = new Set(["completed", "failed", "cancelled", "canceled", "interrupted", "expired"])
 
-async function pollPendingVideos(){
-  const messages = Array.isArray(state.messages) ? state.messages : []
-  for(const message of messages){
-    const meta = message?.meta || {}
-    const jobId = String(meta.video_job_id || "").trim()
-    if(!jobId || !["queued", "generating"].includes(String(meta.video_status || "")) || videoPollsInFlight.has(jobId)) continue
-    videoPollsInFlight.add(jobId)
-    try{
-      const response = await fetch(`/api/video/jobs/${encodeURIComponent(jobId)}`, { credentials: "same-origin", cache: "no-store" })
-      const payload = await response.json()
-      if(!response.ok || !payload?.ok) continue
-      const job = payload.job || {}
-      if(payload.assistant_message){
-        Object.assign(message, payload.assistant_message)
-      }else if(job.status){
-        message.meta = { ...meta, video_status: job.status }
-      }
-      if(["completed", "failed"].includes(String(job.status || "")) || payload.assistant_message){
-        renderMessages()
-      }
-    }catch(_error){
-      // The persisted pending state remains visible; a later poll retries.
-    }finally{
-      videoPollsInFlight.delete(jobId)
+function videoMessageForJob(jobId){
+  return (Array.isArray(state.messages) ? state.messages : []).find((message) =>
+    String(message?.meta?.video_job_id || "").trim() === jobId
+  ) || null
+}
+
+function stopVideoPoller(jobId, entry = null){
+  const current = activeVideoPollers.get(jobId)
+  if(!current || (entry && current !== entry)) return
+  if(current.timer) window.clearTimeout(current.timer)
+  activeVideoPollers.delete(jobId)
+}
+
+function scheduleVideoPoll(jobId, entry, delay){
+  if(activeVideoPollers.get(jobId) !== entry) return
+  entry.timer = window.setTimeout(() => pollVideoJob(jobId, entry), delay)
+}
+
+async function pollVideoJob(jobId, entry){
+  if(activeVideoPollers.get(jobId) !== entry || entry.inFlight) return
+  entry.timer = null
+  const message = videoMessageForJob(jobId)
+  if(message && TERMINAL_VIDEO_STATES.has(String(message?.meta?.video_status || "").toLowerCase())){
+    stopVideoPoller(jobId, entry)
+    return
+  }
+  entry.inFlight = true
+  try{
+    const response = await fetch(`/api/video/jobs/${encodeURIComponent(jobId)}`, { credentials: "same-origin", cache: "no-store" })
+    const payload = await response.json().catch(() => ({}))
+    if(activeVideoPollers.get(jobId) !== entry) return
+    if(response.status === 401 || response.status === 404){
+      stopVideoPoller(jobId, entry)
+      return
     }
+    if(!response.ok || !payload?.ok){
+      entry.delay = Math.min(30000, Math.max(3000, entry.delay * 2))
+      return
+    }
+    const job = payload.job || {}
+    const status = String(job.status || "").toLowerCase()
+    const currentMessage = videoMessageForJob(jobId)
+    const assistantMessage = payload.assistant_message || job.assistant_message
+    if(currentMessage){
+      if(assistantMessage) Object.assign(currentMessage, assistantMessage)
+      else if(status) currentMessage.meta = { ...(currentMessage.meta || {}), video_status: status }
+    }
+    if(TERMINAL_VIDEO_STATES.has(status)){
+      stopVideoPoller(jobId, entry)
+      if(currentMessage && assistantMessage) renderMessages()
+      return
+    }
+    entry.delay = 3000
+  }catch(_error){
+    entry.delay = Math.min(30000, Math.max(3000, entry.delay * 2))
+  }finally{
+    entry.inFlight = false
+    if(activeVideoPollers.get(jobId) === entry) scheduleVideoPoll(jobId, entry, entry.delay)
+  }
+}
+
+function resumePendingVideoPolls(messages){
+  const seen = new Set()
+  for(const message of messages){
+    const jobId = String(message?.meta?.video_job_id || "").trim()
+    const status = String(message?.meta?.video_status || "").toLowerCase()
+    if(!jobId) continue
+    seen.add(jobId)
+    if(TERMINAL_VIDEO_STATES.has(status)){
+      stopVideoPoller(jobId)
+      continue
+    }
+    if(!["queued", "generating", "pending", "processing"].includes(status) || activeVideoPollers.has(jobId)) continue
+    const entry = { timer: null, inFlight: false, delay: 3000 }
+    activeVideoPollers.set(jobId, entry)
+    scheduleVideoPoll(jobId, entry, 0)
+  }
+  for(const jobId of activeVideoPollers.keys()){
+    if(!seen.has(jobId)) stopVideoPoller(jobId)
   }
 }
 
@@ -441,20 +496,7 @@ function renderCodeBlock(content, language = ""){
 }
 
 function renderMessageBody(message){
-  const content = message?.content ?? ""
-
-  const videoJobId = String(message?.meta?.video_job_id || "").trim()
-  const videoStatus = String(message?.meta?.video_status || "").trim()
-  if(message?.role === "assistant" && videoJobId && ["queued", "generating"].includes(videoStatus)){
-    const label = videoStatus === "queued" ? "Video queued…" : "Generating your video…"
-    return `<div class="nova-video-job-status" data-video-job-id="${escapeHtml(videoJobId)}" role="status">${escapeHtml(label)}</div>`
-  }
-  if(message?.role === "assistant" && Array.isArray(message?.attachments)){
-    const video = message.attachments.find((item) => String(item?.type || item?.kind || "").toLowerCase() === "video" && item?.url)
-    if(video){
-      return `<div class="nova-media-card"><video class="nova-media-video" controls preload="metadata"><source src="${escapeHtml(video.url)}" type="${escapeHtml(video.mime_type || "video/mp4")}"></video><div class="nova-media-caption">${escapeHtml(video.title || "Generated video")}</div></div>`
-    }
-  }
+  const content = message?.content ?? message?.text ?? ""
 
   const videoJobId = String(message?.meta?.video_job_id || "").trim()
   const videoStatus = String(message?.meta?.video_status || "").trim()
@@ -512,7 +554,20 @@ prompt: ${content}`
 }
 
 function renderMessageBody(message){
-  const content = message?.content ?? ""
+  const content = message?.content ?? message?.text ?? ""
+
+  const videoJobId = String(message?.meta?.video_job_id || "").trim()
+  const videoStatus = String(message?.meta?.video_status || "").trim()
+  if(message?.role === "assistant" && videoJobId && ["queued", "generating"].includes(videoStatus)){
+    const label = videoStatus === "queued" ? "Video queued…" : "Generating your video…"
+    return `<div class="nova-video-job-status" data-video-job-id="${escapeHtml(videoJobId)}" role="status">${escapeHtml(label)}</div>`
+  }
+  if(message?.role === "assistant" && Array.isArray(message?.attachments)){
+    const video = message.attachments.find((item) => String(item?.type || item?.kind || "").toLowerCase() === "video" && item?.url)
+    if(video){
+      return `<div class="nova-media-card"><video class="nova-media-video" controls preload="metadata"><source src="${escapeHtml(video.url)}" type="${escapeHtml(video.mime_type || "video/mp4")}"></video><div class="nova-media-caption">${escapeHtml(video.title || "Generated video")}</div></div>`
+    }
+  }
 
   if(message?.role === "assistant"){
     let imageContent = ""
@@ -665,6 +720,16 @@ function syncMessagesFromStorage(messages, options = {}){
 
 function renderToolApproval(message){
 
+    if(
+        answerPayloadApi &&
+        typeof answerPayloadApi.renderToolApprovalCard === "function"
+    ){
+        return answerPayloadApi.renderToolApprovalCard(
+            message,
+            state?.activeChatId || state?.active_chat_id || ""
+        )
+    }
+
     const approval =
         message?.toolApproval ||
         message?.tool_runtime ||
@@ -805,11 +870,13 @@ if(!messages.length){
     ){
         window.renderDesktopOnboarding(session)
         updateJumpButton()
+        resumePendingVideoPolls(messages)
         return
     }
 
     el.messages.innerHTML = ""
     updateJumpButton()
+    resumePendingVideoPolls(messages)
     return
 }
 
@@ -896,6 +963,7 @@ ${
   }
 
   updateJumpButton()
+  resumePendingVideoPolls(messages)
 }
 
 async function writeClipboardText(text){
@@ -1196,7 +1264,6 @@ function init(){
   renderMessages()
   scrollToBottom(true)
   updateJumpButton()
-  window.setInterval(pollPendingVideos, 3000)
 }
 
 window.NovaChatMessages = {
@@ -1204,6 +1271,7 @@ window.NovaChatMessages = {
   scrollToBottom,
   updateJumpButton,
   syncMessagesFromStorage,
+  resumePendingVideoPolls,
 }
 
 if(document.readyState === "loading"){

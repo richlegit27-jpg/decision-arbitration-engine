@@ -1,7 +1,5 @@
 ﻿from __future__ import annotations
 
-from pathlib import Path
-
 from nova_backend.tools.base import NovaTool
 
 
@@ -32,20 +30,9 @@ class MemoryWriteTool(NovaTool):
         content="",
         **kwargs,
     ):
-        from nova_backend.services.memory_service import (
-            MemoryService,
-        )
+        from app import memory_service
 
-        memory_file = (
-            Path("runtime")
-            / "user_memory.json"
-        )
-
-        service = MemoryService(
-            memory_file=str(memory_file)
-        )
-
-        return service.add_memory(
+        return memory_service.add_memory(
             {
                 "content": content,
                 "type": "user_fact",

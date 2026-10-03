@@ -30,6 +30,7 @@ def build_tool_runtime(
     session_service=None,
     chat_service=None,
     attachment_service=None,
+    python_runner=None,
 ) -> dict:
 
     missing_dependencies = []
@@ -86,6 +87,7 @@ def build_tool_runtime(
     tool_executor = ToolExecutor(
         action_router=action_router,
         nova_tool_registry=nova_tool_registry,
+        python_runner=python_runner,
     )
 
     # =========================================================

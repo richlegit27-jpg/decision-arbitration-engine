@@ -1333,6 +1333,13 @@ def install_project_chat_response_router(app):
 
         for endpoint_name, view in list(app.view_functions.items()):
 
+            # These are conversational response wrappers.
+            # They must only ever own the canonical POST /api/chat endpoint.
+            # Unrelated APIs (video, tools, billing, projects, sessions, etc.)
+            # must retain their native Flask response contracts.
+            if endpoint_name != "api_chat_route":
+                continue
+
             if endpoint_name in excluded_endpoints:
                 continue
 

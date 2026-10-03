@@ -3,6 +3,7 @@
 from typing import Any, Dict
 
 from nova_backend.tools.manager import tool_manager
+from nova_backend.tools.risk_policy import tool_requires_approval
 
 
 def execute_tool(
@@ -40,28 +41,27 @@ def execute_tool(
             "tool": normalized_name,
         }
 
-    if (
-        getattr(
-            tool,
-            "requires_confirmation",
-            False,
-        )
-        and not confirm
-    ):
+    if tool_requires_approval(normalized_name, tool) and confirm is not True:
 
         return {
             "ok": False,
             "tool": normalized_name,
             "requires_confirmation": True,
+            "status": "approval_required",
+            "error": "approval_required",
             "risk_level": getattr(
                 tool,
                 "risk_level",
                 "high",
             ),
-            "payload": safe_payload,
         }
 
     try:
+
+        from nova_backend.services.tool_sandbox import ToolSandbox
+        safe_payload, blocked = ToolSandbox().validate_payload(normalized_name, safe_payload)
+        if blocked:
+            return blocked
 
         result = tool.run(
             **safe_payload
@@ -86,7 +86,8 @@ def execute_tool(
             "ok": False,
             "tool": normalized_name,
             "error": "tool_execution_failed",
-            "details": repr(exc),
+            "status": "failed",
+            "error_category": "tool_execution_failed",
         }
 
 

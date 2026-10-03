@@ -11,6 +11,7 @@ console.log("[NOVA PREVIEW OWNER LOADED 20260714]");
     window.__NOVA_MOBILE_UPLOAD_CHANGE_AUTHORITY_SINGLE_OWNER_20260705__ = true;
 
     var pendingAttachments = [];
+    var removedClientIds = new Set();
 
 try {
     var saved = localStorage.getItem("nova_mobile_upload");
@@ -78,7 +79,12 @@ try {
             type: mimeType,
             content_type: mimeType,
             size: size,
-            size_bytes: size
+            size_bytes: size,
+            client_id: value.client_id || value.id || value.attachment_id || "",
+            pending_upload: value.pending_upload === true,
+            upload_error: value.upload_error === true,
+            error_message: value.error_message || "",
+            local_preview: String(value.local_preview || "").startsWith("blob:") ? "" : (value.local_preview || "")
         };
     }
 
@@ -89,10 +95,14 @@ try {
         } catch (_) {}
 
         window.NovaMobilePendingAttachments = pendingAttachments;
+        window.NovaMobileAttachments = pendingAttachments;
+        window.novaMobilePendingAttachments = pendingAttachments;
+        window.__novaMobilePendingAttachments = pendingAttachments;
         window.NovaMobileUploadedAttachments = pendingAttachments;
         window.NovaMobileAttachmentQueue = pendingAttachments;
         window.NovaMobileUploadQueue = pendingAttachments;
         window.NovaMobileSharedAttachments = pendingAttachments;
+        window.NovaPendingAttachments = pendingAttachments;
     }
 
     function loadPending() {
@@ -113,7 +123,14 @@ try {
 
                 parsed.forEach(function (item) {
                     var clean = normalizeAttachment(item);
-                    if (clean) pendingAttachments.push(clean);
+                    if (clean) {
+                        if (clean.pending_upload && !clean.url) {
+                            clean.pending_upload = false;
+                            clean.upload_error = true;
+                            clean.error_message = "Upload stopped before the page was closed. Select the file again.";
+                        }
+                        pendingAttachments.push(clean);
+                    }
                 });
             } catch (_) {}
         });
@@ -128,6 +145,7 @@ try {
 
         pendingAttachments.forEach(function (item) {
             var key = [
+                item.client_id || item.id || "",
                 item.filename || "",
                 item.url || item.file_url || item.path || "",
                 item.mime_type || item.type || "",
@@ -153,7 +171,7 @@ try {
             input = document.createElement("input");
             input.id = "nova-mobile-upload-authority-input";
             input.type = "file";
-            input.multiple = false;
+            input.multiple = true;
             input.style.position = "fixed";
             input.style.left = "-10000px";
             input.style.top = "0";
@@ -168,14 +186,13 @@ try {
             input.dataset.novaUploadAuthorityBound = "1";
 
             input.addEventListener("change", function () {
-                var file = input.files && input.files[0];
-
-                if (!file) {
+                var files = Array.from(input.files || []);
+                if (!files.length) {
                     log("no file selected");
                     return;
                 }
-
-                uploadFile(file);
+                files.forEach(uploadFile);
+                input.value = "";
             }, true);
         }
 
@@ -214,6 +231,24 @@ if (
     }
 
     function uploadFile(file) {
+        var clientId = "mobile-" + Date.now() + "-" + Math.random().toString(36).slice(2, 9);
+        var localItem = {
+            id: clientId,
+            client_id: clientId,
+            filename: file.name || "Attachment",
+            name: file.name || "Attachment",
+            mime_type: file.type || "",
+            type: file.type || "",
+            size: Number(file.size) || 0,
+            local_preview: file.type && file.type.indexOf("image/") === 0 ? URL.createObjectURL(file) : "",
+            pending_upload: true
+        };
+        removedClientIds.delete(clientId);
+        pendingAttachments.push(localItem);
+        savePending();
+        renderPreview(pendingAttachments);
+        log("selected attachment", { filename: localItem.filename, type: localItem.type, size: localItem.size });
+
         var form = new FormData();
         form.append("file", file);
         form.append("attachment", file);
@@ -236,18 +271,19 @@ if (
                     try {
                         payload = JSON.parse(raw);
                     } catch (_) {
-                        payload = {
-                            ok: response.ok,
-                            filename: file.name,
-                            name: file.name,
-                            mime_type: file.type,
-                            size: file.size,
-                            raw: raw
-                        };
+                        payload = { ok: false };
                     }
 
                     if (!response.ok || payload.ok === false) {
-                        throw new Error(payload.error || payload.message || raw || "Upload failed");
+                        var uploadError = new Error(
+                            response.status === 401 || response.status === 403 ? "Your session expired. Sign in again, then retry this file." :
+                            response.status === 413 ? "This file is too large to upload." :
+                            response.status === 415 ? "This file type is not supported." :
+                            response.status === 400 ? "Nova could not accept this file. Check its type and try again." :
+                            "The upload did not finish. Check your connection and try again."
+                        );
+                        uploadError.status = response.status;
+                        throw uploadError;
                     }
 
                     var clean =
@@ -287,15 +323,19 @@ if (
 }
 
 
-                    pendingAttachments.length = 0;
-                    pendingAttachments.push(clean);
+                    clean.client_id = clientId;
+                    clean.pending_upload = false;
+                    if (localItem.local_preview && String(localItem.local_preview).startsWith("blob:")) URL.revokeObjectURL(localItem.local_preview);
+                    clean.local_preview = "";
+                    if (removedClientIds.has(clientId)) return;
+                    var itemIndex = pendingAttachments.findIndex(function (item) { return item.client_id === clientId; });
+                    if (itemIndex >= 0) pendingAttachments.splice(itemIndex, 1, clean);
+                    else return;
                     savePending();
 try {
-    console.log("[PREVIEW DEBUG] calling renderPreview", clean);
-    if (typeof renderPreview === "function") renderPreview(clean);
-    console.log("[PREVIEW DEBUG] renderPreview finished");
+    renderPreview(pendingAttachments);
 } catch (e) {
-    console.error("[PREVIEW DEBUG] renderPreview failed", e);
+    console.error("[NOVA PREVIEW] render failed", e);
 }
                     if (typeof window.NovaMobileReceiveUploadedAttachment === "function") {
                         try {
@@ -307,8 +347,16 @@ try {
                 });
             })
             .catch(function (error) {
-                log("upload failed", error);
-                alert("Upload failed: " + (error && error.message ? error.message : String(error)));
+                console.error("[NOVA MOBILE UPLOAD] upload failed", { status: error?.status || 0, message: error?.message || "Upload failed" });
+                if (removedClientIds.has(clientId)) return;
+                var current = pendingAttachments.find(function (item) { return item.client_id === clientId; });
+                if (current) {
+                    current.pending_upload = false;
+                    current.upload_error = true;
+                    current.error_message = error?.message || "The upload did not finish. Check your connection and try again.";
+                    savePending();
+                    renderPreview(pendingAttachments);
+                }
             });
     }
 
@@ -340,12 +388,22 @@ try {
     return host;
 }
 
-function renderPreview(item) {
+function renderPreview(inputItems) {
     var host = findPreviewHost();
     if (!host) return;
 
     host.innerHTML = "";
-
+    var items = Array.isArray(inputItems) ? inputItems : (inputItems ? [inputItems] : []);
+    if (!items.length) {
+        host.hidden = true;
+        host.style.display = "none";
+        host.removeAttribute("data-has-attachment");
+        document.body.classList.remove("nova-mobile-has-attachment");
+        return;
+    }
+    var chips = document.createElement("div");
+    chips.className = "nova-mobile-upload-preview-list";
+    items.forEach(function (item) {
     var chip = document.createElement("div");
     chip.className = "nova-mobile-upload-preview-chip";
     chip.setAttribute("data-nova-role", "attachment-preview-chip");
@@ -353,12 +411,12 @@ function renderPreview(item) {
     var thumb = document.createElement("div");
     thumb.className = "nova-mobile-upload-preview-thumb";
 
-    if (item.local_preview && String(item.type || "").indexOf("image/") === 0) {
+    if ((item.local_preview || item.url) && String(item.type || item.mime_type || "").indexOf("image/") === 0) {
 var img =
     document.createElement("img");
 
 img.src =
-    item.local_preview;
+    item.local_preview || item.url;
 
 img.style.width = "48px";
 img.style.height = "48px";
@@ -407,6 +465,21 @@ img.style.borderRadius = "8px";
     name.className = "nova-mobile-upload-preview-name";
     name.textContent = item.filename || item.name || "attachment";
 
+    var meta = document.createElement("div");
+    meta.className = "nova-mobile-upload-preview-meta";
+    meta.appendChild(name);
+    var info = document.createElement("small");
+    info.className = "nova-mobile-upload-preview-info";
+    var byteCount = Number(item.size || item.size_bytes || 0);
+    var sizeLabel = byteCount >= 1048576 ? (byteCount / 1048576).toFixed(1) + " MB" : byteCount >= 1024 ? Math.round(byteCount / 1024) + " KB" : (byteCount ? byteCount + " B" : "");
+    var typeLabel = String(item.mime_type || item.type || "File").split("/").pop();
+    info.textContent = [typeLabel, sizeLabel].filter(Boolean).join(" · ");
+    meta.appendChild(info);
+    var uploadState = document.createElement("small");
+    uploadState.className = "nova-mobile-upload-preview-state";
+    uploadState.textContent = item.pending_upload ? "Uploading…" : item.upload_error ? "Upload failed" : "Ready to send";
+    meta.appendChild(uploadState);
+
     var remove = document.createElement("button");
     remove.className = "nova-mobile-upload-preview-remove";
     remove.type = "button";
@@ -423,30 +496,37 @@ remove.addEventListener("click", function (event) {
 
     event.stopPropagation();
 
-    window.dispatchEvent(
-        new CustomEvent("nova-mobile-attachments-clear-request")
-    );
+    removeAttachment(item.client_id || item.id);
 
     return false;
 
 }, true);
 
     chip.appendChild(thumb);
-    chip.appendChild(name);
+    chip.dataset.uploadState = item.upload_error ? "failed" : item.pending_upload ? "uploading" : "ready";
+    chip.appendChild(meta);
     chip.appendChild(remove);
-
-    host.innerHTML = "";
-host.appendChild(chip);
-host.style.display = "flex";
-host.style.alignItems = "center";
-host.style.height = "52px";
+    if (item.error_message) {
+        var message = document.createElement("small");
+        message.className = "nova-mobile-upload-error";
+        message.textContent = item.error_message;
+        chip.appendChild(message);
+    }
+    chips.appendChild(chip);
+    });
+    host.appendChild(chips);
+    host.style.display = "flex";
+    host.style.alignItems = "center";
+    host.style.height = "auto";
+    host.style.maxHeight = "92px";
+    host.style.overflowX = "auto";
 
 chip.style.display = "flex";
 chip.style.alignItems = "center";
 chip.style.gap = "10px";
 chip.style.padding = "6px 10px";
 chip.style.borderRadius = "12px";
-chip.style.maxWidth = "95%";
+chip.style.maxWidth = "88vw";
 chip.style.background = "rgba(255,255,255,.08)";
 
 thumb.style.width = "40px";
@@ -461,7 +541,7 @@ if (previewImage) {
     previewImage.style.borderRadius = "8px";
 }
 
-name.style.maxWidth = "320px";
+name.style.maxWidth = "48vw";
 name.style.whiteSpace = "nowrap";
 name.style.overflow = "hidden";
 name.style.textOverflow = "ellipsis";
@@ -478,6 +558,16 @@ remove.style.borderRadius = "50%";
 
     host.setAttribute("data-has-attachment", "1");
     document.body.classList.add("nova-mobile-has-attachment");
+}
+
+function removeAttachment(clientId) {
+    var index = pendingAttachments.findIndex(function (item) { return (item.client_id || item.id) === clientId; });
+    if (clientId) removedClientIds.add(clientId);
+    if (index < 0) return;
+    var removed = pendingAttachments.splice(index, 1)[0];
+    if (removed?.local_preview && String(removed.local_preview).startsWith("blob:")) URL.revokeObjectURL(removed.local_preview);
+    savePending();
+    renderPreview(pendingAttachments);
 }
 
 window.NovaMobileRenderPreview = renderPreview;
@@ -513,6 +603,12 @@ window.addEventListener("nova-mobile-attachment-preview", function (event) {
 }
 
 function clearPendingAttachments() {
+    pendingAttachments.forEach(function (item) {
+        if (item?.client_id || item?.id) removedClientIds.add(item.client_id || item.id);
+    });
+    pendingAttachments.forEach(function (item) {
+        if (item?.local_preview && String(item.local_preview).startsWith("blob:")) URL.revokeObjectURL(item.local_preview);
+    });
     pendingAttachments.length = 0;
 
     window.NovaMobilePendingAttachments = [];
@@ -525,6 +621,8 @@ function clearPendingAttachments() {
         localStorage.removeItem("nova_mobile_attachment");
         localStorage.removeItem("nova_pending_attachment");
         localStorage.removeItem("nova_mobile_pending_attachments");
+        localStorage.removeItem("nova_mobile_uploaded_attachments");
+        localStorage.removeItem("nova_mobile_attachment_queue");
     } catch (_) {}
 
     document.querySelectorAll([
@@ -544,6 +642,10 @@ function clearPendingAttachments() {
 
 window.addEventListener("nova-mobile-attachments-clear-request", function () {
     clearPendingAttachments();
+});
+
+["nova-mobile-after-send", "nova-mobile-message-sent", "nova-mobile-send-complete", "nova-mobile-attachments-cleared"].forEach(function (eventName) {
+    window.addEventListener(eventName, clearPendingAttachments);
 });
 
     function isUploadButton(button) {
@@ -628,23 +730,16 @@ getPendingAttachments: function () {
 },
 
             clearPendingAttachments: clearPendingAttachments,
+            removeAttachment: removeAttachment,
             clear: clearPendingAttachments,
             reset: clearPendingAttachments,
             addAttachment: function (item) {
                 var clean = normalizeAttachment(item);
                 if (!clean) return false;
-if (
-    file &&
-    file.type &&
-    file.type.indexOf("image/") === 0 &&
-    !clean.local_preview
-) {
-    clean.local_preview = URL.createObjectURL(file);
-}
-                pendingAttachments.length = 0;
+                clean.client_id = clean.client_id || clean.id || ("mobile-" + Date.now());
                 pendingAttachments.push(clean);
                 savePending();
-                if (typeof renderPreview === "function") renderPreview(clean);
+                if (typeof renderPreview === "function") renderPreview(pendingAttachments);
                 return true;
             }
         };

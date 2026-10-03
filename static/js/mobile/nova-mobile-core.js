@@ -223,6 +223,13 @@ if (stopGenerationBtn) {
     }
 
     function renderMarkdown(text) {
+        if (
+            window.NovaAnswerPayload &&
+            typeof window.NovaAnswerPayload.renderAnswerPayload === "function"
+        ) {
+            return window.NovaAnswerPayload.renderAnswerPayload(text || "");
+        }
+
         let html =
             escapeHtml(text || "");
 

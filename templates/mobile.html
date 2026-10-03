@@ -133,10 +133,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Nova Mobile</title>
 
 <link rel="stylesheet" href="/static/css/nova-mobile.css?v=hidden-panel-hard-lock-20260630-001">
+<link rel="stylesheet" href="/static/css/nova-message-presentation.css?v=shared-chat-20261003-1">
 
 <style>
     html,
@@ -262,12 +263,14 @@
                 id="nova-mobile-new-chat"
                 class="mobile-header-btn"
                 type="button"
+                aria-label="Start a new chat"
             >New</button>
 
             <button
                 id="nova-mobile-sessions-toggle"
                 class="mobile-header-btn"
                 type="button"
+                aria-label="Open conversations"
             >Sessions</button>
 
             <button
@@ -276,6 +279,7 @@
                 type="button"
                 aria-controls="nova-mobile-projects-panel"
                 aria-expanded="false"
+                aria-label="Open projects"
             >Projects</button>
         </div>
         </div>
@@ -304,12 +308,7 @@
         Account
     </button>
 
-    <button
-        id="nova-mobile-menu-billing"
-        type="button"
-    >
-        Billing
-    </button>
+    <a id="nova-mobile-menu-billing" class="nova-mobile-menu-link" href="/billing">Billing</a>
 
     <button
         id="nova-mobile-menu-settings"
@@ -350,25 +349,6 @@ onclick="
             }
         "
     >Memory</button>
-
-    <button
-        type="button"
-        data-mobile-tool="execution"
-        onclick="
-            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
-            const executionPanel = document.getElementById('nova-mobile-execution-panel');
-
-            if (toolsPanel) {
-                toolsPanel.classList.add('hidden');
-                toolsPanel.style.cssText = 'display:none !important;';
-            }
-
-            if (executionPanel) {
-                executionPanel.classList.remove('hidden');
-                executionPanel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
-            }
-        "
-    >Open Current Work</button>
 
     <button
         id="nova-mobile-menu-export"
@@ -499,14 +479,23 @@ Close Account
     aria-label="Project workspace"
     aria-hidden="true"
 >
-    <button id="nova-mobile-project-back" class="nova-mobile-project-back" type="button">← All projects</button>
+    <button id="nova-mobile-project-back" class="nova-mobile-project-back" type="button" aria-label="Return to Chat">← Back to Chat</button>
     <div class="nova-mobile-project-detail-heading">
         <div><p class="nova-mobile-projects-eyebrow">PROJECT</p><h2 id="nova-mobile-project-title">Project</h2><p id="nova-mobile-project-description"></p></div>
         <span id="nova-mobile-project-status" class="nova-mobile-project-status">Loading</span>
     </div>
+    <section class="nova-mobile-project-overview" aria-label="Project overview">
+        <div><p class="nova-mobile-projects-eyebrow">YOUR GOAL</p><p id="nova-mobile-project-goal-summary">Loading project goal…</p></div>
+        <div class="nova-mobile-project-progress-summary"><div><strong>Progress</strong><span id="nova-mobile-project-progress-label">Loading…</span></div><progress id="nova-mobile-project-progress-meter" max="100" value="0" aria-label="Project completion"></progress></div>
+        <article class="nova-mobile-project-next-move"><p class="nova-mobile-projects-eyebrow">NEXT MOVE</p><h3 id="nova-mobile-project-next-title">Finding the next move…</h3><p id="nova-mobile-project-next-owner"></p><button id="nova-mobile-project-next-action" type="button" hidden>Work on this</button></article>
+        <div class="nova-mobile-project-current"><h3>Current work / needs attention</h3><div id="nova-mobile-project-current-list"></div></div>
+        <div class="nova-mobile-project-completed"><h3>Done</h3><div id="nova-mobile-project-done-list"></div></div>
+        <div class="nova-mobile-project-coming-up"><h3>Coming up</h3><div id="nova-mobile-project-coming-list"></div></div>
+    </section>
     <section class="nova-mobile-project-mission-control" aria-labelledby="nova-mobile-project-control-title">
         <div class="nova-mobile-project-section-heading"><div><p class="nova-mobile-projects-eyebrow">MISSION CONTROL</p><h3 id="nova-mobile-project-control-title">Execution</h3></div><button id="nova-mobile-project-refresh" type="button" aria-label="Refresh project status">Refresh</button></div>
         <p id="nova-mobile-project-execution-status" role="status">Loading project status…</p>
+        <p id="nova-mobile-project-execution-detail" class="nova-mobile-project-execution-detail"></p>
         <div class="nova-mobile-project-actions" role="group" aria-label="Project execution controls">
             <button id="nova-mobile-project-run" type="button" hidden>Run all</button>
             <button id="nova-mobile-project-continue" type="button" hidden>Continue</button>
@@ -515,6 +504,8 @@ Close Account
             <button id="nova-mobile-project-reset" type="button" hidden>Reset</button>
         </div>
     </section>
+    <details class="nova-mobile-project-details">
+      <summary>Plan and project details</summary>
     <section class="nova-mobile-project-section" aria-labelledby="nova-mobile-project-phases-heading">
         <div class="nova-mobile-project-section-heading"><div><p class="nova-mobile-projects-eyebrow">PLAN</p><h3 id="nova-mobile-project-phases-heading">Phases</h3></div></div>
         <div id="nova-mobile-project-phase-list" class="nova-mobile-project-phase-list"></div>
@@ -527,6 +518,15 @@ Close Account
         <div class="nova-mobile-project-section-heading"><div><p class="nova-mobile-projects-eyebrow">DELIVERABLES</p><h3 id="nova-mobile-project-files-heading">Project files</h3></div></div>
         <div id="nova-mobile-project-files-list" class="nova-mobile-project-files-list"></div>
     </section>
+    <section class="nova-mobile-project-section" aria-labelledby="nova-mobile-project-notes-heading">
+        <div class="nova-mobile-project-section-heading"><div><p class="nova-mobile-projects-eyebrow">REFERENCE</p><h3 id="nova-mobile-project-notes-heading">Notes</h3></div></div>
+        <div id="nova-mobile-project-notes-list" class="nova-mobile-project-notes-list" aria-live="polite"></div>
+    </section>
+    <section class="nova-mobile-project-section" aria-labelledby="nova-mobile-project-activity-heading">
+        <div class="nova-mobile-project-section-heading"><div><p class="nova-mobile-projects-eyebrow">HISTORY</p><h3 id="nova-mobile-project-activity-heading">Recent activity</h3></div></div>
+        <div id="nova-mobile-project-activity-list" class="nova-mobile-project-activity-list" aria-live="polite"></div>
+    </section>
+    </details>
 </section>
 
 <section id="nova-mobile-execution-panel" class="mobile-panel hidden" aria-label="Mobile execution">
@@ -605,6 +605,7 @@ Close Account
             id="nova-mobile-input"
             rows="1"
             placeholder="Type a message..."
+            aria-label="Message Nova"
         ></textarea>
 
 <button
@@ -612,6 +613,7 @@ Close Account
     class="mobile-composer-btn mobile-icon-action mobile-animated-action"
     type="button"
     title="Send"
+    aria-label="Send message"
 >
     <span class="mobile-action-icon">➤</span>
 </button>
@@ -634,6 +636,7 @@ Close Account
     class="mobile-composer-btn mobile-icon-action mobile-animated-action"
     type="button"
     title="Voice input"
+    aria-label="Start voice input"
 >
     <span class="mobile-action-icon">🎤</span>
 </button>
@@ -644,6 +647,7 @@ Close Account
     type="button"
     title="Stop speech"
     data-active="false"
+    aria-label="Stop spoken response"
 >
     <span class="mobile-action-icon">🔊</span>
 </button>
@@ -653,8 +657,9 @@ Close Account
     class="mobile-composer-btn mobile-icon-action mobile-animated-action"
     type="button"
     title="Read aloud"
+    aria-label="Read latest response aloud"
 >
-    <span class="mobile-action-icon">📎</span>
+    <span class="mobile-action-icon">🔊</span>
 </button>
 
 <label
@@ -662,8 +667,9 @@ Close Account
     class="mobile-composer-btn mobile-icon-action mobile-animated-action"
     title="Attach file"
     data-nova-attach-owner="static-native-v1"
+    aria-label="Attach files"
 >
-    <span class="mobile-action-icon">??</span>
+    <span class="mobile-action-icon">📎</span>
     <input
         id="nova-mobile-file-input"
         class="nova-mobile-native-file-input"
@@ -678,6 +684,7 @@ Close Account
     class="mobile-composer-btn mobile-icon-action mobile-animated-action"
     type="button"
     title="Tools"
+    aria-label="Open tools and account menu"
     onclick="
         const panel = document.getElementById('nova-mobile-tools-panel');
         if (panel) {
@@ -921,6 +928,7 @@ body {
      CORE SYSTEM (MUST BE FIRST)
 ========================= -->
 
+<script src="/static/js/answer-payload.js?v=shared-chat-20261003-1"></script>
 <script src="/static/js/mobile/nova-mobile-core.js?v=scroll-authority-20260626-002"></script>
 <script src="/static/js/mobile/nova-mobile-layout.js?v=layout-owner-v1"></script>
 
@@ -938,6 +946,7 @@ src="/static/js/mobile/nova-mobile-onboarding-actions.js?v=onboarding-v1-2026072
 
 <script
 src="/static/js/mobile/nova-mobile-chat-ui.js?v=image-attachment-render-20260722"></script>
+<script src="/static/js/tool-approval-actions.js?v=shared-chat-20261003-1"></script>
 <script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
 
 <script src="/static/js/mobile/nova-mobile-stream.js?v=mobile-stream-full-clean-20260604-001"></script>
@@ -4044,67 +4053,11 @@ if (account) {
     };
 }
 
-const billing = document.getElementById("nova-mobile-menu-billing");
-
-if (billing) {
-    billing.onclick = async function () {
-        hideTools();
-
-        const panel = document.getElementById("nova-mobile-billing-panel");
-
-        if (panel) {
-            panel.classList.remove("hidden");
-            panel.style.cssText =
-                "display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;";
-        }
-
-        const box = document.getElementById("nova-mobile-billing-status");
-
-        if (!box) return;
-
-        box.innerHTML = "Loading billing...";
-
-        try {
-            const r = await fetch("/api/account", {
-                credentials: "include",
-                cache: "no-store"
-            });
-
-            const data = await r.json();
-
-            box.innerHTML =
-                "Plan: " + (data.plan || "") +
-                "<br><br>Credits: " + (data.credits ?? 0) +
-                "<br>Monthly Credits: " + (data.monthly_credits ?? 0);
-
-        } catch (e) {
-            box.innerHTML = "Failed to load billing.";
-        }
-    };
-}
-
 const settings = document.getElementById("nova-mobile-menu-settings");
 
 if (settings) {
     settings.onclick = async function () {
         hideTools();
-
-const help = document.getElementById(
-    "nova-mobile-menu-help"
-);
-
-if (help) {
-
-    help.addEventListener(
-        "click",
-        function () {
-
-            window.location.href = "/help";
-
-        }
-    );
-
-}
 
         const panel = document.getElementById("nova-mobile-settings-panel");
 
@@ -4118,7 +4071,10 @@ if (help) {
 
         if (!box) return;
 
-        box.innerHTML = "Loading settings...";
+        box.replaceChildren();
+        const loading = document.createElement("p");
+        loading.textContent = "Loading your account preferences…";
+        box.appendChild(loading);
 
         try {
             const r = await fetch("/api/account", {
@@ -4126,21 +4082,52 @@ if (help) {
                 cache: "no-store"
             });
 
+            if (!r.ok) throw new Error("Account details unavailable");
             const data = await r.json();
-
-            box.innerHTML =
-                "Username: " + (data.username || "") +
-                "<br><br>Plan: " + (data.plan || "") +
-                "<br><br>Credits: " + (data.credits ?? 0) +
-                "<br>Monthly Credits: " + (data.monthly_credits ?? 0) +
-                "<br><br>Theme: Coming soon" +
-                "<br>Voice settings: Coming soon";
+            box.replaceChildren();
+            const intro = document.createElement("p");
+            intro.textContent = "Your Nova account and usage at a glance. Manage security in Account; see plan options in Billing.";
+            box.appendChild(intro);
+            const values = [
+                ["Signed in as", data.username || "Account"],
+                ["Plan", data.plan || "Not available"],
+                ["Available credits", data.credits ?? "Not available"],
+                ["Monthly credits", data.monthly_credits ?? "Not available"]
+            ];
+            const list = document.createElement("dl");
+            list.className = "nova-mobile-settings-values";
+            values.forEach(([label, value]) => {
+                const term = document.createElement("dt");
+                term.textContent = label;
+                const definition = document.createElement("dd");
+                definition.textContent = String(value);
+                list.append(term, definition);
+            });
+            box.appendChild(list);
+            const accountAction = document.createElement("button");
+            accountAction.type = "button";
+            accountAction.textContent = "Account and security";
+            accountAction.onclick = () => {
+                panel?.classList.add("hidden");
+                document.getElementById("nova-mobile-menu-account")?.click();
+            };
+            const billingAction = document.createElement("a");
+            billingAction.href = "/billing";
+            billingAction.textContent = "Billing and plans";
+            billingAction.className = "nova-mobile-menu-link";
+            box.append(accountAction, billingAction);
 
         } catch (e) {
-            box.innerHTML = "Failed to load settings.";
+            box.replaceChildren();
+            const error = document.createElement("p");
+            error.textContent = "Settings could not be loaded. Please try again.";
+            box.appendChild(error);
         }
     };
 }
+
+const help = document.getElementById("nova-mobile-menu-help");
+if (help) help.onclick = function () { window.location.href = "/help"; };
 
 
 
@@ -4183,4 +4170,7 @@ if (help) {
 })();
 </script>
 
+<link rel="stylesheet" href="/static/css/nova-mobile-quality.css?v=mobile-quality-20261003-1">
+
+</body>
 </html>

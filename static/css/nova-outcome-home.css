@@ -144,3 +144,98 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--home-green); ou
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+
+/* ============================================================
+   NOVA — CENTERED HOMEPAGE HERO
+   ============================================================ */
+
+.hero {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: min(1000px, calc(100% - 48px)) !important;
+  max-width: 1000px !important;
+  min-height: 600px !important;
+  margin-inline: auto !important;
+  padding-block: 90px 96px !important;
+  text-align: center !important;
+}
+
+.hero-copy {
+  width: 100% !important;
+  max-width: 900px !important;
+  margin-inline: auto !important;
+  text-align: center !important;
+}
+
+.hero .eyebrow,
+.hero h1,
+.hero-lede,
+.hero-note {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  text-align: center !important;
+}
+
+.hero h1 { max-width: 900px !important; }
+.hero-lede { max-width: 780px !important; }
+.hero-note { max-width: 720px !important; }
+
+.hero-actions {
+  width: 100% !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+.hero-capability-line,
+.hero-proof,
+.hero-features,
+.hero-pillars {
+  width: 100% !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+.hero > .workspace-preview {
+  display: none !important;
+}
+
+@media (max-width: 680px) {
+  .hero {
+    width: min(100% - 34px, 700px) !important;
+    min-height: auto !important;
+    padding-block: 62px 70px !important;
+  }
+
+  .hero h1 {
+    font-size: clamp(42px, 11vw, 58px) !important;
+  }
+
+  .hero-lede {
+    font-size: 15px !important;
+  }
+
+  .hero-actions {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .hero {
+    width: calc(100% - 28px) !important;
+  }
+
+  .hero-actions {
+    flex-direction: column !important;
+  }
+
+  .hero-actions .button,
+  .hero-actions .text-link {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}

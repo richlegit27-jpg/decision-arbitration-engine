@@ -1,7 +1,5 @@
 ﻿from __future__ import annotations
 
-from pathlib import Path
-
 from nova_backend.tools.base import NovaTool
 
 
@@ -31,25 +29,9 @@ class MemoryReadTool(NovaTool):
         self,
         **kwargs,
     ):
-        from nova_backend.services.memory_service import (
-            MemoryService,
-        )
+        from app import memory_service
 
-        memory_file = (
-            Path("runtime")
-            / "user_memory.json"
-        )
-
-        service = MemoryService(
-            memory_file=str(memory_file)
-        )
-
-        store = service._read_store()
-
-        memories = store.get(
-            "memory",
-            [],
-        )
+        memories = memory_service.all()
 
         query = str(
             kwargs.get("query")

@@ -44,9 +44,6 @@ from nova_backend.services.execution_handler import (
     NextMove,
     default_executor,
 )
-from nova_backend.tools.executor import (
-    execute_tool,
-)
 from nova_backend.services.project_workspace_service import (
     project_workspace_service,
 )
@@ -277,6 +274,7 @@ class ChatService:
         self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
         self.error_reporting_service = ErrorReportingService()
         self.code_workspace_service = CodeWorkspaceService()
+        self.python_runner = PythonRunnerService()
 
         # =========================
         # CORE SERVICES
@@ -313,6 +311,7 @@ class ChatService:
             session_service=session_service,
             chat_service=self,
             attachment_service=artifact_service,
+            python_runner=self.python_runner,
         )
 
         self.action_router = self.tool_runtime.get(
@@ -476,8 +475,6 @@ class ChatService:
 
         self.rewrite_service = ResponseRewriteService()
         self.intent_service = IntentService()
-        self.python_runner = PythonRunnerService()
-
         # =========================
         # RUNTIME COGNITION
         # =========================
@@ -647,6 +644,7 @@ class ChatService:
         attachments=None,
         regenerate: bool = False,
         requested_model: str | None = None,
+        idempotency_key: str = "",
     ):
 
         print(
@@ -1127,6 +1125,7 @@ class ChatService:
             brain_state=brain_state,
             decision=primary_decision,
             regenerate=regenerate,
+            idempotency_key=idempotency_key,
         )
 
         print(
@@ -13312,105 +13311,28 @@ Rules:
 
 
         try:
-            from nova_backend.tools.executor import (
-                execute_tool,
-            )
-
-            from nova_backend.tools.manager import (
-                tool_manager,
-            )
-
-            from nova_backend.tools.pending_tool_approval_service import (
-                pending_tool_approval_service,
-            )
-
-            registered_tool = tool_manager.get_tool(
-                tool_name
-            )
-
+            if self.tool_executor is None or self.tool_registry is None:
+                return {"ok": False, "status": "tool_runtime_unavailable", "tool_name": tool_name}
+            registered_tool = self.tool_registry.get_tool(tool_name)
             if registered_tool is not None:
-
-                tool_runtime = execute_tool(
-                    tool_name,
-                    args,
-                    confirm=False,
-                )
-
-                if tool_runtime.get(
-                    "requires_confirmation"
-                ):
-
-                    session_id = self.safe_str(
-                        tool_decision.get(
-                            "session_id"
-                        )
-                    ).strip()
-
-                    if not session_id:
-                        session_id = self.safe_str(
-                            getattr(
-                                self,
-                                "current_session_id",
-                                "",
-                            )
-                        ).strip()
-
-                    if not session_id:
-                        return {
-                            "ok": False,
-                            "status": "tool_approval_session_missing",
-                            "tool_name": tool_name,
-                            "error": (
-                                "Tool approval requires a session."
-                            ),
-                        }
-
+                tool_runtime = self.tool_executor.run(tool_name, args, confirm=False)
+                if tool_runtime.get("error_category") == "approval_required" or tool_runtime.get("requires_confirmation"):
+                    session_id = self.safe_str(tool_decision.get("session_id") or getattr(self, "current_session_id", "")).strip()
+                    owner_id = get_current_user_id()
+                    if not session_id or not owner_id:
+                        return {"ok": False, "status": "tool_approval_identity_missing", "tool_name": tool_name}
                     pending_tool_approval_service.set_pending(
                         session_id,
-                        {
-                            "tool": tool_name,
-                            "payload": args,
-                            "risk": tool_runtime.get(
-                                "risk_level",
-                                "high",
-                            ),
-                            "plan": tool_decision,
-                        },
+                        {"tool": tool_name, "payload": args, "risk": tool_runtime.get("risk_class", "high"), "plan": tool_decision},
+                        owner_id=owner_id,
                     )
-
                     return {
-                        "ok": True,
-                        "status": "tool_approval_required",
-                        "tool_name": tool_name,
-                        "tool_runtime": {
-                            "tool": tool_name,
-                            "payload": args,
-                            "risk": tool_runtime.get(
-                                "risk_level",
-                                "high",
-                            ),
-                            "status": "approval_required",
-                        },
-                        "pending_tool": {
-                            "tool": tool_name,
-                            "payload": args,
-                        },
-                        "message": (
-                            f"Approval required before running "
-                            f"{tool_name}."
-                        ),
+                        "ok": True, "status": "tool_approval_required", "tool_name": tool_name,
+                        "tool_runtime": {"tool": tool_name, "risk": tool_runtime.get("risk_class", "high"), "status": "approval_required"},
+                        "pending_tool": {"tool": tool_name},
+                        "message": f"Approval required before running {tool_name}.",
                     }
-
-                return {
-                    "ok": tool_runtime.get(
-                        "ok",
-                        False,
-                    ),
-                    "status": "tool_executed",
-                    "tool_name": tool_name,
-                    "result": tool_runtime,
-                }
-
+                return {"ok": tool_runtime.get("ok", False), "status": "tool_executed", "tool_name": tool_name, "result": tool_runtime}
         except Exception as e:
             return {
                 "ok": False,
@@ -13427,11 +13349,12 @@ Rules:
     def approve_pending_tool(
         self,
         session_id: str,
+        owner_id: str = "",
     ) -> dict:
 
         approval = (
             pending_tool_approval_service.approve(
-                session_id
+                session_id, owner_id=owner_id or get_current_user_id()
             )
         )
 
@@ -13456,15 +13379,11 @@ Rules:
                 "error": "Pending tool has no tool name.",
             }
 
-        from nova_backend.tools.executor import (
-            execute_tool,
-        )
-
         from nova_backend.tools.result_formatter import (
             format_tool_result,
         )
 
-        result = execute_tool(
+        result = self.tool_executor.run(
             tool_name,
             payload,
             confirm=True,
@@ -13474,6 +13393,101 @@ Rules:
             tool_name,
             result,
         )
+        self._update_tool_approval_message(
+            session_id,
+            owner_id or get_current_user_id(),
+            tool_name,
+            "tool_approved",
+            "Tool approved and executed." if result.get("ok") else "Tool approval was used, but the action could not be completed.",
+        )
+
+        continued_text = ""
+        model_response_id = str(pending.get("model_response_id") or "").strip()
+        model = str(pending.get("model") or "").strip()
+        surface = str(pending.get("surface") or "chat").strip()
+        call_id = str(pending.get("call_id") or "").strip()
+        if model_response_id and call_id and model:
+            try:
+                from nova_backend.services.provider_tool_schema import to_openai_responses_tools
+                tool_definitions = to_openai_responses_tools(
+                    self.tool_registry.get_model_tool_definitions(surface)
+                )
+                continuation = model_gateway_service.responses_create(
+                    nova_user_id=owner_id or get_current_user_id(),
+                    nova_session_id=session_id,
+                    nova_enforce_credits=True,
+                    model=model,
+                    previous_response_id=model_response_id,
+                    input=[{
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": __import__("json").dumps(result, ensure_ascii=False, default=str),
+                    }],
+                    tools=tool_definitions,
+                    tool_choice="auto",
+                )
+
+                from nova_backend.services.model_tool_runtime_service import run_responses_tool_loop, mutation_signature
+                continued = run_responses_tool_loop(
+                    first_response=continuation,
+                    model_call=lambda outputs, response_id: model_gateway_service.responses_create(
+                        nova_user_id=owner_id or get_current_user_id(),
+                        nova_session_id=session_id,
+                        nova_enforce_credits=True,
+                        model=model,
+                        previous_response_id=response_id,
+                        input=outputs,
+                        tools=tool_definitions,
+                        tool_choice="auto",
+                    ),
+                    registry=self.tool_registry,
+                    executor=self.tool_executor,
+                    text_extractor=self._extract_response_text,
+                    surface=surface,
+                    session_id=session_id,
+                    owner_id=owner_id or get_current_user_id(),
+                    model=model,
+                    prior_mutation_signatures=(
+                        [mutation_signature(tool_name, payload)]
+                        if (pending.get("risk") or "READ") != "READ"
+                        else []
+                    ),
+                )
+                continued_text = str(continued.get("text") or "").strip()
+                if continued_text:
+                    followup = self._build_assistant_message(
+                        text=continued_text,
+                        meta={"tool_followup": True, "tool_status": continued.get("status"), "tool_results": continued.get("tool_outputs", [])},
+                        attachments=[],
+                    )
+                    if continued.get("status") == "approval_required":
+                        pending_output = next(
+                            (
+                                item.get("result")
+                                for item in continued.get("tool_outputs", [])
+                                if isinstance(item, dict)
+                                and isinstance(item.get("result"), dict)
+                                and item["result"].get("status") == "approval_required"
+                            ),
+                            {},
+                        )
+                        followup["status"] = "tool_approval_required"
+                        followup["pending_tool"] = pending_output.get("pending_tool") or {}
+                        followup["toolApproval"] = {
+                            "tool": followup["pending_tool"].get("tool"),
+                            "risk": followup["pending_tool"].get("risk"),
+                            "sessionId": session_id,
+                        }
+                    self.session_service.append_message(
+                        session_id,
+                        followup,
+                        user_id=owner_id or get_current_user_id(),
+                    )
+            except Exception as continuation_error:
+                logging.getLogger("nova.tools").warning(
+                    "approved tool continuation failed",
+                    extra={"error_type": type(continuation_error).__name__},
+                )
 
         return {
             "ok": result.get("ok", False),
@@ -13483,17 +13497,19 @@ Rules:
             "risk": pending.get("risk"),
             "result": result,
             "formatted": formatted,
+            "continued_text": continued_text,
         }
 
 
     def deny_pending_tool(
         self,
         session_id: str,
+        owner_id: str = "",
     ) -> dict:
 
         result = (
             pending_tool_approval_service.deny(
-                session_id
+                session_id, owner_id=owner_id or get_current_user_id()
             )
         )
 
@@ -13505,6 +13521,14 @@ Rules:
                 "error": result.get("error"),
             }
 
+        self._update_tool_approval_message(
+            session_id,
+            owner_id or get_current_user_id(),
+            result.get("tool"),
+            "tool_denied",
+            "Tool execution was cancelled.",
+        )
+
         return {
             "ok": True,
             "status": "denied",
@@ -13513,6 +13537,38 @@ Rules:
                 "Tool execution was cancelled."
             ),
         }
+
+    def _update_tool_approval_message(self, session_id, owner_id, tool_name, status, text):
+        """Persist approval-card state so refresh cannot revive a stale action."""
+        if not session_id or not owner_id or not self.session_service:
+            return False
+        try:
+            session_data = self.session_service.get_session(session_id, user_id=owner_id)
+            messages = session_data.get("messages", []) if isinstance(session_data, dict) else []
+            for message in reversed(messages):
+                if not isinstance(message, dict) or message.get("status") != "tool_approval_required":
+                    continue
+                pending = message.get("pending_tool") or {}
+                if tool_name and pending.get("tool") != tool_name:
+                    continue
+                updated = dict(message)
+                updated["status"] = status
+                updated["text"] = text
+                updated["content"] = text
+                updated.pop("pending_tool", None)
+                updated.pop("toolApproval", None)
+                return bool(self.session_service.replace_message(
+                    session_id,
+                    message.get("id"),
+                    updated,
+                    user_id=owner_id,
+                ))
+        except Exception as error:
+            logging.getLogger("nova.tools").warning(
+                "tool approval message update failed",
+                extra={"error_type": type(error).__name__},
+            )
+        return False
 
 
     def _cleanup_memory_items(self) -> None:
@@ -13672,16 +13728,85 @@ Rules:
             except Exception:
                 auth_user_id = ""
 
-            response = model_gateway_service.responses_create(
-                nova_user_id=auth_user_id or None,
-                nova_username=getattr(self, "username", None),
-                nova_session_id=session_id,
-                nova_enforce_credits=True,
-                model=self.chat_model,
-                input=model_messages,
+            tool_turn = None
+            from nova_backend.services.model_tool_runtime_service import (
+                run_responses_tool_loop,
+                should_offer_model_tools,
             )
+            from nova_backend.services.provider_tool_schema import to_openai_responses_tools
+            selected_model = self.chat_model
+            tool_definitions = []
+            request_surface = str(decision.get("surface") or "").strip().lower()
+            if not request_surface:
+                try:
+                    from flask import g
+                    request_surface = str(getattr(g, "nova_chat_surface", "chat") or "chat").strip().lower()
+                except Exception:
+                    request_surface = "chat"
+            if request_surface not in {"chat", "project", "super_ai"}:
+                request_surface = "chat"
+            if (
+                should_offer_model_tools(original_user_text, decision)
+                and self.tool_registry is not None
+                and self.tool_executor is not None
+            ):
+                try:
+                    from nova_backend.model_registry import get_model_provider
+                    if get_model_provider(selected_model) == "openai":
+                        tool_definitions = to_openai_responses_tools(
+                            self.tool_registry.get_model_tool_definitions(request_surface)
+                        )
+                except Exception as tool_error:
+                    print("NOVA MODEL TOOL DISCOVERY FAILED:", type(tool_error).__name__)
+                    tool_definitions = []
 
-            assistant_text = self._extract_response_text(response)
+            if tool_definitions:
+                first_response = model_gateway_service.responses_create(
+                    nova_user_id=auth_user_id or None,
+                    nova_username=getattr(self, "username", None),
+                    nova_session_id=session_id,
+                    nova_enforce_credits=True,
+                    model=selected_model,
+                    input=model_messages,
+                    tools=tool_definitions,
+                    tool_choice="auto",
+                )
+
+                def continue_tool_turn(outputs, previous_response_id):
+                    return model_gateway_service.responses_create(
+                        nova_user_id=auth_user_id or None,
+                        nova_username=getattr(self, "username", None),
+                        nova_session_id=session_id,
+                        nova_enforce_credits=True,
+                        model=selected_model,
+                        previous_response_id=previous_response_id,
+                        input=outputs,
+                        tools=tool_definitions,
+                        tool_choice="auto",
+                    )
+
+                tool_turn = run_responses_tool_loop(
+                    first_response=first_response,
+                    model_call=continue_tool_turn,
+                    registry=self.tool_registry,
+                    executor=self.tool_executor,
+                    text_extractor=self._extract_response_text,
+                    surface=request_surface,
+                    session_id=str(session_id or ""),
+                    owner_id=auth_user_id,
+                    model=str(selected_model or ""),
+                )
+                assistant_text = tool_turn.get("text") or ""
+            else:
+                response = model_gateway_service.responses_create(
+                    nova_user_id=auth_user_id or None,
+                    nova_username=getattr(self, "username", None),
+                    nova_session_id=session_id,
+                    nova_enforce_credits=True,
+                    model=selected_model,
+                    input=model_messages,
+                )
+                assistant_text = self._extract_response_text(response)
 
         except Exception as e:
             print("NOVA MODEL RESPONSE FAILED:", e)
@@ -13767,9 +13892,44 @@ Rules:
                 "execution_mode": bool(is_execution or active_task),
                 "active_task": active_task or original_user_text if is_execution else active_task,
                 "next_step": next_step_out,
+                "tool_status": tool_turn.get("status") if tool_turn else None,
+                "tool_results": tool_turn.get("tool_outputs", []) if tool_turn else [],
             },
             memory_used=[m.get("id") for m in used_memory_items if isinstance(m, dict)],
         )
+        if tool_turn and tool_turn.get("status") == "approval_required":
+            pending_result = next(
+                (
+                    item.get("result")
+                    for item in tool_turn.get("tool_outputs", [])
+                    if isinstance(item, dict)
+                    and isinstance(item.get("result"), dict)
+                    and item["result"].get("status") == "approval_required"
+                ),
+                {},
+            )
+            pending_call = next(
+                (
+                    item for item in tool_turn.get("tool_outputs", [])
+                    if isinstance(item, dict)
+                    and isinstance(item.get("result"), dict)
+                    and item["result"].get("status") == "approval_required"
+                ),
+                {},
+            )
+            pending_tool_name = str(pending_call.get("tool_name") or "")
+            pending_ui = pending_result.get("pending_tool") or {}
+            assistant_msg["status"] = "tool_approval_required"
+            assistant_msg["pending_tool"] = pending_ui or {
+                "tool": pending_tool_name,
+                "risk": pending_result.get("risk_class") or "WRITE",
+                "payload": {},
+            }
+            assistant_msg["toolApproval"] = {
+                "tool": pending_tool_name,
+                "risk": pending_result.get("risk_class") or "WRITE",
+                "sessionId": session_id,
+            }
 
         return self._finalize_response(
             session_id=session_id,

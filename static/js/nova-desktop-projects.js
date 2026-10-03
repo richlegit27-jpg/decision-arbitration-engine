@@ -2767,6 +2767,15 @@ console.log(
     document.addEventListener(
         "DOMContentLoaded",
         () => {
+            const backToChatButton = $("desktopProjectBackToChat");
+            if (backToChatButton && !backToChatButton.dataset.novaBackToChatBound) {
+                backToChatButton.dataset.novaBackToChatBound = "true";
+                backToChatButton.addEventListener(
+                    "click",
+                    showChatWorkspaceView
+                );
+            }
+
             loadProjects();
         }
     );

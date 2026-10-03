@@ -247,6 +247,10 @@ class SessionService:
     "has_attachments",
     "artifact_ids",
     "artifact_id",
+    "video_job_id",
+    "video_status",
+    "project_id",
+    "error_category",
     "execution_id",
     "error",
     "status",
@@ -336,6 +340,9 @@ class SessionService:
 
             cleaned_item = {
                 "id": self._truncate_text(item.get("id", ""), 128),
+                "type": self._truncate_text(item.get("type") or item.get("kind", ""), 32),
+                "title": self._truncate_text(item.get("title", ""), 160),
+                "artifact_id": self._truncate_text(item.get("artifact_id", ""), 128),
                 "filename": self._truncate_text(item.get("filename", ""), 256),
                 "stored_name": self._truncate_text(item.get("stored_name", ""), 256),
                 "url": self._truncate_text(item.get("url", ""), 512),

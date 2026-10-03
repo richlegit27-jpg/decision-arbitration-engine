@@ -56,6 +56,13 @@ class ProjectPlanningAIService:
         ):
             project_context = {}
 
+        try:
+            from nova_backend.tools.registry import registry
+
+            available_tools = registry.list_tools()
+        except Exception:
+            available_tools = []
+
         system_prompt = """
 You are Nova Project Intelligence.
 
@@ -75,6 +82,8 @@ You must understand:
 - what assumptions and unknowns remain
 - how the project has evolved over time
 - what new request the user is making now
+- the kind of goal and scale of work
+- which actions belong to Nova, the user, or both
 
 The user may know very little about how the project should be built.
 Do not expect the user to provide technical tasks.
@@ -87,6 +96,8 @@ Use this exact structure:
 
 {
     "name": "short project name",
+    "work_type": "specific natural-language kind of goal",
+    "complexity": "trivial, small, medium, or large",
     "mission": "clear statement of the project objective",
     "requirements": [
         "requirement"
@@ -110,6 +121,7 @@ Use this exact structure:
         "title": "specific actionable task",
         "priority": "high",
         "description": "what needs to be accomplished",
+        "owner": "NOVA, USER, or COLLABORATIVE",
 
         "action": "analyze",
 
@@ -127,6 +139,7 @@ Use this exact structure:
             {
                 "title": "short concrete step title",
                 "description": "what this step actually does",
+                "owner": "NOVA, USER, or COLLABORATIVE",
                 "action": "implement",
                 "target_file": "",
                 "content": "",
@@ -185,6 +198,23 @@ GENERAL PLANNING RULES:
 - Do not ask the user questions unless planning is genuinely impossible
   without clarification.
 - Prefer useful, concrete work over long lists of speculative tasks.
+- Derive the work type and structure from the user's outcome. Do not apply a
+  software workflow to unrelated goals.
+- Scale organization to complexity. A single obvious operation gets one useful
+  task and no artificial phase hierarchy.
+- Add phases only when they group distinct stages of work.
+- Every task must produce an observable result that advances the stated goal.
+- Parent, task, and step titles must represent distinct levels of work, not
+  paraphrases of one another.
+- Set owner on every task and step: NOVA, USER, or COLLABORATIVE. Use USER for
+  real-world actions Nova cannot perform and COLLABORATIVE for human decisions
+  or review. Use NOVA only for supported model/runtime work.
+- Only use tool_name values present in available_nova_tools in the user context.
+- Do not claim Nova can perform physical actions or unregistered external work.
+- For USER or COLLABORATIVE actions, completion criteria must depend on user
+  confirmation rather than claiming Nova can observe real-world completion.
+- Choose next_actions from actionable work whose dependencies are satisfied.
+  Do not put execution-controller commands in tasks or next_actions.
 
 - When the user's request explicitly asks to build, create, implement, write,
   modify, fix, run, execute, or produce a concrete artifact, tasks for that
@@ -363,6 +393,7 @@ idea through planning, execution, adaptation, and completion.
 """
         user_payload = {
             "project_request": clean_request,
+            "available_nova_tools": available_tools,
         }
 
         if project_context:
@@ -617,44 +648,12 @@ idea through planning, execution, adaptation, and completion.
                     )
                 ).strip().lower()
 
-                # Force concrete execution requests away from analysis-only tasks
-                request_text = str(request or "").lower()
-
-                execution_request = any(
-                    keyword in request_text
-                    for keyword in [
-                        "create",
-                        "build",
-                        "write",
-                        "implement",
-                        "modify",
-                        "fix",
-                        "execute",
-                        "run",
-                        "make",
-                        "video",
-                        "app",
-                        "project",
-                        "website",
-                        "document",
-                        "file",
-                    ]
-                )
-
-                if execution_request and action in {
-                    "analyze",
-                    "research",
-                    "plan",
-                    "design",
-                }:
-                    action = "create"
-                    execution_mode = "ai"
-
-
                 allowed_actions = {
                     "research",
                     "analyze",
+                    "analysis",
                     "plan",
+                    "planning",
                     "design",
                     "write",
                     "document",
@@ -664,7 +663,16 @@ idea through planning, execution, adaptation, and completion.
                     "fix",
                     "refactor",
                     "run",
+                    "execute",
                     "verify",
+                    "test",
+                    "validate",
+                    "review",
+                    "edit",
+                    "patch",
+                    "delete",
+                    "manual",
+                    "user_action",
                 }
 
                 if action not in allowed_actions:
@@ -847,28 +855,8 @@ idea through planning, execution, adaptation, and completion.
                     or ""
                 ).strip()
 
-                if (
-                    action == "analyze"
-                    and execution_mode == "ai"
-                    and expected_output
-                    and any(
-                        word in expected_output.lower()
-                        for word in [
-                            "brief",
-                            "document",
-                            "plan",
-                            "script",
-                            "outline",
-                            "report",
-                        ]
-                    )
-                ):
-                    action = "write"
-
                 if not expected_output:
-                    expected_output = (
-                        f"Concrete result for: {title}"
-                    )
+                    expected_output = ""
 
                 completion_criteria = str(
                     task.get(
@@ -879,10 +867,7 @@ idea through planning, execution, adaptation, and completion.
                 ).strip()
 
                 if not completion_criteria:
-                    completion_criteria = (
-                        f"The task '{title}' has produced "
-                        "its expected output."
-                    )
+                    completion_criteria = ""
 
                 execution_file = str(
                     task.get(
@@ -1020,6 +1005,11 @@ idea through planning, execution, adaptation, and completion.
                             ).strip(),
                             "project_context": project_context,
                             "title": step_title,
+                            "owner": str(
+                                step.get("owner") or step.get("ownership") or task.get("owner") or (
+                                    "USER" if normalized_step_action in {"manual", "user_action"} else "NOVA"
+                                )
+                            ).strip().upper(),
                             "description": str(
                                 step.get(
                                     "description",
@@ -1137,7 +1127,13 @@ idea through planning, execution, adaptation, and completion.
 
                 normalized_tasks.append(
                         {
+                            "id": str(task.get("id") or task.get("task_id") or "").strip(),
                             "title": title,
+                            "owner": str(
+                                task.get("owner") or task.get("ownership") or task.get("actor") or (
+                                    "USER" if action in {"manual", "user_action"} else "NOVA"
+                                )
+                            ).strip().upper(),
                             "priority": priority,
                             "description": description,
                             "action": action,
@@ -1215,6 +1211,10 @@ idea through planning, execution, adaptation, and completion.
                 )
             ).strip()
             or request,
+
+            "goal": str(plan.get("goal") or plan.get("mission") or request).strip() or request,
+            "complexity": str(plan.get("complexity") or "").strip(),
+            "work_type": str(plan.get("work_type") or plan.get("goal_type") or "general").strip(),
 
             "requirements": self._string_list(
                 plan.get(

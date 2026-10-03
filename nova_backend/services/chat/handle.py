@@ -1,6 +1,7 @@
 ﻿import traceback
 import time
 import re
+import os
 
 from nova_backend.services.auth_context import get_current_user_id
 
@@ -29,6 +30,7 @@ def chat_handle(
     decision=None,
     working_state=None,
     regenerate=False,
+    idempotency_key="",
 ):
     decision_intent = (
         decision.get("intent")
@@ -206,7 +208,11 @@ def chat_handle(
                 session_id=session_id,
                 assistant_message_id=assistant_message_id,
                 project_id=project_id,
+                attachments=attachments,
+                model=os.getenv("NOVA_VIDEO_MODEL", "ray-3.2"),
+                idempotency_key=idempotency_key,
             )
+            assistant_message_id = str(job.get("assistant_message_id") or assistant_message_id)
             status = str(job.get("status") or "failed")
             answer = (
                 "Generating your video…"

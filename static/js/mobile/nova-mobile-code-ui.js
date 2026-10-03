@@ -42,6 +42,8 @@
         if (!wrapper) return;
 
         wrapper.querySelectorAll("pre").forEach(function (pre) {
+            // Shared answer cards already own their Copy control and feedback.
+            if (pre.closest(".answer-code")) return;
             if (pre.dataset.enhanced === "1") return;
 
             pre.dataset.enhanced = "1";

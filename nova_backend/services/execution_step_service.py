@@ -239,9 +239,18 @@ class ExecutionStepService:
             or "terminal_execute"
         ).strip()
 
-        confirm = bool(
-            step.get("confirm", True)
-        )
+        approval_required = self.approval_service.requires_approval({**step, "tool_name": tool_name})
+        explicitly_approved = self.approval_service.is_approved(step)
+        confirm = explicitly_approved
+        if approval_required and not explicitly_approved:
+            step["requires_approval"] = True
+            step["approval_required"] = True
+            step["approval_status"] = "pending"
+            step["status"] = "waiting_approval"
+            step["waiting"] = True
+            step["next_action"] = "approval_required"
+            step["error"] = "Approval required before this tool can run."
+            return step
 
         target_file = self._safe_str(
             step.get("target_file")
@@ -273,7 +282,7 @@ class ExecutionStepService:
             payload["command"] = command
 
         step["payload"] = payload
-        step["confirm"] = True
+        step["confirm"] = explicitly_approved
         step["status"] = "running"
         step["error"] = None
 

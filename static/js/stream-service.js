@@ -477,6 +477,11 @@ const requestBody = {
     ""
   ).trim(),
   attachments: attachmentList,
+  idempotency_key: String(payload.idempotencyKey || payload.idempotency_key || (
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `nova-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  )),
 
   // Compatibility aliases for older Nova code.
   chat_id: sessionId,

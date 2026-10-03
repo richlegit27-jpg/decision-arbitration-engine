@@ -406,6 +406,120 @@
   }
 }
 
+/* One scroll owner for the desktop sidebar; session rows stay in normal flow. */
+@media (min-width: 761px) {
+  html body .shell > aside.panel.sidebar {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    scroll-padding-block: 12px !important;
+  }
+
+  html body .shell > aside.panel.sidebar > .brand,
+  html body .shell > aside.panel.sidebar > .workspace-section,
+  html body .shell > aside.panel.sidebar > .side-footer-links {
+    position: static !important;
+    inset: auto !important;
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
+  html body .shell > aside.panel.sidebar > .session-list-shell,
+  html body .shell > aside.panel.sidebar #desktopSessionList,
+  html body .shell > aside.panel.sidebar #desktopProjectList {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overscroll-behavior: auto !important;
+  }
+
+  html body .shell > aside.panel.sidebar .desktop-session-item,
+  html body .shell > aside.panel.sidebar .session-item,
+  html body .shell > aside.panel.sidebar .desktop-session-row:not(.session-menu-open) {
+    position: relative !important;
+    z-index: auto !important;
+  }
+
+  html body .shell > aside.panel.sidebar > .side-footer-links {
+    margin-top: auto !important;
+  }
+
+  /* Account/logout participates in the rail layout above Execution. */
+  html body .shell > aside.panel.tools > #nova-desktop-auth-widget {
+    position: relative !important;
+    inset: auto !important;
+    z-index: auto !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    border-radius: 14px !important;
+    margin: 0 !important;
+  }
+
+  html body .shell > aside.panel.tools > #nova-desktop-auth-widget .nova-auth-user {
+    flex: 1 1 120px !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+
+  .nova-project-workspace-heading {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 14px !important;
+  }
+
+  .nova-project-workspace-heading > div {
+    min-width: 0 !important;
+  }
+
+  .nova-project-back-to-chat {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    flex: 0 0 auto !important;
+    min-height: 40px !important;
+    padding: 8px 13px !important;
+    border: 1px solid var(--nova-ui-line-strong, rgba(187, 175, 225, 0.22)) !important;
+    border-radius: 12px !important;
+    background: var(--nova-ui-accent-soft, rgba(139, 92, 246, 0.15)) !important;
+    color: var(--nova-ui-text, #f3f1fa) !important;
+    font: inherit !important;
+    font-weight: 650 !important;
+    cursor: pointer !important;
+  }
+
+  .nova-project-back-to-chat:hover,
+  .nova-project-back-to-chat:focus-visible {
+    border-color: var(--nova-ui-accent, #a78bfa) !important;
+    outline: none !important;
+  }
+
+  html body .chat-panel.project-workspace-open {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+  }
+
+  html body .chat-panel.project-workspace-open > #chat,
+  html body .chat-panel.project-workspace-open > .composer {
+    display: none !important;
+  }
+}
+
 /* Keep the right rail in normal flow and scroll its contents on short viewports. */
 @media (min-width: 761px) {
   html body .shell > aside.panel.tools {

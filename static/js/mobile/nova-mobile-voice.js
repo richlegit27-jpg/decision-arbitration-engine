@@ -90,38 +90,8 @@
         startVoiceInput
     };
 
-function installVoiceButtonListener() {
-    const button =
-        window.voiceBtn ||
-        document.getElementById("nova-mobile-voice");
-
-    if (!button) {
-        console.warn("[Nova Mobile] voice button not found");
-        return;
-    }
-
-    if (button.dataset.voiceBound === "true") {
-        return;
-    }
-
-    button.dataset.voiceBound = "true";
-
-    button.addEventListener("click", async function () {
-        button.classList.add("recording");
-
-        try {
-            await startVoiceInput();
-        } finally {
-            setTimeout(function () {
-                button.classList.remove("recording");
-            }, 800);
-        }
-    });
-
-    console.log("[Nova Mobile] voice button wired");
-}
-
-setTimeout(installVoiceButtonListener, 0);
+// The loaded mobile app owns the visible Voice button. Keep this helper
+// available to legacy tool callers without binding a second button handler.
 
     console.log("[Nova Mobile] voice module ready");
 })();

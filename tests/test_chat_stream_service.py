@@ -28,6 +28,7 @@ def test_chat_stream_emits_response_before_single_completion_event():
                     "assistant_message": {
                         "text": "A real\nresponse",
                         "attachments": [{"id": "artifact-1"}],
+                        "meta": {"route": "video_generation", "video_job_id": "video-1", "video_status": "queued"},
                     },
                 }
             )
@@ -41,6 +42,7 @@ def test_chat_stream_emits_response_before_single_completion_event():
     assert "debug" not in types
     assert "".join(event.get("content", "") for event in events if event["type"] == "token").strip() == "A real\nresponse"
     assert events[-1]["attachments"] == [{"id": "artifact-1"}]
+    assert events[-1]["assistant_message"]["meta"]["video_job_id"] == "video-1"
 
 
 def test_chat_stream_propagates_api_failure_without_reporting_success():

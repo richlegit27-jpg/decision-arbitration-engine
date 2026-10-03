@@ -11,6 +11,10 @@ import re
 from nova_backend.services.project_planning_ai_service import (
     project_planning_ai_service,
 )
+from nova_backend.services.project_plan_quality_service import (
+    ProjectPlanValidationError,
+    project_plan_quality_service,
+)
 
 
 def _execution_debug(*args, **kwargs):
@@ -157,6 +161,21 @@ class ProjectBuilderService:
 
         if not isinstance(plan, dict):
             raise ValueError("Planner returned an invalid project plan")
+
+        try:
+            try:
+                from nova_backend.tools.registry import registry
+
+                available_tools = set(registry.list_tools())
+            except Exception:
+                available_tools = None
+            plan = project_plan_quality_service.validate(
+                plan,
+                request=clean_request,
+                available_tools=available_tools,
+            )
+        except ProjectPlanValidationError as exc:
+            raise ValueError(f"Project plan needs clarification: {exc}") from exc
 
         planned_phases = plan.get("phases")
 
@@ -2335,6 +2354,7 @@ class ProjectBuilderService:
                     ),
 
                     action=normalized_action,
+                    owner=task_spec.get("owner", "NOVA"),
                     execution_mode=normalized_execution_mode,
 
                     execution_file=execution_file,
@@ -4015,6 +4035,11 @@ class ProjectBuilderService:
                 brain["goal"] = incoming_goal
             elif existing_goal:
                 brain["goal"] = existing_goal
+
+            for field_name in ("complexity", "work_type"):
+                value = str(plan.get(field_name) or "").strip()
+                if value:
+                    brain[field_name] = value
 
             brain["requirements"] = merge_unique(
                 brain.get(

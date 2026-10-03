@@ -1133,6 +1133,14 @@ async function sendNow(event) {
 
     const sessionId = getSessionId();
 const attachments = currentAttachmentsForSend();
+const pendingUpload = attachments.some((item) => item.pending_upload === true);
+const failedUpload = attachments.some((item) => item.upload_error === true);
+if (pendingUpload || failedUpload) {
+    alert(pendingUpload
+        ? "Wait for the selected file to finish uploading before sending."
+        : "One selected file did not upload. Remove it or select it again before sending.");
+    return false;
+}
 const attachmentInput = $("nova-mobile-file-input");
 const wasAttachmentInputDisabled = attachmentInput?.disabled || false;
 const abortController = new AbortController();

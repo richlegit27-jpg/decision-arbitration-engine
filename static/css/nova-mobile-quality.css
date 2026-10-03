@@ -1,0 +1,224 @@
+/* Final, mobile-only guardrails applied after the legacy mobile overrides. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden !important;
+}
+
+.mobile-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+#mobileChatMessages,
+.mobile-chat-container,
+.mobile-chat-message,
+.nova-mobile-message {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+}
+
+#mobileChatMessages pre,
+.mobile-chat-container pre,
+.mobile-chat-message pre,
+.nova-mobile-message pre {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  white-space: pre;
+  -webkit-overflow-scrolling: touch;
+}
+
+#mobileChatMessages table,
+.mobile-chat-container table,
+.mobile-chat-message table,
+.nova-mobile-message table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+#mobileChatMessages img,
+#mobileChatMessages video,
+#mobileChatMessages canvas,
+.mobile-chat-container img,
+.mobile-chat-container video,
+.mobile-chat-container canvas,
+.nova-mobile-message img,
+.nova-mobile-message video {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+#mobileChatMessages video,
+.mobile-chat-container video,
+.nova-mobile-message video {
+  width: 100%;
+  max-height: 70vh;
+  background: #080b12;
+}
+
+@supports (height: 100dvh) {
+  #mobileChatMessages video,
+  .mobile-chat-container video,
+  .nova-mobile-message video {
+    max-height: min(70dvh, 560px);
+  }
+}
+
+.nova-mobile-project-detail {
+  max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nova-mobile-project-overview {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 12px 0;
+}
+.nova-mobile-project-overview > div,
+.nova-mobile-project-next-move {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  border-radius: 15px;
+  background: rgba(15, 23, 42, 0.55);
+  overflow-wrap: anywhere;
+}
+.nova-mobile-project-goal-summary,
+#nova-mobile-project-goal-summary { margin: 3px 0 0; color: #f1f5f9; font-size: 1rem; line-height: 1.45; }
+.nova-mobile-project-progress-summary > div { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.nova-mobile-project-progress-summary progress { width: 100%; height: 8px; accent-color: #a78bfa; }
+.nova-mobile-project-next-move { border-color: rgba(167, 139, 250, 0.35); background: linear-gradient(145deg, rgba(91, 33, 182, 0.18), rgba(15, 23, 42, 0.68)); }
+.nova-mobile-project-next-move h3 { margin: 4px 0; color: #f8fafc; font-size: 1rem; line-height: 1.45; overflow-wrap: anywhere; }
+.nova-mobile-project-next-move p { margin: 4px 0 0; color: #c4b5fd; }
+.nova-mobile-project-next-move button { min-height: 44px; margin-top: 9px; }
+.nova-mobile-project-current h3,
+.nova-mobile-project-completed h3,
+.nova-mobile-project-coming-up h3 { margin: 0 0 7px; color: #cbd5e1; font-size: 0.85rem; }
+.nova-mobile-project-overview-item { margin: 5px 0; color: #e2e8f0; line-height: 1.4; overflow-wrap: anywhere; }
+.nova-mobile-project-overview-item small { display: block; margin-top: 3px; color: #aebbd0; }
+.nova-mobile-project-owner { color: #c4b5fd !important; }
+.nova-mobile-project-details { margin: 12px 0; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 14px; background: rgba(15, 23, 42, 0.34); }
+.nova-mobile-project-details > summary { min-height: 48px; padding: 13px; color: #e2e8f0; font-weight: 700; cursor: pointer; }
+.nova-mobile-project-details[open] > summary { border-bottom: 1px solid rgba(148, 163, 184, 0.14); }
+.nova-mobile-project-details .nova-mobile-project-section { padding-inline: 12px; }
+.nova-mobile-project-execution-detail { margin: 0; color: #cbd5e1; font-size: 0.88rem; line-height: 1.55; overflow-wrap: anywhere; }
+#nova-mobile-project-execution-status[data-status="running"],
+#nova-mobile-project-execution-status[data-status="in_progress"] { border-color: rgba(96,165,250,.5) !important; }
+#nova-mobile-project-execution-status[data-status="completed"],
+#nova-mobile-project-execution-status[data-status="complete"] { border-color: rgba(74,222,128,.45) !important; }
+#nova-mobile-project-execution-status[data-status*="waiting"],
+#nova-mobile-project-execution-status[data-status="approval_required"] { border-color: rgba(250,204,21,.48) !important; }
+#nova-mobile-project-execution-status[data-status="blocked"],
+#nova-mobile-project-execution-status[data-status="failed"] { border-color: rgba(248,113,113,.5) !important; }
+#nova-mobile-project-execution-status[data-status="paused"] { border-color: rgba(196,181,253,.45) !important; }
+.nova-mobile-settings-values { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 6px 10px; margin: 12px 0; }
+.nova-mobile-settings-values dt { color: #aebbd0; }
+.nova-mobile-settings-values dd { min-width: 0; margin: 0; color: #f1f5f9; overflow-wrap: anywhere; }
+.nova-mobile-menu-link { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 12px; border: 1px solid rgba(148,163,184,.2); border-radius: 12px; color: inherit; text-decoration: none; }
+.nova-mobile-upload-preview-list { display: flex; min-width: 0; max-width: 100%; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; }
+.nova-mobile-upload-preview-chip { display: flex; align-items: center; flex: 0 0 auto; gap: 9px; max-width: min(88vw, 390px); min-width: 0; }
+.nova-mobile-upload-preview-meta { display: grid; min-width: 0; gap: 3px; }
+.nova-mobile-upload-preview-name { max-width: 48vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nova-mobile-upload-preview-info { color: #aebbd0; font-size: 0.72rem; }
+.nova-mobile-upload-preview-state { color: #c4b5fd; font-size: 0.72rem; }
+.nova-mobile-upload-preview-chip[data-upload-state="failed"] .nova-mobile-upload-preview-state { color: #fca5a5; }
+.nova-mobile-upload-preview-remove { min-width: 44px; min-height: 44px; flex: 0 0 44px; }
+.nova-mobile-upload-error { margin: 4px 8px; color: #fecaca; font-size: 0.82rem; }
+#nova-mobile-upload-preview-owner { width: 100% !important; height: auto !important; min-height: 48px !important; max-height: 104px !important; overflow: hidden !important; }
+#nova-mobile-upload-preview-owner > .nova-mobile-upload-preview-list { display: flex !important; width: 100% !important; min-width: 0 !important; max-width: 100% !important; overflow-x: auto !important; overflow-y: hidden !important; }
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-chip { flex: 0 0 auto !important; width: auto !important; max-width: 86vw !important; min-width: 0 !important; min-height: 48px !important; height: auto !important; max-height: 96px !important; overflow: hidden !important; }
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-thumb { width: 40px !important; height: 40px !important; flex: 0 0 40px !important; }
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-thumb img { width: 40px !important; height: 40px !important; max-width: 40px !important; max-height: 40px !important; }
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-meta { min-width: 0 !important; }
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-name { min-width: 0 !important; max-width: 46vw !important; }
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-remove { width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; flex: 0 0 44px !important; }
+#nova-mobile-upload-preview-owner .nova-mobile-upload-error { max-width: 80vw !important; white-space: normal !important; }
+
+@supports (height: 100dvh) {
+  .nova-mobile-project-detail {
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px) !important;
+  }
+}
+
+.nova-mobile-project-back {
+  min-height: 44px;
+}
+
+.nova-mobile-project-notes-list,
+.nova-mobile-project-activity-list {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.nova-mobile-project-note,
+.nova-mobile-project-activity-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.35);
+  overflow-wrap: anywhere;
+}
+
+.nova-mobile-project-note strong,
+.nova-mobile-project-activity-item strong {
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.nova-mobile-project-note p,
+.nova-mobile-project-activity-item p {
+  margin: 6px 0 0;
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mobile-header button:focus-visible,
+.mobile-composer button:focus-visible,
+.mobile-composer label:focus-within,
+.mobile-panel button:focus-visible,
+.mobile-panel a:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+}
+
+@media (max-width: 360px) {
+  .mobile-header {
+    min-width: 0;
+  }
+
+  .mobile-header-title,
+  .mobile-header-actions,
+  .mobile-header-btn {
+    min-width: 0;
+  }
+
+  .mobile-header-btn {
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-panel,
+  .mobile-panel * {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

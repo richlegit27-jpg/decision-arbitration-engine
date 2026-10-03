@@ -230,6 +230,7 @@ from nova_backend.services.session_history_service import (
 from nova_backend.services.history_service import HistoryService
 from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.video_generation_service import VideoGenerationService
+from nova_backend.services.luma_video_provider import LumaVideoProvider
 from nova_backend.services.memory_service import MemoryService
 from nova_backend.services.memory_guard_route_service import (
     MemoryGuardRouteService,
@@ -984,12 +985,28 @@ chat_service = ChatService(
     execution_state_service=execution_state_service,
     chat_execution_service=chat_execution_service,
 )
+_nova_video_enabled = str(os.getenv("NOVA_VIDEO_GENERATION_ENABLED", "")).strip().lower() in {"1", "true", "yes", "on"}
+_nova_luma_key_present = bool(str(os.getenv("LUMA_AGENTS_API_KEY") or os.getenv("LUMA_API_KEY") or "").strip())
+_nova_video_provider = LumaVideoProvider() if _nova_video_enabled and _nova_luma_key_present else None
+_nova_video_unavailable_message = (
+    "Video generation is currently disabled on this Nova server."
+    if not _nova_video_enabled
+    else "Video generation needs a Luma API key before it can be enabled on this Nova server."
+)
 video_generation_service = VideoGenerationService(
     DATA_DIR / "nova_video_jobs.json",
     UPLOADS_DIR,
+    provider=_nova_video_provider,
     artifact_service=artifact_service,
     session_service=session_service,
     project_service=project_workspace_service,
+    upload_ownership_service=upload_ownership_service,
+    reference_signing_key=app.secret_key,
+    public_url=os.getenv("NOVA_PUBLIC_URL", "") or (
+        "https://" + str(os.getenv("RAILWAY_PUBLIC_DOMAIN") or "").strip().lstrip("/")
+        if os.getenv("RAILWAY_PUBLIC_DOMAIN") else ""
+    ),
+    provider_unavailable_message=_nova_video_unavailable_message,
 )
 chat_service.video_generation_service = video_generation_service
 video_generation_service.install_routes(app)
@@ -2220,6 +2237,15 @@ def api_chat():
         cache=True,
     ) or {}
 
+    # Surface is context only; authorization remains based on the server's
+    # authenticated identity and owned session checks.
+    try:
+        from flask import g
+        requested_surface = str(data.get("surface") or "chat").strip().lower()
+        g.nova_chat_surface = requested_surface if requested_surface in {"chat", "super_ai"} else "chat"
+    except Exception:
+        pass
+
     app.logger.debug(
         "Chat payload parsed: content_length=%s",
         request.content_length,
@@ -2402,7 +2428,14 @@ def api_chat():
                     break
 
         _nova_image_item = _nova_image
-        if _nova_image:
+        _nova_video_image_request = bool(
+            str(_nova_user_text or "").strip().lower().startswith("/video")
+            or re.search(
+                r"\b(?:animate|make\s+(?:this|it)\s+move|turn\s+(?:this|it)\s+into\s+(?:a\s+)?video|make\s+(?:a\s+)?video|bring\s+(?:this|it)\s+to\s+life)\b",
+                str(_nova_user_text or "").lower(),
+            )
+        )
+        if _nova_image and not _nova_video_image_request:
             _nova_raw_url = str(
                 _nova_image.get("url")
                 or _nova_image.get("file_url")
@@ -2765,7 +2798,14 @@ def api_chat():
                     "raw": item,
                 })
 
-        if image_attachments:
+        _video_with_image_request = bool(
+            str(user_text or "").strip().lower().startswith("/video")
+            or re.search(
+                r"\b(?:animate|make\s+(?:this|it)\s+move|turn\s+(?:this|it)\s+into\s+(?:a\s+)?video|make\s+(?:a\s+)?video|bring\s+(?:this|it)\s+to\s+life)\b",
+                str(user_text or "").lower(),
+            )
+        )
+        if image_attachments and not _video_with_image_request:
             # SKIP_EARLY_IMAGE_GATE_FOR_ANALYSIS_REQUESTS_20260606
             # Do not let the receipt gate block real image/attachment analysis.
             _analysis_text = str(user_text or "").lower().strip()
@@ -3197,6 +3237,7 @@ def api_chat():
             session_id=session_id,
             attachments=attachments_for_chat_service,
             requested_model=requested_model or None,
+            idempotency_key=str(data.get("idempotency_key") or "")[:200],
         )
     except Exception as chat_error:
         import traceback
@@ -3473,7 +3514,8 @@ def api_delete_artifact(artifact_id: str):
 
 @app.post("/api/web/fetch")
 def api_web_fetch():
-    print("HIT API_WEB_FETCH ROUTE", flush=True)
+    if not get_current_user_id():
+        return jsonify({"ok": False, "error": "authentication_required"}), 401
     try:
         data = request.get_json(silent=True) or {}
         url = str(data.get("url") or "").strip()
@@ -3511,18 +3553,20 @@ def api_web_fetch():
             except Exception as exc:
                 result["artifact_error"] = str(exc)
 
+        succeeded = bool(result.get("ok"))
         return jsonify({
-            "ok": True,
+            "ok": succeeded,
             "result": result,
             "artifact": artifact,
-        })
+        }), (200 if succeeded else 502)
 
     except Exception as exc:
+        app.logger.error("web fetch route failed", extra={"error_type": type(exc).__name__})
         return jsonify({
             "ok": False,
-            "error": str(exc),
-            "route": "/api/web/fetch",
-        }), 200
+            "error": "web_fetch_failed",
+            "message": "Nova could not fetch that page. Check the address and try again.",
+        }), 502
 
 # -----------------------
 # RECON

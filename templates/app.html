@@ -1103,6 +1103,7 @@ observer.observe(document.documentElement, {
 <link rel="stylesheet" href="/static/css/nova-desktop-clean.css?v=1">
 <link rel="stylesheet" href="/static/css/nova-desktop-polish.css?v=ux-finishing-20261002-1">
 <link rel="stylesheet" href="/static/css/nova-theme.css?v=settings-20261003-1">
+<link rel="stylesheet" href="/static/css/nova-message-presentation.css?v=shared-chat-20261003-1">
 
 </head>
 <body data-nova-desktop-inline-send="true">
@@ -1429,13 +1430,21 @@ observer.observe(document.documentElement, {
   class="workspace-section"
   hidden
 >
-  <div class="section-title-row">
+  <div class="section-title-row nova-project-workspace-heading">
     <div>
       <h2 id="desktopProjectTitle">No project selected</h2>
       <p id="desktopProjectDescription">
         Create or select a project for work that needs multiple steps.
       </p>
     </div>
+    <button
+      id="desktopProjectBackToChat"
+      class="nova-project-back-to-chat"
+      type="button"
+    >
+      <span aria-hidden="true">←</span>
+      <span>Back to Chat</span>
+    </button>
   </div>
 
   <div class="project-workspace-card">
@@ -1603,6 +1612,10 @@ observer.observe(document.documentElement, {
     </main>
 
     <aside class="panel tools">
+
+<div id="nova-desktop-auth-widget" class="nova-auth-widget">
+    <span class="nova-auth-user">Checking account...</span>
+</div>
 
 <!-- NOVA_DESKTOP_EXECUTION_NATIVE_PANEL -->
 <section
@@ -4809,14 +4822,37 @@ function wire() {
 
     function ensureAuthWidget() {
         var existing = document.getElementById("nova-desktop-auth-widget");
-        if (existing) return existing;
+        if (existing) {
+            placeAuthWidget(existing);
+            return existing;
+        }
 
         var widget = document.createElement("div");
         widget.id = "nova-desktop-auth-widget";
         widget.className = "nova-auth-widget";
         widget.innerHTML = '<span class="nova-auth-user">Checking account...</span>';
-        document.body.appendChild(widget);
+        placeAuthWidget(widget);
         return widget;
+    }
+
+    function placeAuthWidget(widget) {
+        if (!widget) return;
+        var tools = document.querySelector(".shell > aside.panel.tools");
+        var desktop = window.matchMedia && window.matchMedia("(min-width: 761px)").matches;
+        if (desktop && tools) {
+            if (widget.parentElement !== tools) {
+                tools.insertBefore(widget, tools.firstChild);
+            }
+        } else if (widget.parentElement !== document.body) {
+            document.body.appendChild(widget);
+        }
+    }
+
+    if (!window.__NOVA_AUTH_WIDGET_PLACEMENT_BOUND__) {
+        window.__NOVA_AUTH_WIDGET_PLACEMENT_BOUND__ = true;
+        window.addEventListener("resize", function () {
+            placeAuthWidget(document.getElementById("nova-desktop-auth-widget"));
+        });
     }
 
     function userLabel(user) {
