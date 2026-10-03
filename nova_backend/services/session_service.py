@@ -1,8 +1,10 @@
 ﻿from __future__ import annotations
 
 from copy import deepcopy
+from functools import wraps
 from pathlib import Path
 from typing import Any, Dict, List
+import threading
 import uuid
 
 from nova_backend.utils.file_utils import load_json_file, save_json_file
@@ -90,6 +92,15 @@ def _session_sort_key(session: Dict[str, Any]) -> tuple:
     return (0 if pinned else 1, stamp)
 
 
+def _session_transaction(method):
+    """Serialize each session read-modify-write transaction in this process."""
+    @wraps(method)
+    def synchronized(self, *args, **kwargs):
+        with self._mutation_lock:
+            return method(self, *args, **kwargs)
+    return synchronized
+
+
 def _normalize_message(message: Dict[str, Any]) -> Dict[str, Any]:
     msg = dict(message or {})
     msg.setdefault("id", f"msg_{uuid.uuid4().hex}")
@@ -155,6 +166,8 @@ NOVA_SESSION_BAD_AUTO_TITLES_20260624 = {
     "new chat",
     "untitled",
     "untitled session",
+    "new message",
+    "new conversation",
     "web fetch",
     "webfetch",
     "1",
@@ -184,26 +197,45 @@ def _nova_session_title_from_message_20260624(message) -> str:
         return ""
 
     low = text.lower()
-    if low in NOVA_SESSION_BAD_AUTO_TITLES_20260624:
+    if low in NOVA_SESSION_BAD_AUTO_TITLES_20260624 or low in {
+        "hi", "hello", "hey", "hi nova", "hello nova", "hey nova",
+        "test", "testing", "thanks", "thank you",
+    }:
         return ""
     if low.startswith("[nova"):
         return ""
     if low.startswith("http://") or low.startswith("https://"):
         return ""
 
-    words = text.split()
-
-    if len(words) > 6:
-        title = " ".join(words[:6])
-    else:
-        title = text
-
-    title = title.strip(" .,-_:;")
+    # Remove common request openers so the title captures the topic rather
+    # than the conversational preamble.
+    import re
+    project_request = re.match(
+        r"^(?:create|start|make)\s+(?:a\s+)?project\s+to\s+(?:build|make|create)\s+(.+?)\W*$",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if project_request:
+        topic_words = re.findall(r"[\w'-]+", project_request.group(1), flags=re.UNICODE)
+        topic_words = [word for word in topic_words if word.lower() not in {"a", "an", "the", "my"}]
+        if topic_words:
+            return (" ".join(topic_words[:5]) + " Project").title()[:60]
+    text = re.sub(
+        r"^(?:please\s+)?(?:i\s+(?:want|need|would\s+like)\s+to\s+)?(?:ask\s+about|know\s+about|learn\s+about|help\s+me\s+with)\s+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"[`*_#>\"']", "", text)
+    words = re.findall(r"[\w'-]+", text, flags=re.UNICODE)
+    if len(words) < 2:
+        return ""
+    title = " ".join(words[:7]).strip(" .,-_:;")
 
     if not title:
         return ""
 
-    return title[:45]
+    return title[:60]
 
 class SessionService:
     MAX_SESSION_MESSAGES = 80
@@ -555,6 +587,7 @@ class SessionService:
 
     def __init__(self, sessions_file: str | Path):
         self.sessions_file = Path(sessions_file)
+        self._mutation_lock = threading.RLock()
         self._bootstrap()
 
     @property
@@ -723,13 +756,20 @@ class SessionService:
         if not current_user_id:
             return True
 
-        # Unowned local sessions can be claimed by the current user.
-        # get_session() persists the owner immediately after this check.
+        # Legacy ownerless records require an explicit, server-side migration
+        # owner. Never let whichever account happens to read first claim them.
         if not session_user_id:
-            return True
+            import os
 
-        # Authenticated users can only access sessions explicitly
-        # assigned to their user ID.
+            migration_owner_id = str(
+                os.environ.get("NOVA_LEGACY_SESSION_OWNER_ID") or ""
+            ).strip()
+            return bool(
+                migration_owner_id
+                and migration_owner_id == current_user_id
+            )
+
+        # Authenticated users can only access sessions assigned to them.
         return session_user_id == current_user_id
 
     def load(self):
@@ -877,6 +917,7 @@ class SessionService:
 
         return sessions
 
+    @_session_transaction
     def append_execution_history(
         self,
         session_id,
@@ -932,6 +973,7 @@ class SessionService:
 
         return True
 
+    @_session_transaction
     def reset_execution_session(
         self,
         session_id,
@@ -978,6 +1020,7 @@ class SessionService:
 
         return True
 
+    @_session_transaction
     def save(self, sessions, active=None):
         """
         Compatibility bridge.
@@ -1008,6 +1051,7 @@ class SessionService:
     # SESSION CONTROL (FIXED)
     # -----------------------
 
+    @_session_transaction
     def set_active(self, session_id: str, user_id=""):
         if not user_id:
             user_id = self._current_owner_id()
@@ -1038,6 +1082,7 @@ class SessionService:
 
         return found
 
+    @_session_transaction
     def rename(self, session_id: str, title: str, user_id=""):
         data = self._read_store()
         sessions = data.get("sessions", [])
@@ -1060,7 +1105,30 @@ class SessionService:
 
         return None
 
+    @_session_transaction
+    def set_auto_title_if_untitled(self, session_id: str, title: str, user_id=""):
+        """Persist an automatic title only while the session is still eligible."""
+        if not user_id:
+            user_id = self._current_owner_id()
+        clean_title = str(title or "").strip()
+        if not clean_title:
+            return None
+        sessions = self._load_sessions()
+        for item in sessions:
+            if str(item.get("id") or "") != str(session_id or ""):
+                continue
+            if not self._belongs_to_user(item, user_id):
+                return None
+            if item.get("title_manual") or not _nova_session_should_auto_title_20260624(item.get("title")):
+                return item
+            item["title"] = clean_title[:60]
+            item["updated_at"] = iso_now()
+            self._save_sessions(sessions, self.get_active_session_id())
+            return item
+        return None
 
+
+    @_session_transaction
     def pin(self, session_id: str, pinned: bool, user_id=""):
         data = self._read_store()
         sessions = data.get("sessions", [])
@@ -1079,6 +1147,7 @@ class SessionService:
             return session
 
         return None
+    @_session_transaction
     def delete(self, session_id: str, user_id=""):
         if not user_id:
             user_id = self._current_owner_id()
@@ -1110,9 +1179,13 @@ class SessionService:
         ).strip()
 
         if active_id == str(session_id or "").strip():
+            remaining_owned = [
+                item for item in remaining
+                if self._belongs_to_user(item, user_id)
+            ]
             data["active_session_id"] = (
-                remaining[0].get("id")
-                if remaining
+                remaining_owned[0].get("id")
+                if remaining_owned
                 else ""
             )
 
@@ -1120,6 +1193,7 @@ class SessionService:
 
         return True
 
+    @_session_transaction
     def delete_all(self, user_id=""):
         if not user_id:
             user_id = self._current_owner_id()
@@ -1148,6 +1222,7 @@ class SessionService:
     # WORKING STATE
     # -----------------------
 
+    @_session_transaction
     def set_session_meta(
         self,
         session_id: str,
@@ -1246,6 +1321,7 @@ class SessionService:
 
         return deepcopy(state)
 
+    @_session_transaction
     def update_working_state(
         self,
         session_id: str,
@@ -1347,6 +1423,7 @@ class SessionService:
             return str(sessions[0].get("id") or "").strip()
         return ""
 
+    @_session_transaction
     def get_session(self, session_id, user_id=""):
         import time
 
@@ -1405,6 +1482,7 @@ class SessionService:
 
         return session
 
+    @_session_transaction
     def create_session(
         self,
         title="New Chat",
@@ -1448,6 +1526,7 @@ class SessionService:
         return self.get_active_session()
 
 
+    @_session_transaction
     def append_message(
         self,
         session_id,
@@ -1476,29 +1555,8 @@ class SessionService:
 
         sessions[i]["updated_at"] = iso_now()
 
-        print(
-            "[AUTO TITLE DEBUG]",
-            {
-                "title": sessions[i].get("title"),
-                "manual": sessions[i].get("title_manual"),
-                "message": normalized,
-            },
-        )
-
         # NOVA_SESSION_BAD_TITLE_AUTOFIX_20260624
         try:
-            print(
-                "[AUTO TITLE CHECK]",
-                {
-                    "title": sessions[i].get("title"),
-                    "manual": sessions[i].get("title_manual"),
-                    "should_change": _nova_session_should_auto_title_20260624(
-                        sessions[i].get("title")
-                    ),
-                    "message": normalized,
-                },
-            )
-
             if (
                 not sessions[i].get("title_manual")
                 and _nova_session_should_auto_title_20260624(
@@ -1507,11 +1565,6 @@ class SessionService:
             ):
                 candidate = _nova_session_title_from_message_20260624(
                     normalized
-                )
-
-                print(
-                    "[AUTO TITLE CANDIDATE]",
-                    candidate,
                 )
 
                 if candidate:
@@ -1527,6 +1580,7 @@ class SessionService:
 
         return normalized
 
+    @_session_transaction
     def replace_message(
         self,
         session_id,

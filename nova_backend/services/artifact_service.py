@@ -97,6 +97,8 @@ class ArtifactService:
     # =========================
     def _normalize_kind(self, kind: str) -> str:
         k = str(kind or "").lower().strip()
+        if "video" in k:
+            return "video"
         if "image" in k:
             return "image"
         if "web" in k:
@@ -109,6 +111,7 @@ class ArtifactService:
 
     def _derive_group(self, kind: str) -> str:
         mapping = {
+            "video": "Videos",
             "image": "Images",
             "web": "Web",
             "analysis": "Analysis",
@@ -213,10 +216,14 @@ class ArtifactService:
                 return self._normalize_artifact(item)
         return None
 
-    def save_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
+    def save_artifact(
+        self,
+        artifact: Dict[str, Any],
+        owner_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         data = self._read_store()
         items = data.get("artifacts", [])
-        owner_id = self._current_owner_id()
+        owner_id = str(owner_id or self._current_owner_id() or "").strip()
 
         if owner_id:
             artifact["owner_id"] = owner_id
@@ -297,9 +304,14 @@ class ArtifactService:
 
         # ðŸ”¥ STORAGE CONTROL
         MAX_ARTIFACTS = 100
-        items = items[-MAX_ARTIFACTS:]
-
-        data["artifacts"] = items[-MAX_ARTIFACTS:]
+        if owner_id:
+            # A user's artifact retention cap must never evict another user's
+            # records from the shared store.
+            owned = [x for x in items if str((x or {}).get("owner_id") or "") == owner_id]
+            other_owners = [x for x in items if str((x or {}).get("owner_id") or "") != owner_id]
+            data["artifacts"] = other_owners + owned[-MAX_ARTIFACTS:]
+        else:
+            data["artifacts"] = items[-MAX_ARTIFACTS:]
 
         self._write_store(data)
 

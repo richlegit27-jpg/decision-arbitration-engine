@@ -2149,6 +2149,37 @@ class ProjectWorkspaceService:
         return visible_projects
 
     @_synchronized_project_storage
+    def delete_all_projects(self):
+        """Delete every project owned by the authenticated user atomically."""
+        owner_id = str(self._current_owner_id() or "").strip()
+        if not owner_id:
+            raise PermissionError("Authentication required.")
+
+        projects = self._load_projects()
+        if not isinstance(projects, list):
+            raise RuntimeError("Project storage is invalid.")
+
+        owned = [
+            project
+            for project in projects
+            if isinstance(project, dict)
+            and str(project.get("owner_id", "") or "").strip() == owner_id
+        ]
+        remaining = [
+            project
+            for project in projects
+            if not (
+                isinstance(project, dict)
+                and str(project.get("owner_id", "") or "").strip() == owner_id
+            )
+        ]
+
+        if owned:
+            self._save_projects(remaining)
+
+        return len(owned)
+
+    @_synchronized_project_storage
     def get_project(
         self,
         project_id,

@@ -144,6 +144,7 @@ class ChatStreamService:
                 if failed:
                     message = str(
                         payload.get("error")
+                        or self._extract_text(payload)
                         or payload.get("message")
                         or "Nova could not complete this request."
                     )
@@ -151,7 +152,20 @@ class ChatStreamService:
                         "type": "error",
                         "content": message,
                     })
-                    yield self._event({"type": "done", "done": True})
+                    assistant = payload.get("assistant_message")
+                    done_payload = {
+                        "type": "done",
+                        "done": True,
+                    }
+                    if isinstance(assistant, dict):
+                        done_payload["assistant_message"] = assistant
+                        meta = assistant.get("meta")
+                        if (
+                            isinstance(meta, dict)
+                            and meta.get("source") == "image_generation"
+                        ):
+                            done_payload["content"] = message
+                    yield self._event(done_payload)
                     return
 
                 text = self._extract_text(

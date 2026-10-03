@@ -125,6 +125,19 @@ class IntentService:
                 ["attachment_language"],
             )
 
+        # Explicit command only: discussing video must not start generation.
+        if re.match(r"^/video(?:\s|$)", lower):
+            return self._result(
+                "video_generation",
+                "video_generation",
+                "video_generation",
+                0.99,
+                ["explicit_video_command"],
+                save_artifact=True,
+                save_memory=False,
+                use_memory=False,
+            )
+
         # 4. Explicit image generation
         if self._is_image_generation(lower):
             return self._result(

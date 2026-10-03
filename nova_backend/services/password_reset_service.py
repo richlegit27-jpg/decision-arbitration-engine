@@ -56,14 +56,12 @@ class PasswordResetService:
                 )
             )
 
-            return (
-                data
-                if isinstance(data, type(default))
-                else default
-            )
+            if not isinstance(data, type(default)):
+                raise ValueError(f"Invalid JSON store shape: {path}")
+            return data
 
-        except Exception:
-            return default
+        except Exception as exc:
+            raise ValueError(f"Unable to read JSON store: {path}") from exc
 
     def _save_json(
         self,
@@ -100,7 +98,7 @@ class PasswordResetService:
             data.get("users"),
             list,
         ):
-            data["users"] = []
+            raise ValueError("Authentication user store has an invalid users list.")
 
         return data
 
@@ -123,7 +121,7 @@ class PasswordResetService:
             data.get("resets"),
             list,
         ):
-            data["resets"] = []
+            raise ValueError("Password reset store has an invalid resets list.")
 
         return data
 
@@ -494,7 +492,7 @@ class PasswordResetService:
                     ),
                 }
 
-                if token:
+                if token and app.testing:
 
                     response[
                         "reset_token"

@@ -11,9 +11,9 @@ def _nova_boot_log_20260701(*args, **kwargs):
 
 import json
 import re
-import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from nova_backend.services.code_workspace_service import CodeWorkspaceService
 
 
 INACTIVE_EXECUTION_STATUSES = {
@@ -161,39 +161,53 @@ def _has_active_execution(runtime_execution_state: Optional[Any] = None) -> bool
 
 
 def _run_git(args: List[str]) -> str:
+    # Kept as a compatibility helper for legacy Project Brain call sites;
+    # do not accept user-provided arguments as a Git command.
+    allowed = {
+        ("branch", "--show-current"): "branch",
+        ("rev-parse", "--short", "HEAD"): "head_commit",
+        ("log", "-1", "--pretty=%s"): "recent_commits",
+        ("status", "--short"): "entries",
+    }
+    field = allowed.get(tuple(args))
+    if not field:
+        return ""
     try:
-        proc = subprocess.run(
-            ["git", *args],
-            cwd=str(_repo_root()),
-            capture_output=True,
-            text=True,
-            timeout=2,
-            check=False,
-        )
-
-        if proc.returncode != 0:
-            return ""
-
-        return (proc.stdout or "").strip()
+        snapshot = CodeWorkspaceService(timeout=2).snapshot(recent_limit=1)
+        if field == "recent_commits":
+            return str((snapshot.get("recent_commits") or [{}])[0].get("subject") or "")
+        if field == "entries":
+            return "\n".join(
+                f"{item['status']} {item['path']}"
+                for item in snapshot.get("entries", [])
+            )
+        return str(snapshot.get(field) or "")
     except Exception:
         return ""
 
 
 def _git_snapshot() -> Dict[str, Any]:
-    branch = _run_git(["branch", "--show-current"])
-    head = _run_git(["rev-parse", "--short", "HEAD"])
-    subject = _run_git(["log", "-1", "--pretty=%s"])
-    status_raw = _run_git(["status", "--short"])
-
-    dirty_files = [line.strip() for line in status_raw.splitlines() if line.strip()]
-
-    return {
-        "branch": branch,
-        "head": head,
-        "subject": subject,
-        "clean": not dirty_files,
-        "dirty_files": dirty_files,
-    }
+    try:
+        snapshot = CodeWorkspaceService(timeout=2).snapshot(recent_limit=1)
+        return {
+            "branch": snapshot["branch"],
+            "head": snapshot["head_commit"][:12],
+            "subject": (snapshot.get("recent_commits") or [{}])[0].get("subject", ""),
+            "clean": snapshot["is_clean"],
+            "dirty_files": [
+                f"{item['status']} {item['path']}"
+                for item in snapshot.get("entries", [])
+            ],
+        }
+    except Exception:
+        return {
+            "branch": "",
+            "head": "",
+            "subject": "",
+            "clean": False,
+            "dirty_files": [],
+            "available": False,
+        }
 
 
 def get_project_state() -> Dict[str, Any]:

@@ -1,7 +1,24 @@
 ﻿import traceback
 import time
+import re
 
 from nova_backend.services.auth_context import get_current_user_id
+
+
+def normalize_created_project_title(value):
+    title = re.sub(
+        r"^\s*a\s+project\s+to\s+build\s+",
+        "",
+        str(value or ""),
+        flags=re.IGNORECASE,
+    )
+    title = re.sub(r"^\s*(?:a|an|the)\s+", "", title, flags=re.IGNORECASE)
+    title = title.strip().rstrip(" .!?\t")
+    if title:
+        title = title[0].upper() + title[1:]
+    if len(title) > 72:
+        title = title[:69].rstrip() + "…"
+    return title
 
 def chat_handle(
     service,
@@ -29,8 +46,8 @@ def chat_handle(
     print(
         "[CHAT HANDLE HIT]",
         {
-            "user_text": user_text,
             "session_id": session_id,
+            "text_chars": len(str(user_text or "")),
         },
         flush=True,
     )
@@ -119,7 +136,6 @@ def chat_handle(
                 "intent": intent,
                 "mode": mode,
                 "attachment_count": len(attachments or []),
-                "attachments": attachments or [],
             },
             flush=True,
         )
@@ -133,6 +149,291 @@ def chat_handle(
             flush=True,
         )
 
+        if route == "video_generation":
+            video_service = getattr(service, "video_generation_service", None)
+            prompt = re.sub(r"^/video(?:\s+|$)", "", user_text, count=1, flags=re.IGNORECASE).strip()
+            if not prompt:
+                answer = "Add a description after /video to request a video."
+                result = service._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=service._build_user_message(user_text, attachments=attachments),
+                    assistant_msg=service._build_assistant_message(
+                        text=answer,
+                        meta={"route": "video_generation", "video_status": "invalid_request"},
+                    ),
+                    attachments=attachments,
+                    decision=decision,
+                    regenerate=regenerate,
+                )
+                if isinstance(result, dict):
+                    result["ok"] = False
+                    result["route"] = "video_generation"
+                return result
+            if video_service is None:
+                answer = "Video generation isn't available on this Nova server yet. A video provider must be configured first."
+                result = service._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=service._build_user_message(user_text, attachments=attachments),
+                    assistant_msg=service._build_assistant_message(
+                        text=answer,
+                        meta={"route": "video_generation", "video_status": "provider_configuration_required"},
+                    ),
+                    attachments=attachments,
+                    decision=decision,
+                    regenerate=regenerate,
+                )
+                if isinstance(result, dict):
+                    result["ok"] = False
+                    result["route"] = "video_generation"
+                    result["error"] = "provider_configuration_required"
+                return result
+
+            import uuid
+            assistant_message_id = f"msg_{uuid.uuid4().hex}"
+            active_project = None
+            try:
+                project_workspace = getattr(service, "project_workspace_service", None)
+                if project_workspace is not None:
+                    active_project = project_workspace.get_active_project()
+            except Exception:
+                active_project = None
+            project_id = str((active_project or {}).get("id") or "") if isinstance(active_project, dict) else ""
+            job = video_service.create_job(
+                prompt=prompt,
+                owner_id=get_current_user_id(),
+                session_id=session_id,
+                assistant_message_id=assistant_message_id,
+                project_id=project_id,
+            )
+            status = str(job.get("status") or "failed")
+            answer = (
+                "Generating your video…"
+                if status in {"queued", "generating"}
+                else str(job.get("user_error") or "Nova couldn't start video generation. Please try again.")
+            )
+            assistant_msg = service._build_assistant_message(
+                text=answer,
+                meta={
+                    "route": "video_generation",
+                    "video_job_id": job.get("id"),
+                    "video_status": status,
+                    "project_id": project_id or None,
+                    "error_category": job.get("error_category"),
+                },
+            )
+            assistant_msg["id"] = assistant_message_id
+            result = service._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=service._build_user_message(user_text, attachments=attachments),
+                assistant_msg=assistant_msg,
+                attachments=attachments,
+                decision=decision,
+                regenerate=regenerate,
+                project_id=project_id or None,
+            )
+            if isinstance(result, dict):
+                result["ok"] = status in {"queued", "generating"}
+                result["route"] = "video_generation"
+                result["video_job"] = job
+            return result
+
+        if route == "code_workspace":
+            workspace = getattr(service, "code_workspace_service", None)
+            result = (
+                workspace.answer_request(user_text)
+                if workspace is not None
+                else {
+                    "ok": False,
+                    "text": "Repository inspection is unavailable right now.",
+                }
+            )
+            answer_text = str(result.get("text") or "Repository inspection failed.")
+            lower_workspace_request = user_text.lower()
+            asks_for_interpretation = any(
+                phrase in lower_workspace_request
+                for phrase in (
+                    "explain this diff",
+                    "explain the diff",
+                    "explain what changed",
+                    "summarize the repository",
+                    "summarize this repo",
+                    "summarize current development state",
+                    "describe these changes",
+                )
+            )
+            if result.get("ok") and asks_for_interpretation:
+                workspace_decision = dict(decision)
+                workspace_decision["use_memory"] = False
+                workspace_decision["save_memory"] = False
+                workspace_decision["code_workspace_context"] = {
+                    key: result[key]
+                    for key in ("kind", "snapshot", "diff", "commits", "files")
+                    if key in result
+                }
+                try:
+                    interpreted = service._run_chat_model(
+                        user_text=user_text,
+                        decision=workspace_decision,
+                        session_id=session_id,
+                        requested_model=decision.get("model"),
+                        attachments=[],
+                    )
+                    if str(interpreted or "").strip():
+                        answer_text = str(interpreted).strip()
+                except Exception as exc:
+                    print("[CODE WORKSPACE MODEL INTERPRETATION FAILED]", repr(exc), flush=True)
+            response = service._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=service._build_user_message(user_text, attachments=[]),
+                assistant_msg=service._build_assistant_message(
+                    text=answer_text,
+                    meta={
+                        "route": "code_workspace",
+                        "intent": intent,
+                        "workspace_kind": result.get("kind"),
+                        "repository_snapshot": result.get("snapshot"),
+                    },
+                    attachments=[],
+                ),
+                attachments=[],
+                decision=decision,
+                regenerate=regenerate,
+            )
+            if isinstance(response, dict):
+                response["ok"] = bool(result.get("ok"))
+                response["route"] = "code_workspace"
+                response["code_workspace"] = result
+            return response
+
+        if intent == "project_creation":
+            project_builder = getattr(
+                service,
+                "project_builder_service",
+                None,
+            )
+            project_workspace = getattr(
+                service,
+                "project_workspace_service",
+                None,
+            )
+            if project_builder is None or project_workspace is None:
+                raise RuntimeError(
+                    "Project creation services are not configured."
+                )
+
+            try:
+                project_result = project_builder.build_project_from_request(
+                    user_text=user_text,
+                    owner_id=get_current_user_id(),
+                )
+            except Exception as exc:
+                print(
+                    "[CHAT_HANDLE PROJECT CREATION FAILED]",
+                    repr(exc),
+                    flush=True,
+                )
+                failure_response = {
+                    "ok": False,
+                    "error": "project_creation_failed",
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "I couldn't create the project because "
+                            "planning or saving it failed. Please try again."
+                        ),
+                    },
+                    "session_id": session_id,
+                }
+                try:
+                    persisted_failure = service._finalize_response(
+                        session_id=session_id,
+                        user_text=user_text,
+                        user_msg=service._build_user_message(
+                            user_text,
+                            attachments=attachments,
+                        ),
+                        assistant_msg=service._build_assistant_message(
+                            text=failure_response["assistant_message"]["text"],
+                            meta={
+                                "route": "project_builder",
+                                "intent": "project_creation",
+                                "error": "project_creation_failed",
+                            },
+                            attachments=[],
+                        ),
+                        attachments=attachments,
+                        decision=decision,
+                        regenerate=regenerate,
+                    )
+                    if isinstance(persisted_failure, dict):
+                        persisted_failure["ok"] = False
+                        persisted_failure["error"] = "project_creation_failed"
+                        return persisted_failure
+                except Exception as persist_exc:
+                    print(
+                        "[CHAT_HANDLE PROJECT FAILURE PERSIST FAILED]",
+                        repr(persist_exc),
+                        flush=True,
+                    )
+                return failure_response
+
+            project_id = (
+                project_result.get("project_id")
+                if isinstance(project_result, dict)
+                else None
+            )
+            if not project_id:
+                raise RuntimeError(
+                    "Project builder returned no project ID."
+                )
+
+            active_project = project_workspace.set_active_project(project_id)
+            project = active_project or project_result.get("project") or {}
+            project_title = str(
+                project.get("title")
+                or project.get("name")
+                or user_text
+            ).strip()
+            project_title = normalize_created_project_title(project_title)
+            tasks = project_result.get("tasks") or []
+            assistant_text = (
+                f"Created project: {project_title}. "
+                f"It has {len(tasks)} planned task(s) and is ready in Projects."
+            )
+
+            response = service._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=service._build_user_message(
+                    user_text,
+                    attachments=attachments,
+                ),
+                assistant_msg=service._build_assistant_message(
+                    text=assistant_text,
+                    meta={
+                        "route": "project_builder",
+                        "intent": "project_creation",
+                        "project_id": project_id,
+                    },
+                    attachments=[],
+                ),
+                attachments=attachments,
+                decision=decision,
+                regenerate=regenerate,
+                project_id=project_id,
+            )
+            if isinstance(response, dict):
+                response["ok"] = True
+                response["route"] = "project_builder"
+                response["project_id"] = project_id
+                response["project"] = project
+                response["tasks"] = tasks
+            return response
+
         # ==========================================
         # EXECUTION ROUTE
         # ==========================================
@@ -145,7 +446,7 @@ def chat_handle(
                     "session_id": session_id,
                     "intent": intent,
                     "mode": mode,
-                    "user_text": user_text,
+                    "text_chars": len(str(user_text or "")),
                 },
                 flush=True,
             )
@@ -1385,6 +1686,20 @@ def chat_handle(
                     flush=True,
                 )
 
+                if service._looks_like_project_request(user_text):
+                    return {
+                        "ok": False,
+                        "error": "project_creation_failed",
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": (
+                                "I couldn't create the project because "
+                                "planning or saving it failed. Please try again."
+                            ),
+                        },
+                        "session_id": session_id,
+                    }
+
         if (
             route == "planner"
             and isinstance(
@@ -2427,7 +2742,7 @@ def chat_handle(
                 "[CHAT_HANDLE IMAGE GENERATION]",
                 {
                     "session_id": session_id,
-                    "prompt": user_text,
+                    "prompt_chars": len(str(user_text or "")),
                 },
                 flush=True,
             )

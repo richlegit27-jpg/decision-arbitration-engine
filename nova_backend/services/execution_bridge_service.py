@@ -166,7 +166,7 @@ class ExecutionBridgeService:
         if new_task_request:
             print(
                 "[EXECUTION RESTORE BYPASS - NEW TASK]",
-                user_text,
+                {"text_chars": len(str(user_text or ""))},
                 flush=True,
             )
         else:

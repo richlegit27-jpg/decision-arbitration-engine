@@ -1,5 +1,5 @@
 /* NOVA_DESKTOP_POLISH_COMPRESSED_20260621 */
-.error,.statu:root{--nova-text-main:#f8f4ff;--nova-text-soft:#d9c8ff;--nova-text-muted:#a998c9;--nova-purple:#a855f7;--nova-purple-soft:rgba(168,85,247,0.28);--nova-code-bg:#12081f;--nova-code-border:rgba(168,85,247,0.34);}
+:root{--nova-text-main:#f8f4ff;--nova-text-soft:#d9c8ff;--nova-text-muted:#a998c9;--nova-purple:#a855f7;--nova-purple-soft:rgba(168,85,247,0.28);--nova-code-bg:#12081f;--nova-code-border:rgba(168,85,247,0.34);}
 .assistant-bubble,.assistant-message,.message.assistant,.msg.assistant,.desktop-message.assistant,[data-role="assistant"]{color:var(--nova-text-main) !important;line-height:1.58 !important;letter-spacing:0.01em;}
 .user-bubble,.user-message,.message.user,.msg.user,.desktop-message.user,[data-role="user"]{color:#ffffff !important;line-height:1.5 !important;}
 .assistant-bubble p,.assistant-message p,.message.assistant p,.msg.assistant p,.desktop-message.assistant p{margin:0.45rem 0 !important;}
@@ -2830,4 +2830,1180 @@ aside.panel.tools > .quick-actions-section,
 .panel.tools .quick-actions-section {
     position: relative !important;
     z-index: 1 !important;
+}
+
+/* Compact desktop conversation list and per-row action menus. */
+.sessions-workspace .session-current-card[hidden] {
+    display: none !important;
+}
+
+.sessions-workspace .session-list-shell {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    gap: 8px !important;
+}
+
+#desktopSessionList {
+    display: grid !important;
+    gap: 4px !important;
+}
+
+.desktop-session-row {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 30px !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    border: 1px solid transparent !important;
+    border-radius: 11px !important;
+}
+
+.desktop-session-row:hover,
+.desktop-session-row:focus-within,
+.desktop-session-row.session-menu-open {
+    border-color: rgba(216, 180, 254, 0.20) !important;
+    background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.desktop-session-row.session-menu-open {
+    z-index: 50010 !important;
+}
+
+#desktopSessionList .desktop-session-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+    padding: 7px 9px !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-align: left !important;
+}
+
+#desktopSessionList .desktop-session-item:hover,
+#desktopSessionList .desktop-session-item:focus-visible {
+    background: rgba(255, 255, 255, 0.055) !important;
+}
+
+#desktopSessionList .desktop-session-item:focus-visible {
+    outline: 2px solid rgba(196, 181, 253, 0.72) !important;
+    outline-offset: -2px !important;
+}
+
+#desktopSessionList .desktop-session-item.is-active,
+#desktopSessionList .desktop-session-item.active {
+    background: rgba(155, 124, 255, 0.15) !important;
+    color: #fff !important;
+}
+
+#desktopSessionList .desktop-session-title {
+    display: block !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 12px !important;
+    font-weight: 650 !important;
+}
+
+.desktop-session-pin-indicator {
+    flex: 0 0 auto !important;
+    padding: 2px 6px !important;
+    border: 1px solid rgba(216, 180, 254, 0.18) !important;
+    border-radius: 999px !important;
+    color: rgba(221, 214, 254, 0.78) !important;
+    font-size: 9px !important;
+    line-height: 1.3 !important;
+}
+
+.desktop-session-menu-toggle {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    border: 1px solid transparent !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: rgba(238, 232, 255, 0.70) !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+    opacity: 0.35 !important;
+    cursor: pointer !important;
+}
+
+.desktop-session-row:hover .desktop-session-menu-toggle,
+.desktop-session-row:focus-within .desktop-session-menu-toggle,
+.desktop-session-row.session-menu-open .desktop-session-menu-toggle {
+    opacity: 1 !important;
+}
+
+.desktop-session-menu-toggle:hover,
+.desktop-session-menu-toggle[aria-expanded="true"] {
+    border-color: rgba(216, 180, 254, 0.24) !important;
+    background: rgba(155, 124, 255, 0.14) !important;
+}
+
+.desktop-session-menu-toggle:focus-visible,
+.desktop-session-menu-item:focus-visible,
+#nova-manage-delete-all-sessions:focus-visible {
+    outline: 2px solid rgba(196, 181, 253, 0.72) !important;
+    outline-offset: 2px !important;
+}
+
+.desktop-session-menu {
+    position: absolute !important;
+    top: calc(100% + 3px) !important;
+    right: 3px !important;
+    z-index: 100000 !important;
+    width: 150px !important;
+    padding: 5px !important;
+    border: 1px solid rgba(216, 180, 254, 0.20) !important;
+    border-radius: 11px !important;
+    background: rgba(18, 14, 31, 0.98) !important;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.38) !important;
+}
+
+.desktop-session-menu[hidden] {
+    display: none !important;
+}
+
+.desktop-session-row.session-menu-open-above .desktop-session-menu {
+    top: auto !important;
+    bottom: calc(100% + 3px) !important;
+}
+
+.desktop-session-menu-item {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-height: 32px !important;
+    padding: 6px 9px !important;
+    border: 0 !important;
+    border-radius: 7px !important;
+    background: transparent !important;
+    color: #f4efff !important;
+    font-size: 12px !important;
+    text-align: left !important;
+    cursor: pointer !important;
+}
+
+.desktop-session-menu-item:hover {
+    background: rgba(155, 124, 255, 0.16) !important;
+}
+
+.desktop-session-menu-item.is-destructive {
+    color: #fca5a5 !important;
+}
+
+.desktop-session-menu-item.is-destructive:hover {
+    background: rgba(239, 68, 68, 0.12) !important;
+}
+
+#nova-manage-delete-all-sessions {
+    align-self: flex-start !important;
+    min-height: 30px !important;
+    margin-top: 7px !important;
+    padding: 5px 8px !important;
+    border: 1px solid rgba(248, 113, 113, 0.15) !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: rgba(252, 165, 165, 0.72) !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    opacity: 0.78 !important;
+}
+
+#nova-manage-delete-all-sessions:hover {
+    border-color: rgba(248, 113, 113, 0.34) !important;
+    background: rgba(239, 68, 68, 0.08) !important;
+    color: #fecaca !important;
+    opacity: 1 !important;
+}
+
+/* Desktop Projects workspace: integrated selection and flexible content. */
+.desktop-project-list {
+    display: grid !important;
+    gap: 10px !important;
+    min-width: 0 !important;
+    max-height: min(44vh, 420px) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 2px 4px 4px 0 !important;
+}
+
+.desktop-project-list > .session-placeholder {
+    min-width: 0 !important;
+    padding: 14px !important;
+    border: 1px dashed rgba(216, 180, 254, 0.22) !important;
+    border-radius: 12px !important;
+    color: rgba(238, 232, 255, 0.68) !important;
+    line-height: 1.5 !important;
+    overflow-wrap: anywhere !important;
+}
+
+.nova-project-card {
+    min-width: 0 !important;
+    border: 1px solid rgba(216, 180, 254, 0.12) !important;
+    border-radius: 14px !important;
+    background: rgba(255, 255, 255, 0.035) !important;
+    transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease !important;
+}
+
+.nova-project-card:hover {
+    border-color: rgba(216, 180, 254, 0.28) !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+}
+
+.nova-project-card.active,
+.nova-project-card[aria-current="true"] {
+    border-color: rgba(168, 132, 255, 0.58) !important;
+    background: linear-gradient(110deg, rgba(139, 92, 246, 0.15), rgba(255, 255, 255, 0.045)) !important;
+    box-shadow: inset 3px 0 0 rgba(196, 181, 253, 0.86), 0 5px 18px rgba(55, 35, 100, 0.14) !important;
+}
+
+.nova-project-card-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 34px !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    padding: 9px !important;
+}
+
+.nova-project-card-open {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 7px !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 5px 7px !important;
+    border: 0 !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    color: inherit !important;
+    text-align: left !important;
+    cursor: pointer !important;
+}
+
+.nova-project-card-open:focus-visible,
+.nova-project-delete-button:focus-visible,
+#newProjectBtn:focus-visible {
+    outline: 2px solid rgba(196, 181, 253, 0.78) !important;
+    outline-offset: 2px !important;
+}
+
+.nova-project-card-header {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+.nova-project-card-header strong,
+.nova-project-card-description,
+.nova-project-card-footer,
+.nova-project-card-footer > span {
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    white-space: normal !important;
+}
+
+.nova-project-card-header strong {
+    flex: 1 1 auto !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+}
+
+.nova-project-active-badge {
+    position: static !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    padding: 3px 7px !important;
+    border: 1px solid rgba(196, 181, 253, 0.24) !important;
+    border-radius: 999px !important;
+    background: rgba(139, 92, 246, 0.16) !important;
+    color: #ddd6fe !important;
+    font-size: 10px !important;
+    font-weight: 650 !important;
+    line-height: 1.25 !important;
+    white-space: nowrap !important;
+}
+
+.nova-project-card-description {
+    margin: 0 !important;
+    color: rgba(238, 232, 255, 0.68) !important;
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+}
+
+.nova-project-card-footer {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    color: rgba(238, 232, 255, 0.54) !important;
+    font-size: 10px !important;
+    line-height: 1.4 !important;
+}
+
+.nova-project-card-footer > span {
+    flex: 1 1 0 !important;
+}
+
+.nova-project-card-footer > span:last-child {
+    text-align: right !important;
+}
+
+.nova-project-delete-button {
+    align-self: start !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    padding: 0 !important;
+    border: 1px solid transparent !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    color: rgba(252, 165, 165, 0.72) !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    cursor: pointer !important;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+
+.nova-project-delete-button:hover {
+    border-color: rgba(248, 113, 113, 0.24) !important;
+    background: rgba(239, 68, 68, 0.12) !important;
+    color: #fecaca !important;
+}
+
+#newProjectBtn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 0 12px !important;
+}
+
+html body #desktopProjectWorkspace,
+html body #desktopProjectWorkspace .project-workspace-card,
+html body #desktopProjectWorkspace .project-panel-card,
+html body #desktopProjectWorkspace #desktopProjectPhaseList,
+html body #desktopProjectWorkspace #desktopProjectTaskList {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+html body #desktopProjectWorkspace .project-workspace-card {
+    overflow-x: visible !important;
+}
+
+html body #desktopProjectWorkspace .project-panel-card,
+html body #desktopProjectWorkspace .project-workspace-card > *,
+html body #desktopProjectWorkspace .project-panel-card *,
+html body #desktopProjectWorkspace .nova-project-tree * {
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    white-space: normal !important;
+}
+
+html body #desktopProjectTitle,
+html body #desktopProjectDescription {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+    white-space: normal !important;
+}
+
+html body #desktopProjectWorkspace .project-panel-card {
+    margin-bottom: 12px !important;
+    padding: clamp(12px, 2vw, 17px) !important;
+}
+
+html body #desktopProjectWorkspace .nova-project-tree-controls,
+html body #desktopProjectWorkspace .nova-project-tree-header,
+html body #desktopProjectWorkspace .nova-project-files-header,
+html body #desktopProjectWorkspace .nova-project-task-actions,
+html body #desktopProjectWorkspace .nova-project-note-card .note-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+}
+
+html body #desktopProjectWorkspace .nova-project-tree-controls > *,
+html body #desktopProjectWorkspace .nova-project-task-actions > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+html body #desktopProjectWorkspace .nova-project-tree-task-main,
+html body #desktopProjectWorkspace .nova-project-tree-phase-main,
+html body #desktopProjectWorkspace .nova-project-tree-step-title,
+html body #desktopProjectWorkspace .nova-project-task-main,
+html body #desktopProjectWorkspace .nova-project-task-meta,
+html body #desktopProjectWorkspace #desktopProjectFileList,
+html body #desktopProjectWorkspace #desktopProjectNoteList {
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+html body #desktopProjectWorkspace input,
+html body #desktopProjectWorkspace textarea,
+html body #desktopProjectWorkspace select {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.nova-project-activity {
+    display: block !important;
+}
+
+.nova-project-activity > summary {
+    cursor: pointer !important;
+    color: rgba(238, 232, 255, 0.76) !important;
+    font-size: 12px !important;
+    font-weight: 650 !important;
+    list-style-position: inside !important;
+}
+
+.nova-project-activity[open] > summary {
+    margin-bottom: 10px !important;
+}
+
+.nova-project-activity #desktopProjectRecentActivityItems {
+    display: grid !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+}
+
+.nova-project-activity #desktopProjectRecentActivityItems p {
+    font-size: 12px !important;
+}
+
+@media (max-width: 700px) {
+    .nova-project-card-footer {
+        flex-direction: column !important;
+        gap: 3px !important;
+    }
+
+    .nova-project-card-footer > span:last-child {
+        text-align: left !important;
+    }
+
+    html body #desktopProjectWorkspace .nova-project-tree-controls > button {
+        flex: 1 1 100px !important;
+    }
+}
+
+/* NOVA DESKTOP — COHESIVE VISUAL SYSTEM */
+:root {
+    --nova-ui-bg: #090b13;
+    --nova-ui-panel: rgba(17, 20, 32, 0.94);
+    --nova-ui-panel-raised: rgba(24, 27, 42, 0.92);
+    --nova-ui-panel-soft: rgba(255, 255, 255, 0.035);
+    --nova-ui-line: rgba(187, 175, 225, 0.13);
+    --nova-ui-line-strong: rgba(187, 175, 225, 0.22);
+    --nova-ui-text: #f3f1fa;
+    --nova-ui-muted: #a7a4b7;
+    --nova-ui-faint: #858295;
+    --nova-ui-accent: #a78bfa;
+    --nova-ui-accent-soft: rgba(139, 92, 246, 0.15);
+    --nova-ui-radius: 18px;
+    --nova-ui-radius-sm: 11px;
+    --nova-ui-shadow: 0 18px 46px rgba(0, 0, 0, 0.24);
+}
+
+@media (min-width: 761px) {
+    html body {
+        color: var(--nova-ui-text);
+        background-color: var(--nova-ui-bg);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+    }
+
+    html body .shell {
+        grid-template-columns: minmax(220px, 270px) minmax(0, 1fr) minmax(220px, 258px) !important;
+        gap: 13px !important;
+        padding: 13px !important;
+        align-items: stretch;
+    }
+
+    html body .shell > .panel {
+        min-width: 0;
+        border: 1px solid var(--nova-ui-line) !important;
+        border-radius: var(--nova-ui-radius) !important;
+        background: linear-gradient(155deg, rgba(26, 28, 43, 0.97), rgba(13, 16, 26, 0.98)) !important;
+        box-shadow: var(--nova-ui-shadow) !important;
+        backdrop-filter: blur(18px);
+    }
+
+    html body .shell > aside.panel.sidebar {
+        padding: 0 14px 14px !important;
+        overflow-y: auto !important;
+        scrollbar-color: rgba(167, 139, 250, 0.32) transparent;
+    }
+
+    html body .sidebar .brand {
+        padding: 19px 4px 16px !important;
+        border-bottom: 1px solid var(--nova-ui-line) !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    html body .sidebar .brand-title {
+        color: #f6f2ff !important;
+        font-size: 30px !important;
+        font-weight: 760 !important;
+        letter-spacing: -0.07em !important;
+        text-shadow: 0 5px 24px rgba(167, 139, 250, 0.23) !important;
+    }
+
+    html body .sidebar .nova-menu-button {
+        width: 38px !important;
+        height: 38px !important;
+        border: 1px solid var(--nova-ui-line-strong) !important;
+        border-radius: 12px !important;
+        background: rgba(255, 255, 255, 0.045) !important;
+        color: #e8e4f3 !important;
+        box-shadow: none !important;
+        transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+    }
+
+    html body .sidebar .nova-menu-button:hover {
+        border-color: rgba(196, 181, 253, 0.42) !important;
+        background: var(--nova-ui-accent-soft) !important;
+        transform: translateY(-1px);
+    }
+
+    html body .sidebar .workspace-section {
+        margin: 14px 0 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    html body .sidebar .workspace-section h2,
+    html body .sidebar .workspace-section h3 {
+        color: #eeebf6 !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.035em !important;
+    }
+
+    html body #newSessionBtn {
+        min-height: 40px !important;
+        margin: 14px 0 10px !important;
+        padding: 0 13px !important;
+        border: 1px solid rgba(196, 181, 253, 0.36) !important;
+        border-radius: 12px !important;
+        background: linear-gradient(120deg, rgba(124, 91, 220, 0.28), rgba(96, 76, 160, 0.22)) !important;
+        color: #f5f1ff !important;
+        font-size: 12px !important;
+        font-weight: 680 !important;
+        box-shadow: 0 5px 16px rgba(64, 44, 120, 0.14) !important;
+    }
+
+    html body #newSessionBtn:hover {
+        border-color: rgba(196, 181, 253, 0.54) !important;
+        background: linear-gradient(120deg, rgba(139, 92, 246, 0.36), rgba(109, 83, 184, 0.28)) !important;
+    }
+
+    html body #desktopSessionList .desktop-session-row {
+        border-color: transparent !important;
+        background: transparent !important;
+        transition: background 140ms ease, border-color 140ms ease;
+    }
+
+    html body #desktopSessionList .desktop-session-row:hover,
+    html body #desktopSessionList .desktop-session-row:focus-within {
+        border-color: var(--nova-ui-line) !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+    }
+
+    html body #desktopSessionList .desktop-session-item {
+        color: #d4d1df !important;
+        font-size: 12px !important;
+    }
+
+    html body #desktopSessionList .desktop-session-item.is-active,
+    html body #desktopSessionList .desktop-session-item.active {
+        background: rgba(139, 92, 246, 0.15) !important;
+        color: #f8f5ff !important;
+        box-shadow: inset 2px 0 rgba(196, 181, 253, 0.86) !important;
+    }
+
+    html body #desktopSessionList .desktop-session-menu-toggle {
+        color: #b6b1c8 !important;
+    }
+
+    html body .shell > main.panel.chat-panel {
+        padding: 0 !important;
+        border-color: rgba(187, 175, 225, 0.15) !important;
+        background: linear-gradient(180deg, rgba(17, 19, 30, 0.98), rgba(12, 14, 23, 0.99)) !important;
+    }
+
+    html body .chat-panel > .chat-top {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 16px !important;
+        min-width: 0 !important;
+        padding: 15px 21px !important;
+        border-bottom: 1px solid var(--nova-ui-line) !important;
+        background: rgba(255, 255, 255, 0.016) !important;
+        box-shadow: none !important;
+    }
+
+    html body .chat-top .chat-title {
+        margin: 0 0 3px !important;
+        color: #f3f0fa !important;
+        font-size: 17px !important;
+        font-weight: 680 !important;
+        letter-spacing: -0.02em !important;
+        text-shadow: none !important;
+    }
+
+    html body #status,
+    html body #meta {
+        color: var(--nova-ui-muted) !important;
+        font-size: 11px !important;
+        line-height: 1.45 !important;
+    }
+
+    html body #nova-desktop-model-selector {
+        display: grid !important;
+        grid-template-columns: auto minmax(140px, 220px) !important;
+        align-items: center !important;
+        gap: 4px 9px !important;
+        min-width: 0 !important;
+        padding: 8px 10px !important;
+        border: 1px solid var(--nova-ui-line) !important;
+        border-radius: 13px !important;
+        background: rgba(255, 255, 255, 0.027) !important;
+    }
+
+    html body #nova-desktop-model-selector > label {
+        color: var(--nova-ui-muted) !important;
+        font-size: 10px !important;
+        font-weight: 650 !important;
+    }
+
+    html body #tokenUsageDisplay,
+    html body #nova-credit-indicator {
+        grid-row: 2;
+        margin: 0 !important;
+        padding: 2px 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: var(--nova-ui-faint) !important;
+        font-size: 10px !important;
+    }
+
+    html body #nova-credit-indicator {
+        grid-column: 2;
+        justify-self: end;
+    }
+
+    html body #chat.messages {
+        min-width: 0 !important;
+        padding: 25px clamp(18px, 4vw, 56px) 30px !important;
+        scrollbar-color: rgba(167, 139, 250, 0.28) transparent;
+    }
+
+    html body #chat .message-row {
+        display: grid !important;
+        grid-template-columns: 30px minmax(0, min(900px, 100%)) !important;
+        align-items: start !important;
+        gap: 11px !important;
+        width: min(100%, 1000px) !important;
+        margin: 0 auto 22px !important;
+    }
+
+    html body #chat .message-row.user {
+        grid-template-columns: 30px minmax(0, min(760px, 100%)) !important;
+    }
+
+    html body #chat .message-avatar {
+        width: 28px !important;
+        height: 28px !important;
+        margin-top: 5px !important;
+        border: 1px solid var(--nova-ui-line-strong) !important;
+        border-radius: 10px !important;
+        background: rgba(167, 139, 250, 0.13) !important;
+        color: #d9ceff !important;
+        font-size: 10px !important;
+    }
+
+    html body #chat .message-card.assistant {
+        width: 100% !important;
+        max-width: 900px !important;
+        padding: 5px 8px 5px 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    html body #chat .message-card.user {
+        width: fit-content !important;
+        max-width: min(760px, 100%) !important;
+        padding: 11px 15px !important;
+        border: 1px solid rgba(167, 139, 250, 0.20) !important;
+        border-radius: 16px 16px 5px 16px !important;
+        background: rgba(111, 86, 180, 0.17) !important;
+        box-shadow: none !important;
+    }
+
+    html body #chat .message-meta {
+        gap: 9px !important;
+        margin-bottom: 5px !important;
+    }
+
+    html body #chat .message-role {
+        color: #ddd8ed !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+    }
+
+    html body #chat .message-time {
+        color: var(--nova-ui-faint) !important;
+        font-size: 10px !important;
+    }
+
+    html body #chat .message-body {
+        color: #e8e6ef !important;
+        font-size: 14px !important;
+        line-height: 1.72 !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    html body #chat .message-card.assistant .message-body > :first-child {
+        margin-top: 0 !important;
+    }
+
+    html body #chat .message-card.assistant .message-body > :last-child {
+        margin-bottom: 0 !important;
+    }
+
+    html body #chat .message-actions {
+        gap: 10px !important;
+        margin-top: 9px !important;
+        padding-top: 7px !important;
+        border-top: 1px solid rgba(187, 175, 225, 0.08) !important;
+        opacity: 0.62 !important;
+        transition: opacity 140ms ease;
+    }
+
+    html body #chat .message-row:hover .message-actions,
+    html body #chat .message-row:focus-within .message-actions {
+        opacity: 1 !important;
+    }
+
+    html body #chat .message-action-btn {
+        min-height: 28px !important;
+        padding: 4px 8px !important;
+        border: 1px solid transparent !important;
+        border-radius: 8px !important;
+        background: transparent !important;
+        color: #b9b4c9 !important;
+        font-size: 11px !important;
+        box-shadow: none !important;
+    }
+
+    html body #chat .message-action-btn:hover,
+    html body #chat .message-action-btn:focus-visible {
+        border-color: var(--nova-ui-line) !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #f5f2fc !important;
+        transform: none !important;
+    }
+
+    html body .chat-panel > .composer {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 9px !important;
+        margin: 0 17px 15px !important;
+        padding: 12px !important;
+        border: 1px solid rgba(167, 139, 250, 0.23) !important;
+        border-radius: 19px !important;
+        background: linear-gradient(145deg, rgba(24, 25, 39, 0.98), rgba(15, 17, 28, 0.98)) !important;
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.24), inset 0 1px rgba(255, 255, 255, 0.04) !important;
+        transition: border-color 140ms ease, box-shadow 140ms ease;
+        transform: none !important;
+    }
+
+    html body .chat-panel > .composer:focus-within {
+        border-color: rgba(196, 181, 253, 0.50) !important;
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.27), 0 0 0 3px rgba(139, 92, 246, 0.10), inset 0 1px rgba(255, 255, 255, 0.05) !important;
+    }
+
+    html body .chat-panel > .composer #input {
+        width: 100% !important;
+        min-height: 54px !important;
+        max-height: 170px !important;
+        padding: 9px 11px !important;
+        border: 0 !important;
+        border-radius: 10px !important;
+        background: transparent !important;
+        color: #f0edf7 !important;
+        box-shadow: none !important;
+        font-size: 14px !important;
+        line-height: 1.55 !important;
+        resize: none !important;
+    }
+
+    html body .chat-panel > .composer #input:focus {
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+
+    html body .composer-controls {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 8px !important;
+        min-width: 0 !important;
+        padding: 0 2px 1px !important;
+    }
+
+    html body .composer-left-controls {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 6px !important;
+        min-width: 0 !important;
+    }
+
+    html body .composer-controls #attachBtn,
+    html body .composer-controls .desktop-voice-tts-button {
+        min-width: 34px !important;
+        min-height: 34px !important;
+        width: 34px !important;
+        height: 34px !important;
+        border: 1px solid var(--nova-ui-line) !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+        color: #d6d2e0 !important;
+        box-shadow: none !important;
+    }
+
+    html body .composer-controls #sendBtn {
+        min-width: 78px !important;
+        min-height: 36px !important;
+        padding: 0 15px !important;
+        border: 1px solid rgba(196, 181, 253, 0.40) !important;
+        border-radius: 11px !important;
+        background: linear-gradient(135deg, #8062d2, #684eb4) !important;
+        color: #fff !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        box-shadow: 0 5px 14px rgba(69, 47, 128, 0.23) !important;
+    }
+
+    html body .composer-controls #sendBtn:hover:not(:disabled) {
+        border-color: rgba(221, 214, 254, 0.62) !important;
+        background: linear-gradient(135deg, #9274e4, #775cc5) !important;
+    }
+
+    html body .composer-controls #sendBtn:disabled,
+    html body .composer-controls button:disabled {
+        opacity: 0.48 !important;
+        cursor: not-allowed !important;
+        box-shadow: none !important;
+    }
+
+    html body .pending-attachment-chip,
+    html body .file-chip,
+    html body .file-preview {
+        max-width: 100% !important;
+        border: 1px solid var(--nova-ui-line) !important;
+        border-radius: 9px !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        box-shadow: none !important;
+    }
+
+    html body .shell > aside.panel.tools {
+        gap: 10px !important;
+        padding: 15px !important;
+        background: linear-gradient(180deg, rgba(20, 22, 35, 0.98), rgba(13, 15, 25, 0.98)) !important;
+        scrollbar-color: rgba(167, 139, 250, 0.28) transparent;
+    }
+
+    html body .panel.tools > .nova-desktop-execution-native,
+    html body .panel.tools > .memory-section,
+    html body .panel.tools > .quick-actions-section {
+        min-width: 0 !important;
+        padding: 13px !important;
+        border: 1px solid var(--nova-ui-line) !important;
+        border-radius: 14px !important;
+        background: rgba(255, 255, 255, 0.022) !important;
+        box-shadow: none !important;
+    }
+
+    html body .panel.tools .panel-section-title,
+    html body .panel.tools .tools-section > h3 {
+        margin: 0 0 10px !important;
+        color: #e7e3ef !important;
+        font-size: 11px !important;
+        font-weight: 720 !important;
+        letter-spacing: 0.065em !important;
+        text-transform: uppercase;
+    }
+
+    html body .nova-desktop-execution-native-actions,
+    html body #nova-desktop-execution-native .nova-desktop-execution-native-actions {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        margin-top: 10px !important;
+    }
+
+    html body .nova-desktop-execution-native-actions button {
+        flex: 1 1 78px !important;
+        min-width: 0 !important;
+        min-height: 31px !important;
+        padding: 5px 8px !important;
+        border: 1px solid var(--nova-ui-line) !important;
+        border-radius: 9px !important;
+        background: rgba(255, 255, 255, 0.045) !important;
+        color: #d5d1df !important;
+        font-size: 10px !important;
+        font-weight: 650 !important;
+        box-shadow: none !important;
+    }
+
+    html body .nova-desktop-execution-native-actions button:hover:not(:disabled) {
+        border-color: rgba(196, 181, 253, 0.34) !important;
+        background: var(--nova-ui-accent-soft) !important;
+        color: #f3efff !important;
+    }
+
+    html body .quick-actions-section .quick {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+
+    html body .quick-actions-section [data-nova-quick-action] {
+        min-height: 29px !important;
+        padding: 4px 9px !important;
+        border: 1px solid transparent !important;
+        border-radius: 8px !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+        color: #b8b3c8 !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        box-shadow: none !important;
+    }
+
+    html body .quick-actions-section [data-nova-quick-action]:hover {
+        border-color: var(--nova-ui-line) !important;
+        background: rgba(255, 255, 255, 0.07) !important;
+        color: #eeeaf7 !important;
+    }
+
+    html body .panel.tools .memory-section {
+        border-color: rgba(187, 175, 225, 0.14) !important;
+    }
+
+    html body .panel.tools .memory-section .execution-note,
+    html body .panel.tools .memory-section .session-placeholder,
+    html body .panel.tools .memory-section .empty-state {
+        padding: 11px !important;
+        border: 1px dashed var(--nova-ui-line) !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.018) !important;
+        color: var(--nova-ui-muted) !important;
+        font-size: 11px !important;
+        line-height: 1.5 !important;
+    }
+
+    html body .shell input:not([type="file"]),
+    html body .shell textarea,
+    html body .shell select {
+        accent-color: var(--nova-ui-accent);
+    }
+
+    html body .shell input[type="text"],
+    html body .shell input[type="search"],
+    html body .shell input[type="password"],
+    html body .shell textarea,
+    html body .shell select {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        border: 1px solid var(--nova-ui-line-strong) !important;
+        border-radius: 10px !important;
+        background-color: rgba(8, 10, 18, 0.72) !important;
+        color: var(--nova-ui-text) !important;
+        box-shadow: none !important;
+    }
+
+    html body .shell input:focus-visible,
+    html body .shell textarea:focus-visible,
+    html body .shell select:focus-visible,
+    html body .shell button:focus-visible,
+    html body .shell a:focus-visible {
+        outline: 2px solid rgba(196, 181, 253, 0.78) !important;
+        outline-offset: 2px !important;
+    }
+
+    html body .nova-menu-panel,
+    html body .nova-project-modal-dialog,
+    html body .nova-modal-card {
+        border: 1px solid var(--nova-ui-line-strong) !important;
+        border-radius: 17px !important;
+        background: #171927 !important;
+        color: var(--nova-ui-text) !important;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46) !important;
+    }
+
+    html body .nova-menu-panel button {
+        min-height: 36px !important;
+        border-radius: 9px !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        text-align: left !important;
+    }
+
+    html body .nova-menu-panel button:hover {
+        background: rgba(255, 255, 255, 0.06) !important;
+    }
+
+    html body .session-placeholder,
+    html body .nova-panel-muted,
+    html body .nova-project-tree-empty {
+        color: var(--nova-ui-muted) !important;
+        line-height: 1.55 !important;
+    }
+}
+
+/* Focused spacing for the simplified Sessions and project controls. */
+.sidebar .sessions-workspace .workspace-section-label {
+    margin: 14px 2px 2px !important;
+    color: var(--nova-text-muted, #a998c9) !important;
+    font-size: 11px !important;
+    font-weight: 750 !important;
+    letter-spacing: 0.09em !important;
+    line-height: 1.3 !important;
+    text-transform: uppercase !important;
+}
+
+.sidebar .nova-project-delete-all {
+    display: block;
+    width: 100%;
+    min-height: 34px;
+    margin: 8px 0 10px;
+    padding: 7px 10px;
+    border: 1px solid rgba(248, 113, 113, 0.22) !important;
+    border-radius: 10px !important;
+    background: rgba(127, 29, 29, 0.12) !important;
+    color: #fca5a5 !important;
+    font-size: 12px !important;
+    font-weight: 650 !important;
+    text-align: left !important;
+    cursor: pointer;
+}
+
+.sidebar .nova-project-delete-all:hover,
+.sidebar .nova-project-delete-all:focus-visible {
+    border-color: rgba(248, 113, 113, 0.42) !important;
+    background: rgba(127, 29, 29, 0.22) !important;
+}
+
+.desktop-voice-tts-button + .desktop-voice-tts-button {
+    margin-left: 8px !important;
+}
+
+.desktop-voice-tts-button {
+    vertical-align: middle !important;
+}
+
+#chat .message-actions {
+    column-gap: 10px !important;
+}
+
+#chat .message-actions > .message-action-btn + .message-action-btn {
+    margin-left: 4px !important;
+}
+
+#chat .answer-text ul,
+#chat .answer-text ol {
+    display: block !important;
+    margin: 0.5rem 0 0.7rem !important;
+    padding-left: 1.5rem !important;
+    list-style-position: outside !important;
+}
+
+#chat .answer-text li {
+    display: list-item !important;
+    margin: 0.28rem 0 !important;
+}
+
+@media (min-width: 1200px) and (max-width: 1499px) {
+    html body .shell {
+        grid-template-columns: minmax(218px, 245px) minmax(0, 1fr) minmax(210px, 232px) !important;
+    }
+}
+
+@media (min-width: 1001px) and (max-width: 1199px) {
+    html body .shell {
+        grid-template-columns: minmax(200px, 220px) minmax(0, 1fr) minmax(185px, 198px) !important;
+    }
+}
+
+@media (min-width: 761px) and (max-width: 1000px) {
+    html body .shell {
+        grid-template-columns: minmax(170px, 190px) minmax(0, 1fr) minmax(176px, 190px) !important;
+        gap: 9px !important;
+        padding: 9px !important;
+    }
+
+    html body .shell > aside.panel.sidebar {
+        padding-right: 9px !important;
+        padding-left: 9px !important;
+    }
+
+    html body .shell > aside.panel.tools {
+        padding: 10px !important;
+    }
+
+    html body .chat-panel > .chat-top {
+        align-items: flex-start !important;
+        padding: 12px !important;
+    }
+
+    html body #chat.messages {
+        padding-right: 18px !important;
+        padding-left: 18px !important;
+    }
+
+    html body #nova-desktop-model-selector {
+        grid-template-columns: auto minmax(100px, 1fr) !important;
+        gap: 3px 6px !important;
+        padding: 6px 8px !important;
+    }
 }

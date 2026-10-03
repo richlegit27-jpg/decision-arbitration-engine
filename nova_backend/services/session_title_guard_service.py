@@ -15,14 +15,7 @@ def persist_title(session_id, clean_title):
         )
 
         if service:
-            session = service.get_session(session_id) or {}
-
-            if isinstance(session, dict):
-                session["title"] = clean_title
-                service.save(
-                    service.get_all(),
-                    active=session_id,
-                )
+            return service.set_auto_title_if_untitled(session_id, clean_title)
 
     except Exception as error:
         print(
@@ -72,6 +65,21 @@ def apply_response_title_guard(response):
         if not isinstance(session, dict):
             return response
 
+        # A request may have started before the user renamed this chat. Check
+        # persisted metadata as well as the response snapshot so a late hook
+        # cannot restore an automatic title over the user's choice.
+        try:
+            from nova_backend.services import session_service
+            service = getattr(session_service, "session_service", None)
+            persisted = service.get_session(session.get("id")) if service else None
+            if session.get("title_manual") or (isinstance(persisted, dict) and persisted.get("title_manual")):
+                if isinstance(persisted, dict):
+                    session["title"] = str(persisted.get("title") or session.get("title") or "New Chat")
+                return response
+        except Exception:
+            if session.get("title_manual"):
+                return response
+
         old_title = str(
             session.get("title")
             or ""
@@ -97,21 +105,21 @@ def apply_response_title_guard(response):
         print(
             "[TITLE GUARD DEBUG]",
             {
-                "old_title": old_title,
-                "user_text": user_text,
+                "text_chars": len(str(user_text or "")),
                 "route": route,
                 "source": source,
-                "cleaned": cleaned,
             },
         )
 
         if cleaned != old_title:
             session["title"] = cleaned
 
-            persist_title(
+            persisted = persist_title(
                 session.get("id"),
                 cleaned,
             )
+            if isinstance(persisted, dict):
+                session["title"] = str(persisted.get("title") or cleaned)
 
             response.set_data(
                 json.dumps(

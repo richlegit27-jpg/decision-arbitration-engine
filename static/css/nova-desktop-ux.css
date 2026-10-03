@@ -1,0 +1,487 @@
+/* Focused desktop finishing pass: visible popovers, workspace hierarchy, and flow layout. */
+@media (min-width: 761px) {
+  .sessions-workspace .desktop-session-row.session-menu-open {
+    z-index: 100002 !important;
+  }
+
+  .desktop-session-menu {
+    position: fixed !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: 100003 !important;
+    max-width: min(190px, calc(100vw - 16px)) !important;
+    max-height: calc(100vh - 16px) !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+    transform: none !important;
+  }
+
+  .desktop-session-menu[hidden],
+  .nova-desktop-execution-native-actions button[hidden] {
+    display: none !important;
+  }
+
+  .sessions-workspace .session-list-shell,
+  .sessions-workspace #desktopSessionList {
+    overflow: visible !important;
+  }
+
+  .desktop-session-menu-toggle {
+    opacity: 0.48 !important;
+  }
+
+  .desktop-session-row:hover .desktop-session-menu-toggle,
+  .desktop-session-row:focus-within .desktop-session-menu-toggle,
+  .desktop-session-row.session-menu-open .desktop-session-menu-toggle {
+    opacity: 1 !important;
+  }
+
+  .side-footer-links {
+    display: flex !important;
+    justify-content: flex-start !important;
+    border-top: 1px solid var(--nova-ui-line, rgba(187, 175, 225, 0.13)) !important;
+    padding-top: 10px !important;
+  }
+
+  #openArtifactsBtn {
+    min-width: 0 !important;
+    min-height: 34px !important;
+    padding: 6px 11px !important;
+    border: 1px solid var(--nova-ui-line, rgba(187, 175, 225, 0.13)) !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.035) !important;
+    color: var(--nova-ui-muted, #a7a4b7) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+  }
+
+  #openArtifactsBtn[aria-expanded="true"] {
+    color: var(--nova-ui-text, #f3f1fa) !important;
+    border-color: var(--nova-ui-line-strong, rgba(187, 175, 225, 0.22)) !important;
+    background: var(--nova-ui-accent-soft, rgba(139, 92, 246, 0.15)) !important;
+  }
+
+  #desktopProjectWorkspace,
+  #desktopProjectWorkspace > *,
+  #desktopProjectWorkspace .project-panel-card,
+  #desktopProjectWorkspace #desktopProjectExecutionTree,
+  #desktopProjectWorkspace #desktopProjectFiles,
+  #desktopProjectWorkspace #desktopProjectNotes,
+  #desktopProjectWorkspace #desktopProjectRecentActivity {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #desktopProjectWorkspace .project-panel-card,
+  #desktopProjectWorkspace #desktopProjectExecutionTree {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    margin: 0 0 12px !important;
+    padding: clamp(12px, 1.5vw, 17px) !important;
+    border: 1px solid var(--nova-ui-line, rgba(187, 175, 225, 0.13)) !important;
+    border-radius: 15px !important;
+    background: linear-gradient(150deg, rgba(255,255,255,.035), rgba(255,255,255,.016)) !important;
+    box-shadow: 0 12px 28px rgba(0,0,0,.12) !important;
+  }
+
+  #desktopProjectWorkspace .project-panel-card h3,
+  #desktopProjectWorkspace #desktopProjectExecutionTree h3 {
+    margin: 0 !important;
+    color: var(--nova-ui-text, #f3f1fa) !important;
+    font-size: 14px !important;
+    font-weight: 680 !important;
+    letter-spacing: -.01em !important;
+  }
+
+  #desktopProjectWorkspace .project-panel-card p,
+  #desktopProjectWorkspace #novaProjectTreeSummary {
+    color: var(--nova-ui-muted, #a7a4b7) !important;
+    font-size: 12px !important;
+    line-height: 1.55 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-tree-header,
+  #desktopProjectWorkspace .nova-project-files-header {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px 12px !important;
+    margin: 0 !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-tree-controls,
+  #desktopProjectWorkspace .nova-project-task-actions,
+  #desktopProjectWorkspace .nova-project-note-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 7px !important;
+  }
+
+  #desktopProjectWorkspace .project-panel-card button,
+  #desktopProjectWorkspace #desktopProjectExecutionTree button {
+    min-height: 32px !important;
+    max-width: 100% !important;
+    padding: 6px 10px !important;
+    border: 1px solid var(--nova-ui-line-strong, rgba(187, 175, 225, 0.22)) !important;
+    border-radius: 9px !important;
+    background: rgba(255,255,255,.045) !important;
+    color: #e2deeb !important;
+    font-size: 11px !important;
+    font-weight: 620 !important;
+    box-shadow: none !important;
+  }
+
+  #desktopProjectWorkspace .project-panel-card button:hover,
+  #desktopProjectWorkspace #desktopProjectExecutionTree button:hover {
+    background: var(--nova-ui-accent-soft, rgba(139, 92, 246, 0.15)) !important;
+    border-color: rgba(196,181,253,.36) !important;
+  }
+
+  #desktopProjectWorkspace #desktopProjectFileList,
+  #desktopProjectWorkspace #desktopProjectNoteList,
+  #desktopProjectWorkspace .nova-project-tree,
+  #desktopProjectWorkspace .nova-project-task-list {
+    display: grid !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-file,
+  #desktopProjectWorkspace .nova-project-note,
+  #desktopProjectWorkspace .nova-project-note-card,
+  #desktopProjectWorkspace .nova-project-tree-task,
+  #desktopProjectWorkspace .nova-project-tree-task-card,
+  #desktopProjectWorkspace .nova-project-tree-phase-card,
+  #desktopProjectWorkspace .nova-project-phase,
+  #desktopProjectWorkspace .nova-project-tree-direct-tasks,
+  #desktopProjectWorkspace .nova-project-tree-phase,
+  #desktopProjectWorkspace .nova-project-tree-section-title,
+  #desktopProjectWorkspace .nova-project-task {
+    min-width: 0 !important;
+    padding: 10px 12px !important;
+    border: 1px solid rgba(187,175,225,.10) !important;
+    border-radius: 11px !important;
+    background: rgba(255,255,255,.025) !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-tree-task-status {
+    flex: 0 0 auto !important;
+    padding: 3px 7px !important;
+    border: 1px solid rgba(187,175,225,.16) !important;
+    border-radius: 999px !important;
+    background: rgba(255,255,255,.035) !important;
+    color: #c6c0d2 !important;
+    font-size: 9px !important;
+    line-height: 1.3 !important;
+    white-space: nowrap !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-tree-task-status[data-status="blocked"],
+  #desktopProjectWorkspace .nova-project-tree-task-status[data-status="failed"],
+  #desktopProjectWorkspace .nova-project-tree-task-status[data-status="error"] {
+    border-color: rgba(248,113,113,.28) !important;
+    background: rgba(239,68,68,.08) !important;
+    color: #fecaca !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-tree-task-status[data-status="running"],
+  #desktopProjectWorkspace .nova-project-tree-task-status[data-status="active"] {
+    border-color: rgba(167,139,250,.30) !important;
+    background: rgba(139,92,246,.12) !important;
+    color: #ddd6fe !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-tree-step-status {
+    flex: 0 0 auto !important;
+    color: var(--nova-ui-muted, #a7a4b7) !important;
+    font-size: 9px !important;
+    white-space: nowrap !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-tree-step-blocker {
+    flex: 1 0 100% !important;
+    color: #fecaca !important;
+    font-size: 10px !important;
+    line-height: 1.45 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-file {
+    align-items: center !important;
+    flex-wrap: wrap !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-file-info,
+  #desktopProjectWorkspace .nova-project-file-info a,
+  #desktopProjectWorkspace .nova-project-note p,
+  #desktopProjectWorkspace .nova-project-note-card p,
+  #desktopProjectWorkspace .nova-project-tree-step-title,
+  #desktopProjectWorkspace .nova-project-tree-task-main,
+  #desktopProjectWorkspace .nova-project-task-main {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+
+  #desktopProjectWorkspace #desktopProjectNoteTitle,
+  #desktopProjectWorkspace #desktopProjectNoteContent,
+  #desktopProjectWorkspace input,
+  #desktopProjectWorkspace textarea {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    border: 1px solid var(--nova-ui-line-strong, rgba(187, 175, 225, 0.22)) !important;
+    border-radius: 10px !important;
+    background: rgba(8,10,18,.72) !important;
+    color: var(--nova-ui-text, #f3f1fa) !important;
+  }
+
+  #desktopProjectWorkspace #desktopProjectNoteContent {
+    min-height: 96px !important;
+    resize: vertical !important;
+  }
+
+  #desktopProjectWorkspace .nova-project-empty-state,
+  #desktopProjectWorkspace .session-placeholder {
+    padding: 11px 12px !important;
+    border: 1px dashed var(--nova-ui-line, rgba(187, 175, 225, 0.13)) !important;
+    border-radius: 10px !important;
+    background: rgba(255,255,255,.018) !important;
+    color: var(--nova-ui-muted, #a7a4b7) !important;
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .nova-desktop-execution-native {
+    position: relative !important;
+    z-index: 1 !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  .nova-desktop-execution-label {
+    margin: 0 0 7px !important;
+    color: var(--nova-ui-text, #f3f1fa) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1.4 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .nova-desktop-execution-native [data-execution-panel] {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    color: var(--nova-ui-muted, #a7a4b7) !important;
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .nova-desktop-execution-native-actions {
+    position: static !important;
+    z-index: auto !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    margin-top: 10px !important;
+  }
+
+  .nova-desktop-execution-native-actions button {
+    flex: 0 1 auto !important;
+    min-height: 32px !important;
+  }
+
+  .panel.tools {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    gap: 10px !important;
+  }
+
+  .panel.tools > .memory-section {
+    flex: 1 1 auto !important;
+    min-height: 150px !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  .panel.tools > .memory-section #desktopMemoryList {
+    height: auto !important;
+    max-height: min(36vh, 360px) !important;
+    min-height: 90px !important;
+    overflow: auto !important;
+  }
+
+  .panel.tools > .quick-actions-section {
+    position: relative !important;
+    z-index: auto !important;
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+  }
+
+  .quick-actions-section .quick {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 5px !important;
+  }
+
+  .quick-actions-section [data-nova-quick-action] {
+    flex: 0 1 auto !important;
+    min-height: 28px !important;
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+  }
+
+  .nova-onboarding-guide {
+    margin: 10px 0 14px !important;
+    padding: 14px 16px !important;
+    border: 1px solid var(--nova-ui-line, rgba(187, 175, 225, 0.13)) !important;
+    border-radius: 14px !important;
+    background: linear-gradient(135deg, rgba(139,92,246,.10), rgba(255,255,255,.025)) !important;
+    color: var(--nova-ui-text, #f3f1fa) !important;
+    font-size: 12px !important;
+    line-height: 1.55 !important;
+  }
+
+  .nova-onboarding-guide p {
+    margin: 6px 0 !important;
+    color: var(--nova-ui-muted, #a7a4b7) !important;
+  }
+
+  .nova-onboarding-guide .nova-onboarding-example {
+    color: #ddd6fe !important;
+  }
+
+  .nova-onboarding-guide > span {
+    color: var(--nova-ui-faint, #858295) !important;
+    font-size: 10px !important;
+  }
+
+  @media (max-height: 800px) {
+    .panel.tools {
+      gap: 7px !important;
+      padding-top: 10px !important;
+      padding-bottom: 10px !important;
+    }
+
+    .panel.tools > .nova-desktop-execution-native,
+    .panel.tools > .memory-section,
+    .panel.tools > .quick-actions-section {
+      padding: 10px !important;
+    }
+
+    .panel.tools > .memory-section {
+      min-height: 120px !important;
+    }
+
+    .panel.tools > .memory-section #desktopMemoryList {
+      max-height: 25vh !important;
+    }
+  }
+
+  @media (max-width: 1100px) {
+    #desktopProjectWorkspace .nova-project-file {
+      align-items: flex-start !important;
+    }
+
+    .nova-desktop-execution-native-actions button {
+      flex: 1 1 100px !important;
+    }
+  }
+}
+
+/* Keep the right rail in normal flow and scroll its contents on short viewports. */
+@media (min-width: 761px) {
+  html body .shell > aside.panel.tools {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-content: flex-start !important;
+    gap: 10px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    padding-bottom: 14px !important;
+  }
+
+  html body .shell > aside.panel.tools > .nova-desktop-execution-native,
+  html body .shell > aside.panel.tools > .memory-section,
+  html body .shell > aside.panel.tools > .quick-actions-section {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin-block: 0 !important;
+  }
+
+  html body .shell > aside.panel.tools > .nova-desktop-execution-native {
+    order: 0 !important;
+    overflow: visible !important;
+  }
+
+  html body .shell > aside.panel.tools > .memory-section {
+    order: 1 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  html body .shell > aside.panel.tools > .quick-actions-section {
+    order: 2 !important;
+  }
+
+  html body .shell > aside.panel.tools > .memory-section #desktopMemoryList {
+    height: auto !important;
+    max-height: min(36vh, 360px) !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  html body .shell > aside.panel.tools .nova-desktop-execution-native-actions,
+  html body .shell > aside.panel.tools .quick-actions-section .quick {
+    position: static !important;
+    flex-wrap: wrap !important;
+    min-height: 0 !important;
+  }
+
+  /* Project detail belongs in the center workspace, never the Sessions rail. */
+  html body .chat-panel #desktopProjectWorkspace[hidden] {
+    display: none !important;
+  }
+
+  html body .chat-panel.project-workspace-open > #chat {
+    display: none !important;
+  }
+
+  html body .chat-panel.project-workspace-open > #desktopProjectWorkspace:not([hidden]) {
+    display: grid !important;
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    align-content: start !important;
+  }
+}

@@ -102,7 +102,7 @@ async function verifyMfaLogin(code) {
 async function forgotPassword(email) {
 
     return await apiFetch(
-        "/api/auth/forgot-password",
+        "/api/auth/password-reset/request",
         {
             method: "POST",
 
@@ -119,13 +119,13 @@ async function resetPassword(
 ) {
 
     return await apiFetch(
-        "/api/auth/reset-password",
+        "/api/auth/password-reset/confirm",
         {
             method: "POST",
 
             body: JSON.stringify({
                 token,
-                new_password: newPassword,
+                password: newPassword,
             }),
         }
     );

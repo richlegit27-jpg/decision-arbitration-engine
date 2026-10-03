@@ -185,6 +185,89 @@ class DecisionService:
 
         return False
 
+    def _is_explicit_project_creation_request(self, user_text: str) -> bool:
+        """Recognize direct project-building requests, not how-to questions."""
+        text = " ".join(self.safe_str(user_text).lower().split()).rstrip("?!. ")
+
+        informational_prefixes = (
+            "how do i ",
+            "how can i ",
+            "how would i ",
+            "how do you ",
+            "how can you ",
+            "tell me how ",
+            "explain how ",
+            "what is the best way to ",
+            "what would it take to ",
+        )
+        if text.startswith(informational_prefixes):
+            return False
+
+        # Strip polite/request lead-ins, then require an explicit
+        # creation/build verb at the start of the remaining request.
+        for _ in range(2):
+            matched_prefix = False
+            for prefix in (
+                "please ",
+                "can you ",
+                "could you ",
+                "would you ",
+                "i want you to ",
+                "i need you to ",
+                "i'd like you to ",
+                "i would like you to ",
+                "let's ",
+                "i want to ",
+            ):
+                if text.startswith(prefix):
+                    text = text[len(prefix):].lstrip()
+                    matched_prefix = True
+                    break
+            if not matched_prefix:
+                break
+
+        # A request for a project plan is not necessarily a request to create
+        # a persistent Nova project. The explicit "project to ..." form is.
+        if text.startswith((
+            "create a project plan",
+            "make a project plan",
+            "build a project plan",
+        )):
+            return False
+
+        action_prefixes = (
+            "create a project",
+            "create a new project",
+            "create project",
+            "create new project",
+            "make a project",
+            "make a new project",
+            "build a project",
+            "build a new project",
+            "start a project",
+            "start a new project",
+            "new project",
+            "build me ",
+            "create me ",
+            "make me ",
+            "develop me ",
+            "design me ",
+            "build a ",
+            "build an ",
+            "create a ",
+            "create an ",
+            "make a ",
+            "make an ",
+            "develop a ",
+            "develop an ",
+            "implement a ",
+            "implement an ",
+            "design a website",
+            "design an app",
+            "i need a project ",
+        )
+        return text.startswith(action_prefixes)
+
     def _decide_route(
         self,
         user_text: str,
@@ -194,6 +277,29 @@ class DecisionService:
 
         user_text = self.safe_str(user_text)
         lower_text = user_text.lower()
+
+        # Repository questions and Git mutation requests must be claimed
+        # before pending execution or generic command routing. The dedicated
+        # Code Workspace only exposes configured-root read operations.
+        code_workspace = getattr(
+            self.chat_service,
+            "code_workspace_service",
+            None,
+        )
+        if code_workspace is not None and not attachments:
+            code_workspace_intent = code_workspace.classify_request(user_text)
+            if code_workspace_intent:
+                return {
+                    "route": "code_workspace",
+                    "mode": "read_only_repository_inspection",
+                    "intent": code_workspace_intent,
+                    "confidence": 1.0,
+                    "reasons": ["configured_repository_git_intent"],
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": False,
+                    "prompt": user_text,
+                }
 
         # Resume an existing unfinished execution before normal route
         # classification can send the continuation to general_chat or
@@ -325,20 +431,40 @@ class DecisionService:
                 repr(exc),
             )
 
-        project_execution_request = (
-            "create a project" in lower_text
-            or "create a new project" in lower_text
-            or "create a tiny test project" in lower_text
-            or "build a project" in lower_text
-            or "make a project" in lower_text
+        project_execution_request = self._is_explicit_project_creation_request(
+            user_text
         )
 
         if project_execution_request:
-            return self._execution_decision(
-                user_text=user_text,
-                intent="project_execution",
-                reason="project_creation_with_execution_request",
+            explicit_execution = any(
+                marker in lower_text
+                for marker in (
+                    "run it",
+                    "run the project",
+                    "execute it",
+                    "execute the project",
+                    "start execution",
+                    "run all tasks",
+                )
             )
+            if explicit_execution:
+                return self._execution_decision(
+                    user_text=user_text,
+                    intent="project_execution",
+                    reason="project_creation_with_explicit_execution_request",
+                )
+
+            return {
+                "route": "project_builder",
+                "mode": "project_creation",
+                "intent": "project_creation",
+                "confidence": 1.0,
+                "reasons": ["explicit_conversational_project_creation"],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": True,
+                "prompt": user_text,
+            }
 
         print(
             "[NOVA_IMAGE_ROUTE_DIAGNOSTIC]",
@@ -602,7 +728,25 @@ class DecisionService:
             "where are we",
             "where are we at",
             "what are we doing",
+            "what are we going to do first",
+            "what should we do first",
+            "what is the first task",
+            "what's the first task",
+            "whats the first task",
+            "first saved task",
+            "exact first task in the project",
             "what is left",
+            "what's left",
+            "whats left",
+            "what did we finish",
+            "what have we finished",
+            "what have we completed",
+            "what's blocking us",
+            "what is blocking us",
+            "explain the current task",
+            "explain current task",
+            "describe the current task",
+            "continue planning it",
             "what are we working on",
             "what are we working on now",
             "what are we working on right now",
@@ -694,19 +838,9 @@ class DecisionService:
             "execution step",
         )
 
-        project_execution_request = (
-            (
-                "create a project" in lower_text
-                or "create a tiny test project" in lower_text
-                or "build a project" in lower_text
-                or "make a project" in lower_text
-            )
-            and (
-                "execute" in lower_text
-                or "run" in lower_text
-                or "start" in lower_text
-            )
-        )
+        project_execution_request = self._is_explicit_project_creation_request(
+            user_text
+        ) and any(word in lower_text for word in ("execute", "run", "start"))
 
         if project_execution_request:
             return self._execution_decision(

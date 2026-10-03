@@ -178,6 +178,33 @@ def build_current_project_answer(user_id=None) -> str:
         f"{', '.join(context.validation) if context.validation else 'No validation items loaded.'}"
     )
 
+
+def build_first_saved_task_answer(active_project=None) -> str:
+    """Answer first-task questions from the current user's persisted project."""
+    project = active_project
+    if project is None:
+        from nova_backend.services.project_workspace_service import project_workspace_service
+
+        project = project_workspace_service.get_active_project()
+    if not isinstance(project, dict):
+        return ""
+
+    tasks = project.get("tasks")
+    if not isinstance(tasks, list) or not tasks:
+        return ""
+
+    first_task = next((task for task in tasks if isinstance(task, dict)), None)
+    if not first_task:
+        return ""
+
+    title = str(
+        first_task.get("title")
+        or first_task.get("name")
+        or first_task.get("description")
+        or ""
+    ).strip()
+    return f"The first saved task is {title}." if title else ""
+
 def build_safe_next_answer() -> str:
     return build_project_brain_decision_context_answer(
         user_text="what should we do next"

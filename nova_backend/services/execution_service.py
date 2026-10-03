@@ -934,8 +934,6 @@ class ExecutionService:
         print(
             "[PLANNER INPUT DEBUG]",
             {
-                "user_text_repr": repr(user_text),
-                "cleaned_user_text_repr": repr(cleaned_user_text),
                 "length": len(cleaned_user_text),
             },
             flush=True,

@@ -41,24 +41,7 @@ class MemoryRouteService:
         @guarded_json_route
         def api_memory_add():
 
-            print(
-                "[MEMORY ADD DEBUG RAW]",
-                {
-                    "content_type": request.content_type,
-                    "content_length": request.content_length,
-                    "raw": request.get_data(
-                        cache=True,
-                        as_text=True,
-                    ),
-                },
-            )
-
             data = get_json_body(request)
-
-            print(
-                "[MEMORY ADD DEBUG JSON]",
-                data,
-            )
 
             text = get_str(data, "text")
             kind = get_str(data, "kind", "note") or "note"

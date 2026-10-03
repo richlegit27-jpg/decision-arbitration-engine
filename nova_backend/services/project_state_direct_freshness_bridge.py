@@ -99,7 +99,6 @@ def build_project_state_direct_fresh_response(payload):
 
     print(
         "[FRESHNESS BRIDGE DEBUG]",
-        repr(user_text),
         repr(intent),
     )
 

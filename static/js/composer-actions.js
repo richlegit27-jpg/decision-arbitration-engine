@@ -990,14 +990,32 @@ const streamText = String(
     ""
 )
 
+const assistantResponse = reply?.assistant_message || {}
 const responseAttachments =
     Array.isArray(reply?.attachments)
         ? reply.attachments.slice()
-        : (
-            reply?.attachment
-                ? [reply.attachment]
-                : []
-        )
+        : Array.isArray(assistantResponse.attachments)
+          ? assistantResponse.attachments.slice()
+          : (reply?.attachment ? [reply.attachment] : [])
+const imageAttachment = responseAttachments.find((attachment) =>
+    String(attachment?.mime_type || attachment?.type || "").toLowerCase().startsWith("image/") &&
+    (attachment?.url || attachment?.image_url || attachment?.file_url)
+)
+const responseImageUrl = String(
+    reply?.image_url ||
+    assistantResponse.image_url ||
+    imageAttachment?.image_url ||
+    imageAttachment?.url ||
+    imageAttachment?.file_url ||
+    ""
+).trim()
+const imageOutput = responseImageUrl
+    ? {
+        image_url: responseImageUrl,
+        image_generation: true,
+        saved_artifact: reply?.saved_artifact || null,
+      }
+    : {}
 
 if(streamText.trim()){
 
@@ -1021,6 +1039,7 @@ if(streamText.trim()){
                 thinking: false,
                 isThinking: false,
                 attachments: responseAttachments,
+                ...imageOutput,
             }
         )
 
@@ -1036,6 +1055,7 @@ const appended = appendAssistantMessage(
     {
         execution: reply?.execution || null,
         execution_state: reply?.execution_state || null,
+        ...imageOutput,
     }
 )
 
@@ -1067,6 +1087,18 @@ reply = await postChat({
 
   handleNonStreamingReply(reply, chatId)
 }
+}
+
+if(
+  reply?.ok === true &&
+  reply?.route === "project_builder" &&
+  reply?.project_id
+){
+  window.dispatchEvent(
+    new CustomEvent("nova:project-created", {
+      detail: { projectId: reply.project_id },
+    })
+  )
 }
 
       if(sendToken !== sendSequence){
@@ -1110,7 +1142,7 @@ reply = await postChat({
 
       if(!aborted){
         console.error("NovaComposerActions send error:", error)
-        appendAssistantMessage("Send failed.")
+        appendAssistantMessage(window.NovaDesktopUX?.formatError("chat", error) || "Nova couldn't complete that message. Please try again.")
       }
 
       if(typeof onSendError === "function"){
@@ -1207,6 +1239,10 @@ async function regenerateMessage(messageId){
   const forcedAttachments = Array.isArray(userMessage.attachments)
     ? userMessage.attachments.slice()
     : []
+  const isImageGeneration =
+    assistantMessage?.image_generation === true ||
+    assistantMessage?.meta?.source === "image_generation" ||
+    String(userMessage.text || userMessage.content || "").trim().toLowerCase().startsWith("/image")
 
   console.log(
     "[Nova Regen] retrying",
@@ -1228,7 +1264,7 @@ const result = await sendCurrentMessage({
   forcedText,
   forcedAttachments,
   skipLocalUserAppend: true,
-  isRegeneration: true,
+  isRegeneration: !isImageGeneration,
   assistantId: assistantMessage.id,
   userId: userMessage.id,
 })

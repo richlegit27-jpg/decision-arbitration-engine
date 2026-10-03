@@ -26,11 +26,7 @@ from nova_backend.tools.code_search_tool import CodeSearchTool
 from nova_backend.tools.code_replace_tool import CodeReplaceTool
 from nova_backend.tools.text_search_tool import TextSearchTool
 
-from nova_backend.tools.git_status_tool import GitStatusTool
-from nova_backend.tools.git_diff_tool import GitDiffTool
-from nova_backend.tools.git_log_tool import GitLogTool
-from nova_backend.tools.git_show_tool import GitShowTool
-from nova_backend.tools.git_commit_tool import GitCommitTool
+from nova_backend.tools.code_workspace_tool import CodeWorkspaceTool
 
 from nova_backend.tools.shell_command_tool import ShellCommandTool
 from nova_backend.tools.terminal_execute_tool import TerminalExecuteTool
@@ -88,11 +84,11 @@ def load_tools(chat_service=None):
         TextSearchTool(),
 
         # GIT
-        GitStatusTool(),
-        GitDiffTool(),
-        GitLogTool(),
-        GitShowTool(),
-        GitCommitTool(),
+        # One repository-scoped read-only Git surface replaces the legacy
+        # path-taking tools and the mutating commit tool.
+        CodeWorkspaceTool(
+            service=getattr(chat_service, "code_workspace_service", None),
+        ),
 
         # TERMINAL / SHELL
         ShellCommandTool(),

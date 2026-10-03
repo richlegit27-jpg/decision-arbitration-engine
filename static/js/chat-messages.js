@@ -39,7 +39,37 @@ const COPY_FEEDBACK_MS = 1200
 
 let eventsBound = false
 let copiedMessageId = ""
+let copyFailedMessageId = ""
 let copyFeedbackTimer = null
+const videoPollsInFlight = new Set()
+
+async function pollPendingVideos(){
+  const messages = Array.isArray(state.messages) ? state.messages : []
+  for(const message of messages){
+    const meta = message?.meta || {}
+    const jobId = String(meta.video_job_id || "").trim()
+    if(!jobId || !["queued", "generating"].includes(String(meta.video_status || "")) || videoPollsInFlight.has(jobId)) continue
+    videoPollsInFlight.add(jobId)
+    try{
+      const response = await fetch(`/api/video/jobs/${encodeURIComponent(jobId)}`, { credentials: "same-origin", cache: "no-store" })
+      const payload = await response.json()
+      if(!response.ok || !payload?.ok) continue
+      const job = payload.job || {}
+      if(payload.assistant_message){
+        Object.assign(message, payload.assistant_message)
+      }else if(job.status){
+        message.meta = { ...meta, video_status: job.status }
+      }
+      if(["completed", "failed"].includes(String(job.status || "")) || payload.assistant_message){
+        renderMessages()
+      }
+    }catch(_error){
+      // The persisted pending state remains visible; a later poll retries.
+    }finally{
+      videoPollsInFlight.delete(jobId)
+    }
+  }
+}
 
 function escapeHtml(value){
   return String(value ?? "")
@@ -412,6 +442,32 @@ function renderCodeBlock(content, language = ""){
 
 function renderMessageBody(message){
   const content = message?.content ?? ""
+
+  const videoJobId = String(message?.meta?.video_job_id || "").trim()
+  const videoStatus = String(message?.meta?.video_status || "").trim()
+  if(message?.role === "assistant" && videoJobId && ["queued", "generating"].includes(videoStatus)){
+    const label = videoStatus === "queued" ? "Video queued…" : "Generating your video…"
+    return `<div class="nova-video-job-status" data-video-job-id="${escapeHtml(videoJobId)}" role="status">${escapeHtml(label)}</div>`
+  }
+  if(message?.role === "assistant" && Array.isArray(message?.attachments)){
+    const video = message.attachments.find((item) => String(item?.type || item?.kind || "").toLowerCase() === "video" && item?.url)
+    if(video){
+      return `<div class="nova-media-card"><video class="nova-media-video" controls preload="metadata"><source src="${escapeHtml(video.url)}" type="${escapeHtml(video.mime_type || "video/mp4")}"></video><div class="nova-media-caption">${escapeHtml(video.title || "Generated video")}</div></div>`
+    }
+  }
+
+  const videoJobId = String(message?.meta?.video_job_id || "").trim()
+  const videoStatus = String(message?.meta?.video_status || "").trim()
+  if(message?.role === "assistant" && videoJobId && ["queued", "generating"].includes(videoStatus)){
+    const label = videoStatus === "queued" ? "Video queued…" : "Generating your video…"
+    return `<div class="nova-video-job-status" data-video-job-id="${escapeHtml(videoJobId)}" role="status">${escapeHtml(label)}</div>`
+  }
+  if(message?.role === "assistant" && Array.isArray(message?.attachments)){
+    const video = message.attachments.find((item) => String(item?.type || item?.kind || "").toLowerCase() === "video" && item?.url)
+    if(video){
+      return `<div class="nova-media-card"><video class="nova-media-video" controls preload="metadata"><source src="${escapeHtml(video.url)}" type="${escapeHtml(video.mime_type || "video/mp4")}"></video><div class="nova-media-caption">${escapeHtml(video.title || "Generated video")}</div></div>`
+    }
+  }
 
   if(message?.role === "assistant"){
     let imageContent = ""
@@ -807,7 +863,11 @@ el.messages.innerHTML = messages.map((message) => {
   type="button"
   data-copy-message="${escapeHtml(message.id || "")}"
 >
-  ${copiedMessageId === message.id ? "Copied" : "Copy"}
+  ${copiedMessageId === message.id
+    ? "Copied"
+    : copyFailedMessageId === message.id
+      ? "Copy failed"
+      : "Copy"}
 </button>
 
 ${
@@ -838,7 +898,47 @@ ${
   updateJumpButton()
 }
 
-function copyMessageText(messageId){
+async function writeClipboardText(text){
+    const value = String(text ?? "")
+
+    if(!value){
+        return false
+    }
+
+    try{
+        if(navigator.clipboard?.writeText){
+            await navigator.clipboard.writeText(value)
+            return true
+        }
+    }catch(error){
+        console.warn(
+            "[Nova Copy] clipboard API unavailable; trying fallback",
+            error
+        )
+    }
+
+    const textarea = document.createElement("textarea")
+    textarea.value = value
+    textarea.setAttribute("readonly", "")
+    textarea.style.position = "fixed"
+    textarea.style.opacity = "0"
+    textarea.style.pointerEvents = "none"
+    document.body.appendChild(textarea)
+    textarea.select()
+
+    let copied = false
+    try{
+        copied = document.execCommand("copy")
+    }catch(error){
+        console.warn("[Nova Copy] fallback failed", error)
+    }finally{
+        textarea.remove()
+    }
+
+    return copied
+}
+
+async function copyMessageText(messageId){
     const messages = getMessages()
 
     const message = messages.find((item) => {
@@ -857,31 +957,31 @@ function copyMessageText(messageId){
         message.content ??
         message.text ??
         ""
-    ).trim()
+    )
 
-    if(!text){
+    if(!text.trim()){
         return
     }
 
-    navigator.clipboard.writeText(text).then(() => {
-        copiedMessageId = String(messageId)
+    const copied = await writeClipboardText(text)
 
+    copiedMessageId = copied ? String(messageId) : ""
+    copyFailedMessageId = copied ? "" : String(messageId)
+    renderMessages()
+
+    if(copyFeedbackTimer){
+        clearTimeout(copyFeedbackTimer)
+    }
+
+    copyFeedbackTimer = window.setTimeout(() => {
+        copiedMessageId = ""
+        copyFailedMessageId = ""
         renderMessages()
+    }, COPY_FEEDBACK_MS)
 
-        if(copyFeedbackTimer){
-            clearTimeout(copyFeedbackTimer)
-        }
-
-        copyFeedbackTimer = window.setTimeout(() => {
-            copiedMessageId = ""
-            renderMessages()
-        }, COPY_FEEDBACK_MS)
-    }).catch((error) => {
-        console.warn(
-            "[Nova Copy] clipboard write failed",
-            error
-        )
-    })
+    if(!copied){
+        console.warn("[Nova Copy] unable to copy message text")
+    }
 }
 
 function handleMessagesClick(event){
@@ -978,7 +1078,7 @@ if(action === "tool-approve"){
         )
 
     if(copyMessageId){
-        copyMessage(copyMessageId)
+        copyMessageText(copyMessageId)
     }
 }
 
@@ -1016,9 +1116,11 @@ function bindEvents(){
                 }
 
                 try{
-                    await navigator.clipboard.writeText(
-                        codeText
-                    )
+                    const copied = await writeClipboardText(codeText)
+
+                    if(!copied){
+                        throw new Error("Clipboard copy was not available")
+                    }
 
                     codeCopyButton.classList.add(
                         "is-copied"
@@ -1094,6 +1196,7 @@ function init(){
   renderMessages()
   scrollToBottom(true)
   updateJumpButton()
+  window.setInterval(pollPendingVideos, 3000)
 }
 
 window.NovaChatMessages = {

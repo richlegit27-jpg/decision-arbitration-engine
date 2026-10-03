@@ -1099,6 +1099,11 @@ observer.observe(document.documentElement, {
 })();
 </script>
 
+<!-- NOVA_DESKTOP_POLISH_CSS_LINK_20261002 -->
+<link rel="stylesheet" href="/static/css/nova-desktop-clean.css?v=1">
+<link rel="stylesheet" href="/static/css/nova-desktop-polish.css?v=ux-finishing-20261002-1">
+<link rel="stylesheet" href="/static/css/nova-theme.css?v=settings-20261003-1">
+
 </head>
 <body data-nova-desktop-inline-send="true">
   <div class="shell">
@@ -1124,6 +1129,13 @@ observer.observe(document.documentElement, {
   class="nova-menu-panel"
   hidden
 >
+  <button
+    type="button"
+    onclick="window.location.href='/'"
+  >
+    Home
+  </button>
+
   <button
     type="button"
     onclick="window.location.href='/super-ai'"
@@ -1174,24 +1186,19 @@ observer.observe(document.documentElement, {
       </div>
 
  <!-- NOVA_DESKTOP_WORKSPACE_PANEL_REORG_20260610 -->
-<section class="workspace-section">
-  <div class="section-title-row">
-    <div>
-      <h2>Sessions</h2>
-    </div>
-  </div>
-
+<section class="workspace-section sessions-workspace">
   <button class="primary-side-button" id="newSessionBtn" type="button">
+    <span aria-hidden="true">+</span>
     <span>New Chat</span>
-    <span>+</span>
   </button>
 
-  <div class="session-current-card">
+  <h2 class="workspace-section-label">Sessions</h2>
+
+  <div class="session-current-card" hidden>
     <input id="sid" spellcheck="false" aria-label="Active session ID" />
   </div>
 
   <div class="session-list-shell">
-    <div class="session-label">Recent</div>
     <div id="desktopSessionList" class="desktop-session-list">
       <div class="session-placeholder">Loading sessions...</div>
     </div>
@@ -1213,6 +1220,15 @@ observer.observe(document.documentElement, {
         >
           <span>New Project</span>
           <span>+</span>
+        </button>
+
+        <button
+          class="nova-project-delete-all"
+          id="deleteAllProjectsBtn"
+          type="button"
+          aria-label="Delete all projects"
+        >
+          Delete All Projects
         </button>
 
         <div
@@ -1298,195 +1314,6 @@ observer.observe(document.documentElement, {
   </div>
 </div>
 
-<section
-  id="desktopProjectWorkspace"
-  class="workspace-section"
->
-  <div class="section-title-row">
-    <div>
-      <h2 id="desktopProjectTitle">No project selected</h2>
-      <p id="desktopProjectDescription">
-        Select a project to open workspace.
-      </p>
-    </div>
-  </div>
-
-  <div class="project-workspace-card">
-
-    <h3>Project Workspace</h3>
-
-    <p id="desktopProjectStatus">
-      Workspace ready
-    </p>
-<div
-  id="desktopProjectExecutionTree"
-  class="project-panel-card nova-project-execution-tree"
->
-  <div class="nova-project-tree-header">
-    <div>
-      <h3>Project Execution</h3>
-      <p id="novaProjectTreeSummary">
-        Select a project to view execution.
-      </p>
-    </div>
-
-    <button
-      id="desktopProjectAddTaskButton"
-      type="button"
-    >
-      + Add Task
-    </button>
-  </div>
-
-
-
-  <div
-    id="nova-project-tree-controls"
-    class="nova-project-tree-controls"
-    aria-label="Project execution controls"
-  >
-    <button
-      id="novaLeftRunAll"
-      type="button"
-    >
-      Run All
-    </button>
-
-<button
-  id="novaLeftContinue"
-  type="button"
->
-  Continue
-</button>
-
-<button
-  id="novaLeftNextTask"
-  type="button"
->
-  Next Task
-</button>
-
-    <button
-      id="novaLeftStop"
-      type="button"
-    >
-      Stop
-    </button>
-
-    <button
-      id="novaLeftReset"
-      type="button"
-    >
-      Reset
-    </button>
-  </div>
-
-  <div
-    id="desktopProjectPhaseList"
-    class="nova-project-tree"
-  >
-    <div class="session-placeholder">
-      Select a project to view phases.
-    </div>
-  </div>
-
-  <div
-    id="desktopProjectTaskList"
-    class="nova-project-task-list"
-    aria-hidden="true"
-  ></div>
-</div>
-
-
-    <div
-      id="desktopProjectFiles"
-      class="project-panel-card"
-    >
-      <div class="nova-project-files-header">
-        <h3>Project Files</h3>
-
-        <button
-          id="desktopProjectUploadButton"
-          type="button"
-        >
-          Upload File
-        </button>
-      </div>
-
-      <input
-        id="desktopProjectFileInput"
-        type="file"
-        hidden
-      />
-
-      <div id="desktopProjectFileList">
-        <p>No files yet.</p>
-      </div>
-    </div>
-
-
-    <div
-      id="desktopProjectNotes"
-      class="project-panel-card"
-    >
-      <h3>Notes</h3>
-
-      <button
-        id="desktopProjectAddNoteButton"
-        type="button"
-      >
-        + Add Note
-      </button>
-
-      <div
-        id="desktopProjectNoteEditor"
-        hidden
-      >
-
-        <input
-          id="desktopProjectNoteTitle"
-          type="text"
-          placeholder="Note title"
-        />
-
-        <textarea
-          id="desktopProjectNoteContent"
-          placeholder="Write a project note..."
-        ></textarea>
-
-        <button
-          id="desktopProjectSaveNote"
-          type="button"
-        >
-          Save Note
-        </button>
-
-        <button
-          id="desktopProjectCancelNote"
-          type="button"
-        >
-          Cancel
-        </button>
-
-      </div>
-
-      <div id="desktopProjectNoteList">
-        <p>No notes yet.</p>
-      </div>
-    </div>
-
-
-    <div
-      id="desktopProjectRecentActivity"
-      class="project-panel-card"
-    >
-      <h3>Recent Activity</h3>
-      <p>No activity yet.</p>
-    </div>
-
-  </div>
-</section>
-
 <div
   id="newProjectModal"
   class="nova-project-modal"
@@ -1556,9 +1383,7 @@ observer.observe(document.documentElement, {
 </div>
 
 <div class="side-footer-links">
-  <a href="/">Home</a>
-  <a href="/help">Help</a>
-<button class="footer-mini-button" id="openArtifactsBtn" type="button">Artifacts</button>
+  <button class="footer-mini-button" id="openArtifactsBtn" type="button" aria-expanded="false">Artifacts</button>
 </div>
 
     </aside>
@@ -1599,6 +1424,157 @@ observer.observe(document.documentElement, {
 </div>
       </header>
 
+<section
+  id="desktopProjectWorkspace"
+  class="workspace-section"
+  hidden
+>
+  <div class="section-title-row">
+    <div>
+      <h2 id="desktopProjectTitle">No project selected</h2>
+      <p id="desktopProjectDescription">
+        Create or select a project for work that needs multiple steps.
+      </p>
+    </div>
+  </div>
+
+  <div class="project-workspace-card">
+
+    <h3>Project Workspace</h3>
+
+    <p id="desktopProjectStatus">
+      Workspace ready
+    </p>
+<div
+  id="desktopProjectExecutionTree"
+  class="project-panel-card nova-project-execution-tree"
+>
+  <div class="nova-project-tree-header">
+    <div>
+      <h3>Project Execution</h3>
+      <p id="novaProjectTreeSummary">
+        Select a project to view execution.
+      </p>
+    </div>
+
+    <button
+      id="desktopProjectAddTaskButton"
+      type="button"
+    >
+      + Add Task
+    </button>
+  </div>
+
+
+
+  <div
+    id="desktopProjectPhaseList"
+    class="nova-project-tree"
+  >
+    <div class="session-placeholder">
+      Select a project to view phases.
+    </div>
+  </div>
+
+  <div
+    id="desktopProjectTaskList"
+    class="nova-project-task-list"
+    aria-hidden="true"
+  ></div>
+</div>
+
+
+    <div
+      id="desktopProjectFiles"
+      class="project-panel-card"
+    >
+      <div class="nova-project-files-header">
+        <h3>Project Files</h3>
+
+        <button
+          id="desktopProjectUploadButton"
+          type="button"
+        >
+          Upload File
+        </button>
+      </div>
+
+      <input
+        id="desktopProjectFileInput"
+        type="file"
+        hidden
+      />
+
+      <div id="desktopProjectFileList">
+        <p>Files Nova creates for this project will appear here.</p>
+      </div>
+    </div>
+
+
+    <div
+      id="desktopProjectNotes"
+      class="project-panel-card"
+    >
+      <h3>Project Notes</h3>
+
+      <button
+        id="desktopProjectAddNoteButton"
+        type="button"
+      >
+        + Add Note
+      </button>
+
+      <div
+        id="desktopProjectNoteEditor"
+        hidden
+      >
+
+        <input
+          id="desktopProjectNoteTitle"
+          type="text"
+          placeholder="Note title"
+        />
+
+        <textarea
+          id="desktopProjectNoteContent"
+          placeholder="Write a project note..."
+        ></textarea>
+
+        <button
+          id="desktopProjectSaveNote"
+          type="button"
+        >
+          Save Note
+        </button>
+
+        <button
+          id="desktopProjectCancelNote"
+          type="button"
+        >
+          Cancel
+        </button>
+
+      </div>
+
+      <div id="desktopProjectNoteList">
+        <p>Keep project notes and important details here.</p>
+      </div>
+    </div>
+
+
+    <details
+      id="desktopProjectRecentActivity"
+      class="project-panel-card nova-project-activity"
+    >
+      <summary>Recent Activity</summary>
+      <div id="desktopProjectRecentActivityItems">
+        <p>No activity yet.</p>
+      </div>
+    </details>
+
+  </div>
+</section>
+
       <section id="chat" class="messages chat-messages desktop-rescue-messages" data-messages="true">
         <div class="msg assistant">
           <div class="role">assistant</div>
@@ -1638,10 +1614,13 @@ observer.observe(document.documentElement, {
         Execution
     </div>
 
+    <div id="novaDesktopExecutionLabel" class="nova-desktop-execution-label" role="status" aria-live="polite">
+        Execution · No active project
+    </div>
+
     <div data-execution-panel>
         <div class="nova-panel-muted">
-            No active mission yet. Start with
-            <strong>auto-plan &lt;goal&gt;</strong>.
+            Start or select a project to use execution controls.
         </div>
     </div>
 
@@ -1650,6 +1629,7 @@ observer.observe(document.documentElement, {
         <button
             id="desktopContinueProject"
             type="button"
+            hidden
         >
             Continue
         </button>
@@ -1657,6 +1637,7 @@ observer.observe(document.documentElement, {
         <button
             id="desktopApproveProject"
             type="button"
+            hidden
         >
             Approve
         </button>
@@ -1664,6 +1645,7 @@ observer.observe(document.documentElement, {
         <button
             id="desktopRunAll"
             type="button"
+            hidden
         >
             Run All
         </button>
@@ -1671,9 +1653,14 @@ observer.observe(document.documentElement, {
         <button
             id="desktopPause"
             type="button"
+            hidden
         >
             Pause
         </button>
+
+        <button id="desktopNextProject" type="button" hidden>Next</button>
+        <button id="desktopStopProject" type="button" hidden>Stop</button>
+        <button id="desktopResetProject" type="button" hidden>Reset</button>
 
     </div>
 </section>
@@ -2705,18 +2692,7 @@ if (summarizeBtn) {
       });
     });
 
-document.querySelectorAll("[data-nova-quick-action]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const action = button.getAttribute("data-nova-quick-action");
-
-    const prompts = {
-      plan: "I want to plan something. Help me organize the next steps.",
-      write: "Help me write something."
-    };
-
-    handleSendClick(prompts[action] || "");
-  });
-});
+// Quick Actions are bound once in the final initializer below.
 
     try {
       const saved = localStorage.getItem(LS_SID);
@@ -2758,7 +2734,8 @@ if (attachBtn && desktopFileInput) {
 
     uploadDesktopAttachment(file).catch((error) => {
       clearDesktopAttachments();
-      addMsg("assistant", "Upload error: " + (error.message || error));
+      console.error("[Nova Desktop Upload Error]", error);
+      addMsg("assistant", window.NovaDesktopUX?.formatError("upload", error) || "Nova couldn't upload that file. Check the file and connection, then try again.");
     });
   });
 }
@@ -2883,6 +2860,9 @@ function renderDesktopOnboarding(session) {
     }
 
     const onboarding = session.meta.onboarding;
+    const welcomeMessage = /\bauto-plan\b/i.test(String(onboarding.welcome_message || ""))
+        ? "Ask Nova naturally, or create a project for work that takes several steps."
+        : (onboarding.welcome_message || "Ask Nova questions, brainstorm, write, research, or work with code.");
 
     const escapeValue =
         typeof esc === "function"
@@ -2899,8 +2879,14 @@ function renderDesktopOnboarding(session) {
             : [];
 
     root.innerHTML = `
+        <div class="nova-onboarding-guide">
+            <strong>Get started with Nova</strong>
+            <p>Chat for questions, writing, research, and code. Attach files when you want Nova to analyze them. Create a project for work that takes several steps, then use Continue or Run All to carry out its plan.</p>
+            <p class="nova-onboarding-example">Try: “Create a project to build a simple website for my business.”</p>
+            <span>Nova can also remember useful context where appropriate.</span>
+        </div>
         <div class="nova-onboarding-welcome">
-            ${escapeValue(onboarding.welcome_message || "")}
+            ${escapeValue(welcomeMessage)}
         </div>
 
         <div class="nova-onboarding-actions">
@@ -3425,44 +3411,10 @@ window.NovaChatMessages.syncMessagesFromStorage(
   "use strict";
 
   function addDesktopSessionsButton() {
-    if (document.getElementById("openSessionsBtn")) return;
-
-    var newButton = document.getElementById("newSessionBtn");
-    var memoryButton = document.getElementById("openMemoryBtn");
-    var host =
-      (newButton && newButton.parentElement) ||
-      (memoryButton && memoryButton.parentElement) ||
-      document.querySelector("aside") ||
-      document.querySelector(".sidebar") ||
-      document.body;
-
-    var button = document.createElement("button");
-    button.id = "openSessionsBtn";
-    button.type = "button";
-    button.className = newButton ? newButton.className : "primary-side-button";
-    button.textContent = "Sessions";
-
-    button.onclick = function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      console.log("[NOVA sessions] refreshing sessions after send")
-
-      if (typeof window.NovaDesktopOpenSessionsRescue === "function") {
-        window.NovaDesktopOpenSessionsRescue().catch(console.error);
-      } else if (typeof window.loadDesktopSessions === "function") {
-        window.loadDesktopSessions();
-        console.log("[Nova Desktop Sessions Button] loaded sessions directly");
-      }
-    };
-
-    if (newButton && newButton.nextSibling) {
-      newButton.parentElement.insertBefore(button, newButton.nextSibling);
-    } else if (newButton) {
-      newButton.parentElement.appendChild(button);
-    } else {
-      host.insertBefore(button, host.firstChild);
-    }
+    // The desktop session list is always visible; do not add a second Sessions button.
+    var legacyButton = document.getElementById("openSessionsBtn");
+    if (legacyButton) legacyButton.remove();
+    return null;
   }
 
   function bindExactDesktopButtons() {
@@ -3636,13 +3588,14 @@ function getCurrentSessionId() {
 }
 
   function setStatus(text) {
-    var status = document.getElementById("nova-current-session-manager-status");
-    if (status) status.textContent = text || "";
+    var status = document.getElementById("status");
+    if (status) status.textContent = "status: " + (text || "");
   }
 
   async function postJson(url, payload) {
     var response = await fetch(url, {
       method: "POST",
+      credentials: "same-origin",
       headers: {
         "Accept": "application/json",
         "Content-Type": "application/json"
@@ -3666,32 +3619,6 @@ try {
     return data;
   }
 
-  async function getCurrentSession() {
-    var sid = getCurrentSessionId();
-
-    if (!sid) {
-      throw new Error("No current session selected.");
-    }
-
-    var response = await fetch("/api/sessions/" + encodeURIComponent(sid), {
-      headers: { "Accept": "application/json" }
-    });
-
-const raw = await response.text();
-
-var data = {};
-try {
-  data = JSON.parse(raw);
-} catch (e) {
-  console.warn("Non-JSON response:", raw);
-}
-    if (!response.ok || data.ok === false) {
-      throw new Error(data.error || data.message || "Could not load current session.");
-    }
-
-    return data.session || data.data || data;
-  }
-
   async function refreshSessionsIfPossible() {
     try {
       if (typeof window.loadDesktopSessions === "function") {
@@ -3707,12 +3634,15 @@ try {
     } catch (error) {}
   }
 
-  async function renameCurrentSession() {
+  async function renameCurrentSession(sessionId, knownSession) {
     try {
-      var session = await getCurrentSession();
-      var sid = session.id || getCurrentSessionId();
+      var sid = String(sessionId || "").trim();
+      if (!sid || !knownSession || String(knownSession.id || "") !== sid) {
+        throw new Error("The selected conversation is no longer available.");
+      }
+      var session = knownSession;
       var oldTitle = session.title || "Session";
-      var nextTitle = prompt("Rename current session:", oldTitle);
+      var nextTitle = prompt("Rename conversation:", oldTitle);
 
       if (!nextTitle) return;
 
@@ -3727,14 +3657,17 @@ try {
       setStatus("Renamed to: " + nextTitle);
       await refreshSessionsIfPossible();
     } catch (error) {
-      setStatus(error.message || "Rename failed.");
+      setStatus(window.NovaDesktopUX?.formatError("session", error, "Nova couldn't rename this conversation. Please try again.") || "Nova couldn't rename this conversation. Please try again.");
     }
   }
 
-  async function togglePinCurrentSession() {
+  async function togglePinCurrentSession(sessionId, knownSession) {
     try {
-      var session = await getCurrentSession();
-      var sid = session.id || getCurrentSessionId();
+      var sid = String(sessionId || "").trim();
+      if (!sid || !knownSession || String(knownSession.id || "") !== sid) {
+        throw new Error("The selected conversation is no longer available.");
+      }
+      var session = knownSession;
       var nextPinned = !Boolean(session.pinned);
 
       await postJson("/api/sessions/pin", {
@@ -3742,101 +3675,85 @@ try {
         pinned: nextPinned
       });
 
-      setStatus(nextPinned ? "Pinned current session." : "Unpinned current session.");
+      setStatus(nextPinned ? "Pinned conversation." : "Unpinned conversation.");
       await refreshSessionsIfPossible();
     } catch (error) {
-      setStatus(error.message || "Pin failed.");
+      setStatus(window.NovaDesktopUX?.formatError("session", error, "Nova couldn't update this conversation. Please try again.") || "Nova couldn't update this conversation. Please try again.");
     }
   }
 
-  async function deleteCurrentSession() {
+  async function deleteCurrentSession(sessionId, knownSession) {
     try {
-      var session = await getCurrentSession();
-      var sid = session.id || getCurrentSessionId();
+      var sid = String(sessionId || "").trim();
+      if (!sid || !knownSession || String(knownSession.id || "") !== sid) {
+        throw new Error("The selected conversation is no longer available.");
+      }
+      var session = knownSession;
       var title = session.title || sid;
+      var deletingCurrentSession = sid === getCurrentSessionId();
 
-      if (!confirm("Delete current session?\n\n" + title)) return;
+      if (!confirm("Delete this conversation?\n\n" + title)) return;
 
       var result = await postJson("/api/sessions/delete", {
         session_id: sid
       });
 
-      var nextId = result && result.active_session_id ? result.active_session_id : "";
+      if (deletingCurrentSession) {
+        var nextId = result && result.active_session_id ? result.active_session_id : "";
 
-localStorage.removeItem("nova_desktop_session_id");
-localStorage.removeItem("nova_desktop_active_session_id");
-localStorage.removeItem("session_id");
-localStorage.removeItem("active_session_id");
+        localStorage.removeItem("nova_desktop_session_id");
+        localStorage.removeItem("nova_desktop_active_session_id");
+        localStorage.removeItem("session_id");
+        localStorage.removeItem("active_session_id");
 
-      if (nextId) {
-        localStorage.setItem("nova.session_id", nextId);
-        localStorage.setItem("nova_session_id", nextId);
-        localStorage.setItem("nova_active_session_id", nextId);
+        if (nextId) {
+          localStorage.setItem("nova.session_id", nextId);
+          localStorage.setItem("nova_session_id", nextId);
+          localStorage.setItem("nova_active_session_id", nextId);
 
-        var sidInput = document.getElementById("sid");
-        if (sidInput) sidInput.value = nextId;
+          var sidInput = document.getElementById("sid");
+          if (sidInput) sidInput.value = nextId;
 
-        if (typeof window.NovaDesktopFetchSession === "function") {
-          await window.NovaDesktopFetchSession(nextId);
+          if (typeof window.NovaDesktopFetchSession === "function") {
+            await window.NovaDesktopFetchSession(nextId);
+          }
+        } else {
+          localStorage.removeItem("nova.session_id");
+          localStorage.removeItem("nova_session_id");
+          localStorage.removeItem("nova_active_session_id");
+
+          if (typeof window.NovaNewSessionV2 === "function") {
+            await window.NovaNewSessionV2();
+          } else {
+            var chat = document.getElementById("chat");
+            if (chat) chat.innerHTML = "";
+          }
         }
-      } else {
-        localStorage.removeItem("nova.session_id");
-        localStorage.removeItem("nova_session_id");
-        localStorage.removeItem("nova_active_session_id");
-
-        var chat = document.getElementById("chat");
-        if (chat) chat.innerHTML = "";
       }
 
       setStatus("Deleted session: " + title);
       await refreshSessionsIfPossible();
 
     } catch (error) {
-      setStatus(error.message || "Delete failed.");
+      setStatus(window.NovaDesktopUX?.formatError("session", error, "Nova couldn't delete this conversation. Please try again.") || "Nova couldn't delete this conversation. Please try again.");
     }
   }
 
   function installManager() {
-    if (document.getElementById("nova-current-session-manager")) return;
+    var list = document.getElementById("desktopSessionList");
+    if (!list) return;
 
-var host =
-      document.querySelector(".session-current-card") ||
-      document.querySelector(".session-list-shell") ||
-      document.querySelector("aside") ||
-      document.querySelector(".sidebar") ||
-      document.querySelector(".side-panel") ||
-      document.querySelector(".panel") ||
-      document.body;
-
-    var box = document.createElement("div");
-    box.id = "nova-current-session-manager";
-
-box.innerHTML =
-  '<div id="nova-current-session-manager-title">Manage current session</div>' +
-'<div class="nova-current-session-manager-row">' +
-  '<button id="nova-manage-rename-session" class="nova-current-session-manager-btn" type="button">Rename</button>' +
-  '<button id="nova-manage-pin-session" class="nova-current-session-manager-btn" type="button">Pin/Unpin</button>' +
-  '<button id="nova-manage-delete-session" class="nova-current-session-manager-btn" type="button">Delete</button>' +
-'</div>' +
-'<div id="nova-delete-all-sessions-panel">' +
-  '<button id="nova-manage-delete-all-sessions" class="nova-current-session-manager-btn" type="button">Delete All Conversations</button>' +
-'</div>' +
-  '</div>' +
-  '<div id="nova-current-session-manager-status"></div>';
-
-    if (host.firstChild) {
-      host.insertBefore(box, host.firstChild);
-    } else {
-      host.appendChild(box);
+    var button = document.getElementById("nova-manage-delete-all-sessions");
+    if (!button) {
+      button = document.createElement("button");
+      button.id = "nova-manage-delete-all-sessions";
+      button.type = "button";
+      button.className = "nova-sessions-delete-all";
+      button.textContent = "Delete All Conversations";
+      list.parentNode.insertBefore(button, list.nextSibling);
     }
 
-    document.getElementById("nova-manage-rename-session").onclick = renameCurrentSession;
-    document.getElementById("nova-manage-pin-session").onclick = togglePinCurrentSession;
-    document.getElementById("nova-manage-delete-session").onclick = deleteCurrentSession;
-    document.getElementById("nova-manage-delete-all-sessions").onclick =
-      deleteAllSessions;
-
-    console.log("[Nova Current Session Manager] ready");
+    button.onclick = deleteAllSessions;
   }
 
 async function deleteAllSessions() {
@@ -3858,9 +3775,15 @@ async function deleteAllSessions() {
     setStatus("All conversations deleted.");
   } catch (error) {
     console.warn("[delete all sessions failed]", error);
-    setStatus("Delete all failed.");
+    setStatus(window.NovaDesktopUX?.formatError("session", error, "Nova couldn't delete all conversations. Please try again.") || "Nova couldn't delete all conversations. Please try again.");
   }
 }
+
+  window.NovaDesktopSessionActions = {
+    rename: renameCurrentSession,
+    togglePin: togglePinCurrentSession,
+    delete: deleteCurrentSession,
+  };
 
   installManager();
 
@@ -4023,13 +3946,12 @@ if (countEl) {
        * system intercept them.
        */
 if (
-button.id === "novaLeftNextTask" ||
-  button.id === "novaLeftRunAll" ||
-  button.id === "novaLeftStop" ||
-  button.id === "novaLeftReset" ||
   button.id === "desktopContinueProject" ||
   button.id === "desktopRunAll" ||
   button.id === "desktopPause" ||
+  button.id === "desktopNextProject" ||
+  button.id === "desktopStopProject" ||
+  button.id === "desktopResetProject" ||
   button.id === "desktopProjectContinueButton" ||
   button.id === "desktopProjectRunAllButton"
 ) {
@@ -4415,14 +4337,12 @@ if (label.indexOf("continue") === 0) {
        * never intercept these controls.
        */
 if (
-  button.id === "novaLeftContinue" ||
-  button.id === "novaLeftNextTask" ||
-  button.id === "novaLeftRunAll" ||
-  button.id === "novaLeftStop" ||
-  button.id === "novaLeftReset" ||
-  button.id === "desktopContinueProject" ||
+    button.id === "desktopContinueProject" ||
   button.id === "desktopRunAll" ||
   button.id === "desktopPause" ||
+  button.id === "desktopNextProject" ||
+  button.id === "desktopStopProject" ||
+  button.id === "desktopResetProject" ||
   button.id === "desktopProjectContinueButton" ||
   button.id === "desktopProjectRunAllButton"
 ) {
@@ -4480,6 +4400,7 @@ if (
   var recognition = null;
   var listening = false;
   var speaking = false;
+  var speakPending = false;
 
   function $(id) {
     return document.getElementById(id);
@@ -4510,7 +4431,9 @@ if (
 
   function latestAssistantText() {
     var chat = $("chat") || document.querySelector("#chat") || document.body;
-    var candidates = Array.from(chat.querySelectorAll(".msg.assistant .bubble, .assistant .bubble, .msg.assistant, [data-role='assistant']"));
+    var candidates = Array.from(chat.querySelectorAll(
+      ".message-row.assistant .message-body, .message-card.assistant .message-body, .msg.assistant .bubble, .assistant .bubble, .msg.assistant, [data-role='assistant']"
+    ));
 
     if (!candidates.length) {
       candidates = Array.from(chat.querySelectorAll(".bubble, .msg"));
@@ -4642,11 +4565,14 @@ function setVoiceButtonState(btn) {
       window.speechSynthesis.cancel();
     } catch (e) {}
     speaking = false;
+    speakPending = false;
     var btn = $("desktopSpeakBtn");
     if (btn) {
     btn.textContent = "🔊 Speak";
     btn.title = "Read the latest assistant reply aloud";
     btn.classList.remove("speaking");
+    btn.disabled = false;
+    btn.removeAttribute("aria-busy");
 }
   }
 
@@ -4658,7 +4584,7 @@ function setVoiceButtonState(btn) {
       return;
     }
 
-    if (speaking) {
+    if (speaking || speakPending || window.speechSynthesis.speaking || window.speechSynthesis.pending) {
       stopSpeech();
       return;
     }
@@ -4674,18 +4600,27 @@ function setVoiceButtonState(btn) {
     var utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1;
     utterance.pitch = 1;
+    speakPending = true;
+    if (btn) {
+      btn.textContent = "Preparing…";
+      btn.setAttribute("aria-busy", "true");
+    }
 
     utterance.onstart = function () {
+      speakPending = false;
       speaking = true;
       if (btn) {
     btn.textContent = "⏹ Stop Speaking";
     btn.title = "Stop text-to-speech";
     btn.classList.add("speaking");
+    btn.disabled = false;
+    btn.removeAttribute("aria-busy");
 }
     };
 
 utterance.onend = function () {
   speaking = false;
+  speakPending = false;
 
   if (btn) {
     btn.textContent = "🔊 Speak";
@@ -4694,13 +4629,21 @@ utterance.onend = function () {
   }
 };
 
-utterance.onerror = function () {
+utterance.onerror = function (event) {
   speaking = false;
+  speakPending = false;
 
   if (btn) {
     btn.textContent = "🔊 Speak";
     btn.title = "Read the latest assistant reply aloud";
     btn.classList.remove("speaking");
+    btn.disabled = false;
+    btn.removeAttribute("aria-busy");
+  }
+  var status = $("status");
+  var speechError = String(event && event.error || "").toLowerCase();
+  if (status && speechError !== "canceled" && speechError !== "interrupted") {
+    status.textContent = "Nova couldn't read that response aloud. Try again.";
   }
 };
     window.speechSynthesis.speak(utterance);
@@ -6335,8 +6278,8 @@ if (input) input.value = "";
 const emptyHtml = `
   <div class="nova-empty-chat">
     <div>
-      <div class="nova-empty-chat-title">Nova is ready</div>
-      <div class="nova-empty-chat-subtitle">Send a message to begin.</div>
+      <div class="nova-empty-chat-title">Start a conversation with Nova</div>
+      <div class="nova-empty-chat-subtitle">Ask a question, attach a file, or create a project for work that takes several steps.</div>
     </div>
   </div>
 `;
@@ -6466,6 +6409,9 @@ console.log("[Nova Force New Chat] cleared chat");
         } else {
             showLeftArtifacts();
         }
+
+        const button = getButton();
+        if (button) button.setAttribute("aria-expanded", isOpen ? "false" : "true");
     }
 
     function openLeftArtifactViewer(artifact) {
@@ -6677,10 +6623,8 @@ console.log("[Nova Force New Chat] cleared chat");
                 list.appendChild(card);
             });
         } catch (error) {
-            list.innerHTML =
-                "<pre style='white-space:pre-wrap;color:#ff8080;'>" +
-                esc(error && error.stack ? error.stack : error) +
-                "</pre>";
+            console.error("[Nova Left Artifacts] failed to load", error);
+            list.textContent = window.NovaDesktopUX?.formatError("artifact", error) || "Nova couldn't load Artifacts. Check your connection and try again.";
         }
     }
 
@@ -6717,9 +6661,10 @@ console.log("[Nova Force New Chat] cleared chat");
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="/static/js/nova-sessions-v2.js"></script>
+<script src="/static/js/nova-sessions-v2.js?v=sidebar-workspace-20261003-1"></script>
 <script src="/static/js/nova-chat-stream.js"></script>
 <script src="/static/js/chat-state.js"></script>
+<script src="/static/js/answer-payload.js?v=verified-ux-cleanup-20261003-1"></script>
 <script src="/static/js/chat-messages.js"></script>
 <script src="/static/js/tool-approval-actions.js"></script>
 <script src="/static/js/chat-service.js"></script>
@@ -6757,8 +6702,8 @@ console.log(
 <script src="/static/js/nova-execution.js"></script>
 <script src="/static/js/app-api.js"></script>
 <script src="/static/js/composer_dashboard_ai_tools.js?v=20260929-1"></script>
-<script src="/static/js/nova-desktop-projects.js"></script>
-<script src="/static/js/nova-project-execution-controls.js"></script>
+<script src="/static/js/nova-desktop-projects.js?v=sidebar-workspace-20261003-1"></script>
+<script src="/static/js/nova-desktop-ux.js?v=sidebar-workspace-20261003-1"></script>
 <script src="/static/js/app.js"></script>
 <script src="/static/js/nova-main.js"></script>
 
@@ -6854,7 +6799,7 @@ console.log(
   }
 
   function addCopyButton(pre, code) {
-    if (pre.querySelector(".nova-code-copy")) return;
+    if (pre.closest(".nova-live-code-block") || pre.querySelector(".nova-code-copy")) return;
 
     const btn = document.createElement("button");
     btn.type = "button";
@@ -7021,7 +6966,8 @@ console.log(
   }
 
   function polishPre(pre) {
-    if (!pre || pre.dataset.novaCodeHeaderPolished === "1") return;
+    if (!pre || pre.closest(".nova-live-code-block")) return;
+    if (pre.dataset.novaCodeHeaderPolished === "1") return;
 
     const code = pre.querySelector("code");
     if (!code) return;
@@ -7060,13 +7006,6 @@ console.log(
   console.log("[Nova Code Block Header Polish] ready");
 })();
 </script>
-
-
-<!-- NOVA_DESKTOP_POLISH_CSS_LINK_20260620 -->
-<link rel="stylesheet"
-<link rel="stylesheet" href="/static/css/nova-desktop-polish.css?v=recent-session-cards-final-20260621-1">
-<link rel="stylesheet" href="/static/css/nova-desktop-clean.css?v=1">
-
 
 
 <!-- NOVA_CODE_BLOCK_VISUAL_POLISH_FINAL_20260622 -->
@@ -9274,6 +9213,7 @@ window.NovaLoadDesktopMemory = load;
         const blocks = scope.querySelectorAll ? scope.querySelectorAll("#chat pre") : [];
 
         blocks.forEach(function (pre) {
+            if (pre.closest(".nova-live-code-block")) return;
             if (!pre || pre.dataset.novaCodeEnhanced === "1") return;
 
             pre.dataset.novaCodeEnhanced = "1";
@@ -11038,35 +10978,6 @@ pre code {
 <script>
 (function () {
 
-const novaSettingsClose =
-
-    document.getElementById(
-        "novaSettingsClose"
-    );
-
-
-if (novaSettingsClose) {
-
-    novaSettingsClose.onclick = function () {
-
-        const modal =
-            document.getElementById(
-                "novaSettingsModal"
-            );
-
-        if (modal) {
-
-            modal.setAttribute(
-                "hidden",
-                ""
-            );
-
-        }
-
-    };
-
-}
-
 const novaAboutClose =
     document.getElementById(
         "novaAboutClose"
@@ -11152,23 +11063,7 @@ document.addEventListener(
         if (novaSettingsBtn) {
 
             novaSettingsBtn.onclick = function () {
-
-                console.log(
-                    "[Nova Menu] Settings OPEN"
-                );
-
-                const modal =
-                    document.getElementById(
-                        "novaSettingsModal"
-                    );
-
-                if (modal) {
-
-                    modal.removeAttribute(
-                        "hidden"
-                    );
-
-                }
+                window.location.href = "/settings";
 
             };
 
@@ -11334,74 +11229,6 @@ document.addEventListener(
 </style>
 
 <!-- NOVA_MENU_MODALS_20260728 -->
-
-<div
-  id="novaSettingsModal"
-  class="nova-modal"
-  hidden
->
-  <div class="nova-modal-card">
-
-    <button
-      id="novaSettingsClose"
-      class="nova-modal-close"
-      type="button"
-    >
-      ✕
-    </button>
-
-
-    <h2>
-      Nova Settings
-    </h2>
-
-
-    <div class="nova-setting-row">
-      <span>
-        Theme
-      </span>
-
-      <button type="button">
-        Dark
-      </button>
-    </div>
-
-
-    <div class="nova-setting-row">
-      <span>
-        Memory
-      </span>
-
-      <button type="button">
-        Enabled
-      </button>
-    </div>
-
-
-    <div class="nova-setting-row">
-      <span>
-        Voice
-      </span>
-
-      <button type="button">
-        Disabled
-      </button>
-    </div>
-
-
-    <div class="nova-setting-row">
-      <span>
-        Account
-      </span>
-
-      <span>
-        Developer
-      </span>
-    </div>
-
-
-  </div>
-</div>
 
 <div
   id="novaAboutModal"
@@ -11835,6 +11662,8 @@ aside.panel.tools > .quick-actions-section {
 </script>
 
 
+<link rel="stylesheet" href="/static/css/nova-desktop-ux.css?v=sidebar-workspace-20261003-1">
+<script src="/static/js/nova-settings.js?v=settings-20261003-1"></script>
 </body>
 </html>
 

@@ -72,8 +72,7 @@
         if (!state) {
             container.innerHTML = `
                 <div class="nova-panel-muted">
-                    No active mission yet. Start with
-                    <strong>auto-plan &lt;goal&gt;</strong>.
+                    Start or select a project to use execution controls.
                 </div>
             `;
 
@@ -90,6 +89,8 @@
                 state.status ||
                 "ready"
             );
+        const visibleStatus =
+            window.NovaDesktopUX?.statusLabel(status) || status;
 
         const title =
             String(
@@ -110,10 +111,13 @@
             );
 
         const error =
-            String(
-                state.error ||
-                ""
-            );
+            state.error
+                ? (window.NovaDesktopUX?.formatError("execution", state.error) || "Nova couldn't complete this project action. Review the project status and try again.")
+                : "";
+        const visibleResult =
+            result && ["blocked", "failed", "error"].includes(status.toLowerCase())
+                ? (window.NovaDesktopUX?.formatError("execution", result) || "Nova couldn't complete this project action. Review the project status and try again.")
+                : result;
 
         const stepsHtml =
             steps.length
@@ -124,6 +128,8 @@
                                 step?.status ||
                                 "pending"
                             );
+                        const visibleStepStatus =
+                            window.NovaDesktopUX?.statusLabel(stepStatus) || stepStatus;
 
                         const stepTitle =
                             String(
@@ -155,6 +161,11 @@
                             }
                         }
 
+                        const visibleOutput =
+                            output && ["blocked", "failed", "error"].includes(stepStatus.toLowerCase())
+                                ? (window.NovaDesktopUX?.formatError("execution", output) || "This step needs attention before the project can continue.")
+                                : output;
+
                         return `
                             <div
                                 class="nova-execution-step"
@@ -178,7 +189,7 @@
                                     <span
                                         class="nova-execution-step-status"
                                     >
-                                        ${escapeHtml(stepStatus)}
+                                        ${escapeHtml(visibleStepStatus)}
                                     </span>
                                 </div>
 
@@ -188,7 +199,7 @@
                                             <div
                                                 class="nova-execution-step-output"
                                             >
-                                                ${escapeHtml(output)}
+                                        ${escapeHtml(visibleOutput)}
                                             </div>
                                         `
                                         : ""
@@ -213,7 +224,7 @@
                     class="nova-execution-status"
                     data-status="${escapeHtml(status)}"
                 >
-                    ${escapeHtml(status)}
+                    ${escapeHtml(visibleStatus)}
                 </div>
             </div>
 
@@ -235,7 +246,7 @@
                 result
                     ? `
                         <div class="nova-execution-result">
-                            ${escapeHtml(result)}
+                            ${escapeHtml(visibleResult)}
                         </div>
                     `
                     : ""

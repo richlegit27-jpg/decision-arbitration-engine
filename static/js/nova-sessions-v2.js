@@ -40,6 +40,178 @@
     );
   }
 
+  let sessionsById = new Map();
+
+  function closeSessionMenu(row, restoreFocus = false) {
+    if (!row) return;
+
+    const toggle = row.querySelector("[data-session-menu-toggle]");
+    const menu = row.querySelector("[data-session-menu]");
+    row.classList.remove("session-menu-open", "session-menu-open-above");
+    if (toggle) toggle.setAttribute("aria-expanded", "false");
+    if (menu) {
+      menu.hidden = true;
+      menu.style.removeProperty("position");
+      menu.style.removeProperty("top");
+      menu.style.removeProperty("left");
+      menu.style.removeProperty("right");
+      menu.style.removeProperty("bottom");
+    }
+    if (restoreFocus) toggle?.focus();
+  }
+
+  function closeAllSessionMenus(list, restoreFocus = false) {
+    const openRow = list.querySelector(".desktop-session-row.session-menu-open");
+    if (openRow) closeSessionMenu(openRow, restoreFocus);
+  }
+
+  function openSessionMenu(toggle, focusFirst = false) {
+    const list = $("desktopSessionList");
+    const row = toggle.closest(".desktop-session-row");
+    if (!list || !row) return;
+
+    closeAllSessionMenus(list);
+    const menu = row.querySelector("[data-session-menu]");
+    if (!menu) return;
+
+    const toggleBounds = toggle.getBoundingClientRect();
+    row.classList.add("session-menu-open");
+    menu.hidden = false;
+    menu.style.setProperty("position", "fixed", "important");
+    menu.style.setProperty("right", "auto", "important");
+    menu.style.setProperty("bottom", "auto", "important");
+    const menuBounds = menu.getBoundingClientRect();
+    const menuWidth = menuBounds.width || 150;
+    const menuHeight = menuBounds.height || 112;
+    const viewportPadding = 8;
+    const left = Math.max(
+      viewportPadding,
+      Math.min(window.innerWidth - menuWidth - viewportPadding, toggleBounds.right - menuWidth)
+    );
+    const below = toggleBounds.bottom + 4;
+    const top = below + menuHeight <= window.innerHeight - viewportPadding
+      ? below
+      : Math.max(viewportPadding, toggleBounds.top - menuHeight - 4);
+    menu.style.setProperty("left", `${left}px`, "important");
+    menu.style.setProperty("top", `${top}px`, "important");
+    toggle.setAttribute("aria-expanded", "true");
+
+    if (focusFirst) {
+      menu.querySelector("button")?.focus();
+    }
+  }
+
+  function bindSessionListActions(list) {
+    if (!list || list.dataset.novaSessionActionsBound === "true") return;
+    list.dataset.novaSessionActionsBound = "true";
+
+    list.addEventListener("click", async (event) => {
+      const target = event.target instanceof Element
+        ? event.target.closest("button")
+        : null;
+      if (!target || !list.contains(target)) return;
+
+      const row = target.closest(".desktop-session-row");
+      if (!row) return;
+
+      if (target.matches("[data-session-menu-toggle]")) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (row.classList.contains("session-menu-open")) {
+          closeSessionMenu(row);
+        } else {
+          openSessionMenu(target);
+        }
+        return;
+      }
+
+      const action = target.getAttribute("data-session-action");
+      if (action) {
+        event.preventDefault();
+        event.stopPropagation();
+        const sessionId = row.dataset.sessionId || "";
+        closeSessionMenu(row, true);
+        const actions = window.NovaDesktopSessionActions;
+        const session = sessionsById.get(sessionId);
+        if (!sessionId || !session || !actions) {
+          setStatus("This conversation is no longer available. Refresh the list and try again.");
+          return;
+        }
+        if (action === "rename") await actions.rename?.(sessionId, session);
+        if (action === "pin") await actions.togglePin?.(sessionId, session);
+        if (action === "delete") await actions.delete?.(sessionId, session);
+        return;
+      }
+
+      if (target.matches("[data-session-open]")) {
+        event.preventDefault();
+        const session = sessionsById.get(row.dataset.sessionId || "");
+        if (session) {
+          closeAllSessionMenus(list);
+          await selectSession(session);
+        }
+      }
+    });
+
+    list.addEventListener("keydown", (event) => {
+      const toggle = event.target instanceof Element
+        ? event.target.closest("[data-session-menu-toggle]")
+        : null;
+      const menu = event.target instanceof Element
+        ? event.target.closest("[data-session-menu]")
+        : null;
+
+      if (toggle && event.key === "ArrowDown") {
+        event.preventDefault();
+        openSessionMenu(toggle, true);
+        return;
+      }
+
+      if (menu && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+        const items = [...menu.querySelectorAll("button")];
+        const current = items.indexOf(document.activeElement);
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        event.preventDefault();
+        items[(current + step + items.length) % items.length]?.focus();
+        return;
+      }
+
+      if (menu && ["Home", "End"].includes(event.key)) {
+        const items = [...menu.querySelectorAll("button")];
+        event.preventDefault();
+        items[event.key === "Home" ? 0 : items.length - 1]?.focus();
+      }
+    });
+
+    list.addEventListener("focusout", (event) => {
+      const row = event.target instanceof Element
+        ? event.target.closest(".desktop-session-row")
+        : null;
+      if (!row) return;
+      window.setTimeout(() => {
+        if (!row.contains(document.activeElement)) closeSessionMenu(row);
+      }, 0);
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!list.contains(event.target)) closeAllSessionMenus(list);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      const openRow = list.querySelector(".desktop-session-row.session-menu-open");
+      if (openRow) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeSessionMenu(openRow, true);
+      }
+    });
+
+    const closeOpenMenu = () => closeAllSessionMenus(list);
+    window.addEventListener("resize", closeOpenMenu);
+    list.addEventListener("scroll", closeOpenMenu, true);
+  }
+
   function rememberSessionId(sid) {
     if (!sid) {
       return;
@@ -234,12 +406,14 @@ if (existing) {
       document
         .querySelectorAll(".desktop-session-item")
         .forEach((item) => {
-          item.classList.toggle(
-            "active",
-            item.dataset.sessionId === sid
-          )
+          const active = item.dataset.sessionId === sid;
+          item.classList.toggle("active", active);
+          item.classList.toggle("is-active", active);
+          item.setAttribute("aria-current", active ? "true" : "false");
+          item.setAttribute("aria-pressed", active ? "true" : "false");
         })
 
+      window.NovaDesktopProjects?.showChatView?.()
       setStatus("session selected")
 
       console.log(
@@ -253,6 +427,7 @@ if (existing) {
         "[NOVA Sessions V2] session selection failed",
         error
       )
+      setStatus(window.NovaDesktopUX?.formatError("session-load", error) || "Nova couldn't load this conversation. Check your connection and try again.")
     }
   }
 
@@ -299,10 +474,11 @@ if (existing) {
         [];
 
       list.innerHTML = "";
+      sessionsById = new Map();
 
       if (!sessions.length) {
         list.innerHTML =
-          "<div class='session-placeholder'>No saved sessions yet.</div>";
+          "<div class='session-placeholder'>No conversations yet. Start a new chat with Nova.</div>";
 
         return;
       }
@@ -384,6 +560,8 @@ if (existing) {
         }
 
       }
+      bindSessionListActions(list);
+
       sessions.slice(0, 30).forEach((session) => {
         const sid = getSessionId(session);
 
@@ -391,36 +569,69 @@ if (existing) {
           return;
         }
 
-        const btn = document.createElement("button");
+        sessionsById.set(sid, session);
+        const activeId = String(getState()?.activeChatId || "").trim();
+        const active = sid === activeId;
+        const pinned = Boolean(session.pinned);
 
-        btn.type = "button";
-        btn.className = "desktop-session-item";
-        btn.dataset.sessionId = sid;
+        const row = document.createElement("div");
+        row.className = "desktop-session-row";
+        row.dataset.sessionId = sid;
 
-        const title = document.createElement("div");
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "desktop-session-item" + (active ? " is-active" : "");
+        open.dataset.sessionId = sid;
+        open.dataset.sessionOpen = "true";
+        open.setAttribute("aria-current", active ? "true" : "false");
+        open.setAttribute("aria-pressed", active ? "true" : "false");
+        open.title = getSessionTitle(session);
 
+        const title = document.createElement("span");
         title.className = "desktop-session-title";
         title.textContent = getSessionTitle(session);
+        open.appendChild(title);
 
-        const meta = document.createElement("div");
+        if (pinned) {
+          const pinIndicator = document.createElement("span");
+          pinIndicator.className = "desktop-session-pin-indicator";
+          pinIndicator.textContent = "Pinned";
+          pinIndicator.setAttribute("aria-label", "Pinned conversation");
+          open.appendChild(pinIndicator);
+        }
 
-        meta.className = "desktop-session-meta";
-        meta.textContent = sid;
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "desktop-session-menu-toggle";
+        toggle.dataset.sessionMenuToggle = "true";
+        toggle.setAttribute("aria-label", "Conversation actions for " + getSessionTitle(session));
+        toggle.setAttribute("aria-haspopup", "menu");
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.textContent = "⋯";
 
-        btn.appendChild(title);
-        btn.appendChild(meta);
+        const menu = document.createElement("div");
+        menu.className = "desktop-session-menu";
+        menu.dataset.sessionMenu = "true";
+        menu.setAttribute("role", "menu");
+        menu.setAttribute("aria-label", "Conversation actions");
+        menu.hidden = true;
 
-        btn.addEventListener(
-          "click",
-          async function (event) {
-            event.preventDefault();
-            event.stopPropagation();
+        [
+          ["rename", "Rename", false],
+          ["pin", pinned ? "Unpin" : "Pin", false],
+          ["delete", "Delete", true],
+        ].forEach(([action, label, destructive]) => {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "desktop-session-menu-item" + (destructive ? " is-destructive" : "");
+          item.dataset.sessionAction = action;
+          item.setAttribute("role", "menuitem");
+          item.textContent = label;
+          menu.appendChild(item);
+        });
 
-            await selectSession(session);
-          }
-        );
-
-        list.appendChild(btn);
+        row.append(open, toggle, menu);
+        list.appendChild(row);
       });
 
       const activeId =
@@ -432,10 +643,11 @@ if (existing) {
         list
           .querySelectorAll(".desktop-session-item")
           .forEach((item) => {
-            item.classList.toggle(
-              "active",
-              item.dataset.sessionId === activeId
-            );
+            const isActive = item.dataset.sessionId === activeId;
+            item.classList.toggle("active", isActive);
+            item.classList.toggle("is-active", isActive);
+            item.setAttribute("aria-current", isActive ? "true" : "false");
+            item.setAttribute("aria-pressed", isActive ? "true" : "false");
           });
       }
 
@@ -450,7 +662,9 @@ if (existing) {
       );
 
       list.innerHTML =
-        "<div class='session-placeholder'>Could not load sessions.</div>";
+        "<div class='session-placeholder'>" +
+        (window.NovaDesktopUX?.formatError("session-load", error) || "Nova couldn't load your conversations. Check your connection and try again.") +
+        "</div>";
 
       setStatus("sessions failed");
     }
@@ -588,6 +802,7 @@ if (chat) {
     await loadSessions();
 
 
+    window.NovaDesktopProjects?.showChatView?.();
     setStatus("new session ready");
 
 

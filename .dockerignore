@@ -5,6 +5,7 @@ venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+data/
 nova_backups/
 data/*.bak
 data/*backup*

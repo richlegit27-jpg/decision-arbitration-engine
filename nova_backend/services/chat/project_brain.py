@@ -179,7 +179,19 @@ def install_project_brain_patch(ChatService):
         text = str(user_text or "").strip().lower()
         text = text.replace("?", "'").replace("`", "")
         text = " ".join(text.split())
-        bare = text.rstrip("?!.")
+        bare = text.rstrip("?!.'")
+        if (
+            bare in {
+                "what are we going to do first",
+                "what should we do first",
+                "what is the first task",
+                "what's the first task",
+                "whats the first task",
+            }
+            or "exact first task in the project" in bare
+            or "first saved task" in bare
+        ):
+            return "first_saved_task"
         
         if (
             "nova status" in bare
@@ -353,8 +365,7 @@ def install_project_brain_patch(ChatService):
         try:
             print(
                 "[ANSWER KIND BEFORE BRANCH]",
-                repr(kind),
-                repr(user_text),
+                {"kind": kind, "text_chars": len(str(user_text or ""))},
             )
 
             if kind == "failure_interpreter":
@@ -411,9 +422,7 @@ def install_project_brain_patch(ChatService):
 
                 print(
                     "[CHAT SERVICE CALLING PBGI]",
-                    repr(user_text),
-                    "kind=",
-                    repr(kind),
+                    {"kind": kind, "text_chars": len(str(user_text or ""))},
                 )
 
                 fresh_answer = build_project_brain_general_answer(
@@ -598,11 +607,6 @@ def _nova_project_brain_question_top_priority_handle_20260701(
         )
     )
 
-    print(
-        "[QUESTION TEXT DEBUG]",
-        repr(user_text),
-    )
-
     kind = (
         _nova_project_brain_question_kind_20260701(
             user_text
@@ -611,14 +615,12 @@ def _nova_project_brain_question_top_priority_handle_20260701(
 
     print(
         "[KIND CHECK BEFORE ANSWER]",
-        repr(user_text),
-        repr(kind),
+        {"kind": kind, "text_chars": len(str(user_text or ""))},
     )
 
     print(
         "[PROJECT BRAIN DEBUG]",
-        repr(user_text),
-        repr(kind),
+        {"kind": kind, "text_chars": len(str(user_text or ""))},
     )
 
     session_id = (
@@ -627,6 +629,19 @@ def _nova_project_brain_question_top_priority_handle_20260701(
             kwargs,
         )
     )
+
+    if kind == "first_saved_task":
+        from nova_backend.services.project_brain_context_builder import (
+            build_first_saved_task_answer,
+        )
+
+        saved_task_answer = build_first_saved_task_answer()
+        if saved_task_answer:
+            return _nova_project_brain_response_20260701(
+                saved_task_answer,
+                session_id,
+                first_message=False,
+            )
 
     if kind in {
         "current_project_state",

@@ -79,9 +79,9 @@ class ExecutionHandler:
         print(
             "DEBUG EXECUTION HANDLER ENTERED",
             {
-                "user_text": user_text,
                 "session_id": session_id,
                 "auth_user_id": auth_user_id,
+                "text_chars": len(str(user_text or "")),
             },
         )
 

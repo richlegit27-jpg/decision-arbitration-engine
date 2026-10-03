@@ -32,44 +32,7 @@ class AutonomyRouteGuardService:
                 ):
                     return None
 
-                raw_body = request.get_data(
-                    cache=True,
-                    as_text=True,
-                )
-
-                print(
-                    "[RAW BYTES FIRST GUARD]",
-                    request.get_data(
-                        cache=True,
-                    ),
-                    flush=True,
-                )
-
-                import json
-
-                raw_body = request.get_data(
-                    cache=True,
-                    as_text=True,
-                )
-
-                try:
-                    payload = json.loads(raw_body)
-
-                except Exception as exc:
-                    print(
-                        "[FIRST GUARD JSON LOAD FAILED]",
-                        repr(raw_body),
-                        repr(exc),
-                        flush=True,
-                    )
-
-                    payload = {}
-
-                print(
-                    "[FIRST GUARD JSON]",
-                    payload,
-                    flush=True,
-                )
+                payload = request.get_json(silent=True) or {}
 
                 from nova_backend.services.autonomy_plan_adapter import (
                     build_autonomy_plan_response,
@@ -88,7 +51,7 @@ class AutonomyRouteGuardService:
             except Exception as exc:
                 print(
                     "[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD] failed:",
-                    exc,
+                    type(exc).__name__,
                 )
                 return None
 
@@ -125,6 +88,6 @@ class AutonomyRouteGuardService:
             except Exception as exc:
                 print(
                     "[NOVA_PATCH_BUILD_ADAPTER_GUARD] failed:",
-                    exc,
+                    type(exc).__name__,
                 )
                 return None

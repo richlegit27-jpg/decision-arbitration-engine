@@ -6,7 +6,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
-UPLOADS_DIR = BASE_DIR / "uploads"
+UPLOADS_DIR = Path(
+    os.environ.get("NOVA_UPLOADS_DIR", str(DATA_DIR / "uploads"))
+)
 
 SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
 ARTIFACTS_FILE = DATA_DIR / "nova_artifacts.json"

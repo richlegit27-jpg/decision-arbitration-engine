@@ -100,11 +100,7 @@ class ExecutionTopGuardService:
         execution_bridge_service=None,
         **services,
     ):
-        print(
-            "[TOP EXECUTION GUARD ENTERED]",
-            repr(payload),
-            flush=True,
-        )
+        print("[TOP EXECUTION GUARD ENTERED]", flush=True)
 
         if not isinstance(payload, dict):
             return {
@@ -173,7 +169,7 @@ class ExecutionTopGuardService:
                     "is_continuation_request": (
                         is_continuation_request
                     ),
-                    "user_text": user_text,
+                    "text_chars": len(user_text),
                 },
                 flush=True,
             )

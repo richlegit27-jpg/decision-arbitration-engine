@@ -9,7 +9,8 @@ class BlogRouteService:
             "[BLOG ROUTES] INSTALLED"
         )
 
-        from flask import render_template, jsonify, request
+        from flask import render_template, jsonify, request, redirect
+        from nova_backend.services.auth_context import get_current_user_id
 
         @app.route("/help")
         def nova_help_page_20260611():
@@ -21,6 +22,8 @@ class BlogRouteService:
 
         @app.route("/blog/write")
         def nova_blog_write_page_restored_20260711():
+            if not get_current_user_id():
+                return redirect("/login")
             return render_template("blog_write.html")
 
         @app.route("/blog/<slug>")
@@ -58,6 +61,13 @@ class BlogRouteService:
                         "posts": posts,
                     }
                 )
+
+            # Publishing is an admin action. Require both the server-authenticated
+            # account and the configured admin secret; an unset secret fails closed.
+            expected_admin_key = __import__("os").environ.get("NOVA_ADMIN_KEY", "").strip()
+            provided_admin_key = request.headers.get("X-NOVA-ADMIN-KEY", "").strip()
+            if not get_current_user_id() or not expected_admin_key or provided_admin_key != expected_admin_key:
+                return jsonify({"ok": False, "error": "Only an authenticated Nova administrator can publish posts."}), 403
 
             payload = request.get_json(
                 silent=True

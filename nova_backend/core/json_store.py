@@ -19,8 +19,11 @@ def read_json(path: Path, default: Any) -> Any:
         return deepcopy(default)
 
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        write_json(path, default)
-        return deepcopy(default)
+        # utf-8-sig accepts ordinary UTF-8 and strips a BOM when older
+        # Windows tools have written one. Invalid JSON still fails closed.
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        # Keep the original bytes available for recovery. Mutations must fail
+        # until the existing store is repaired explicitly.
+        raise ValueError(f"Unable to read JSON store: {path}") from exc
 

@@ -293,7 +293,7 @@ def _observe_project_brain_answer(
 
     print(
         "[NOVA BEHAVIOR OBSERVE HIT]",
-        user_text,
+        {"text_chars": len(str(user_text or ""))},
     )
 
     try:
@@ -507,10 +507,7 @@ def _nova_project_brain_general_live_selector_normalize_20260702(user_text):
     return q
 
 def _legacy_build_project_brain_general_answer_497(user_text=""):
-    print(
-        "[DEBUG_PROJECT_BRAIN_GENERAL_CALLED]",
-        user_text,
-    )
+    print("[DEBUG_PROJECT_BRAIN_GENERAL_CALLED]", {"text_chars": len(str(user_text or ""))})
 
     intent = classify_project_brain_intent(user_text)
 
@@ -522,7 +519,7 @@ def _legacy_build_project_brain_general_answer_497(user_text=""):
 
     print(
         "[DEBUG PROJECT BRAIN FINAL INTENT]",
-        repr(user_text),
+        {"text_chars": len(str(user_text or ""))},
         "=>",
         intent,
     )
@@ -674,7 +671,7 @@ def _decision_log_current_project_answer(*args, **kwargs):
 
     print(
         "[NOVA CURRENT PROJECT ANSWER CALLED]",
-        user_text,
+        {"text_chars": len(str(user_text or ""))},
     )
 
     if _nova_is_decision_log_question_20260701(user_text):

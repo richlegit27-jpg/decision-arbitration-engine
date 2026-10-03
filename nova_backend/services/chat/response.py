@@ -383,12 +383,12 @@ class ChatResponseHandler:
             "[FINALIZE RESPONSE ENTERED]",
             {
                 "session_id": session_id,
-                "user_text": user_text,
                 "has_user_msg":
                 isinstance(user_msg, dict),
                 "has_assistant_msg":
                 isinstance(assistant_msg, dict),
                 "regenerate": regenerate,
+                "text_chars": len(str(user_text or "")),
             },
         )
 

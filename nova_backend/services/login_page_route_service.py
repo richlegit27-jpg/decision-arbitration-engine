@@ -43,6 +43,9 @@ class LoginPageRouteService:
                 "reset_password.html",
             )
 
+        def verify_email_page():
+            return render_template("verify_email.html")
+
         def account_page():
             user_id = str(session.get("nova_user_id") or "").strip()
             if not user_id:
@@ -110,6 +113,14 @@ class LoginPageRouteService:
                 "/reset-password",
                 "nova_reset_password_page_20260908",
                 reset_password_page,
+                methods=["GET"],
+            )
+
+        if not route_exists("/verify-email"):
+            app.add_url_rule(
+                "/verify-email",
+                "nova_verify_email_page_20261002",
+                verify_email_page,
                 methods=["GET"],
             )
 

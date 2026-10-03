@@ -1,0 +1,415 @@
+/* Shared presentation layer for Nova pages outside the main desktop workspace. */
+:root {
+  color-scheme: dark;
+  --nova-page-bg: #090b13;
+  --nova-page-surface: rgba(17, 20, 32, 0.94);
+  --nova-page-surface-raised: rgba(24, 27, 42, 0.94);
+  --nova-page-line: rgba(187, 175, 225, 0.14);
+  --nova-page-line-strong: rgba(187, 175, 225, 0.24);
+  --nova-page-text: #f3f1fa;
+  --nova-page-muted: #a7a4b7;
+  --nova-page-accent: #a78bfa;
+  --nova-page-accent-soft: rgba(139, 92, 246, 0.15);
+  --nova-page-success: #70d9b2;
+  --nova-page-danger: #f28b9b;
+  --nova-page-radius: 20px;
+  --nova-page-shadow: 0 28px 76px rgba(0, 0, 0, 0.34);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--nova-page-bg);
+  scroll-behavior: smooth;
+}
+
+body {
+  color: var(--nova-page-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background:
+    radial-gradient(ellipse at 14% 0%, rgba(139, 92, 246, 0.13), transparent 34rem),
+    radial-gradient(ellipse at 88% 4%, rgba(112, 217, 178, 0.07), transparent 30rem),
+    var(--nova-page-bg);
+}
+
+a,
+button,
+input,
+textarea,
+select {
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(167, 139, 250, 0.8);
+  outline-offset: 3px;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  border-color: var(--nova-page-line-strong);
+  border-radius: 13px;
+  background-color: rgba(10, 12, 21, 0.72);
+  color: var(--nova-page-text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #858296;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(167, 139, 250, 0.68) !important;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.14) !important;
+}
+
+button:disabled,
+button[aria-busy="true"] {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.login-shell,
+.card,
+.nova-error-shell,
+.nova-admin-panel,
+.nova-admin-card {
+  border-color: var(--nova-page-line) !important;
+  background: linear-gradient(150deg, rgba(20, 23, 37, 0.97), rgba(12, 14, 24, 0.96)) !important;
+  box-shadow: var(--nova-page-shadow) !important;
+}
+
+.login-shell {
+  position: relative;
+  isolation: isolate;
+  max-width: 500px !important;
+  padding: clamp(26px, 5vw, 38px) !important;
+  border-radius: 28px !important;
+  overflow: hidden;
+}
+
+.login-shell::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  height: 170px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(139, 92, 246, 0.17), transparent 72%);
+  content: "";
+  pointer-events: none;
+}
+
+.login-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  color: var(--nova-page-text);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+}
+
+.login-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(167, 139, 250, 0.38);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(139, 92, 246, 0.34), rgba(112, 217, 178, 0.16));
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(72, 50, 130, 0.28);
+}
+
+.login-shell h1,
+.card h1 {
+  letter-spacing: -0.045em;
+}
+
+.login-shell .tab-btn,
+.login-shell .google-btn,
+.wrap .back-link,
+.wrap .logout-btn {
+  border-color: var(--nova-page-line-strong);
+  background-color: rgba(255, 255, 255, 0.045);
+}
+
+.login-shell .tab-btn.active {
+  border-color: rgba(167, 139, 250, 0.46);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.23), rgba(112, 217, 178, 0.12));
+}
+
+.login-shell .submit-btn,
+.card button[type="submit"] {
+  border: 1px solid rgba(196, 181, 253, 0.32);
+  background: linear-gradient(135deg, #a78bfa, #7c6be3 58%, #67c9a9);
+  color: #100f19;
+  box-shadow: 0 10px 24px rgba(106, 82, 188, 0.24);
+}
+
+.login-shell .submit-btn:hover,
+.card button[type="submit"]:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.forgot-password,
+.back-link {
+  color: #c4b5fd !important;
+}
+
+.message.error,
+.security-error,
+[role="alert"] {
+  color: #ff9eaa;
+}
+
+.message.success,
+.security-success {
+  color: #84e2bd;
+}
+
+.note,
+.info-item,
+.security-card,
+.nova-admin-card {
+  border-color: var(--nova-page-line) !important;
+  background-color: rgba(255, 255, 255, 0.035) !important;
+}
+
+.nova-public-nav,
+.nova-features-nav,
+.nova-roadmap-nav,
+.nova-faq-nav,
+.nova-contact-nav,
+.nova-legal-nav,
+.nova-billing-nav,
+.nova-help-nav,
+.nova-home-nav,
+.nova-error-nav,
+.topbar,
+.nav {
+  border-color: var(--nova-page-line);
+}
+
+.nova-public-nav a,
+.nova-features-nav a,
+.nova-roadmap-nav a,
+.nova-faq-nav a,
+.nova-contact-nav a,
+.nova-legal-nav a,
+.nova-billing-nav a,
+.nova-help-nav a,
+.nova-home-nav a,
+.nova-error-nav a {
+  text-underline-offset: 4px;
+}
+
+.nova-billing-shell,
+.nova-public-shell,
+.nova-features-shell,
+.nova-roadmap-shell,
+.nova-faq-shell,
+.nova-contact-shell,
+.nova-legal-shell,
+.nova-help-shell,
+.nova-blog-shell,
+.shell,
+.page,
+.wrap {
+  isolation: isolate;
+}
+
+.nova-blog-shell .post,
+.nova-blog-shell .empty,
+.page article,
+.page .panel,
+.editor-grid .panel {
+  border-color: var(--nova-page-line) !important;
+  background: linear-gradient(150deg, rgba(20, 23, 37, 0.95), rgba(12, 14, 24, 0.94)) !important;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.24);
+}
+
+.verify-shell {
+  width: min(500px, calc(100% - 32px));
+  padding: clamp(24px, 5vw, 38px);
+  border: 1px solid var(--nova-page-line);
+  border-radius: 26px;
+  background: linear-gradient(150deg, rgba(20, 23, 37, 0.97), rgba(12, 14, 24, 0.96));
+  box-shadow: var(--nova-page-shadow);
+}
+
+.verify-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.verify-brand-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(167, 139, 250, 0.38);
+  border-radius: 11px;
+  background: var(--nova-page-accent-soft);
+}
+
+.verify-shell a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 0 16px;
+  border: 1px solid var(--nova-page-line-strong);
+  border-radius: 12px;
+  background: rgba(139, 92, 246, 0.16);
+  color: var(--nova-page-text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.history-page {
+  width: min(920px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 56px;
+}
+
+.history-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--nova-page-line);
+}
+
+.history-brand,
+.history-nav a {
+  color: var(--nova-page-text);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.history-hero {
+  padding: 34px 0 22px;
+}
+
+.history-hero p,
+.history-role {
+  color: var(--nova-page-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.history-hero h1 {
+  margin: 8px 0;
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  letter-spacing: -0.05em;
+}
+
+.history-session-id {
+  color: var(--nova-page-muted);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.history-transcript {
+  display: grid;
+  gap: 12px;
+}
+
+.history-message,
+.history-empty {
+  padding: 18px;
+  border: 1px solid var(--nova-page-line);
+  border-radius: 16px;
+  background: var(--nova-page-surface);
+}
+
+.history-message .history-role {
+  margin: 0 0 10px;
+}
+
+.history-message pre {
+  margin: 0;
+  color: var(--nova-page-text);
+  font: inherit;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.history-message.user {
+  border-color: rgba(167, 139, 250, 0.24);
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.history-status {
+  width: min(520px, calc(100% - 32px));
+  margin: max(12vh, 48px) auto;
+  padding: 28px;
+  border: 1px solid var(--nova-page-line);
+  border-radius: 22px;
+  background: var(--nova-page-surface);
+  box-shadow: var(--nova-page-shadow);
+}
+
+.history-status h1 {
+  margin: 10px 0;
+}
+
+.history-status a {
+  color: #c4b5fd;
+}
+
+@media (max-width: 640px) {
+  .login-shell {
+    padding: 24px 20px !important;
+    border-radius: 22px !important;
+  }
+
+  .wrap,
+  .shell,
+  .page {
+    max-width: calc(100% - 24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

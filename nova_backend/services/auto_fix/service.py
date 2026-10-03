@@ -19,7 +19,7 @@ class AutoFixService:
     ) -> dict:
 
 
-        print("AUTO_FIX_FILE_HIT:", user_text)
+        print("AUTO_FIX_FILE_HIT:", {"text_chars": len(str(user_text or ""))})
 
         import os
         import time

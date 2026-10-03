@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings — Nova</title>
+  <link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
+  <style>
+    .settings-page{width:min(1080px,calc(100% - 32px));margin:0 auto;padding:36px 0 64px}
+    .settings-head{margin-bottom:26px}.settings-head h1{font-size:clamp(34px,6vw,54px);margin:0 0 8px;letter-spacing:-.06em}.settings-head p,.setting-copy p{color:var(--nova-page-muted);line-height:1.55;margin:0}
+    .settings-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:20px;align-items:start}
+    .settings-nav,.settings-content{border:1px solid var(--nova-page-line);border-radius:20px;background:var(--nova-page-surface);padding:12px}
+    .settings-nav a{display:block;padding:11px 12px;border-radius:11px;color:var(--nova-page-muted);text-decoration:none;font-weight:700}.settings-nav a:hover,.settings-nav a[aria-current="page"]{background:var(--nova-page-accent-soft);color:var(--nova-page-text)}
+    .settings-content section{padding:13px 12px 20px;border-bottom:1px solid var(--nova-page-line)}.settings-content section:last-child{border:0}.settings-content h2{font-size:17px;margin:0 0 13px}.setting-row{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:13px 0}.setting-copy strong{display:block;margin-bottom:4px}.setting-control{min-width:175px}.setting-control select{width:100%;padding:10px}.settings-status{min-height:22px;color:var(--nova-page-success);font-size:13px;margin:12px}
+    body.theme-light{--nova-page-bg:#f4f6fc;--nova-page-surface:rgba(255,255,255,.94);--nova-page-surface-raised:#fff;--nova-page-line:rgba(49,58,84,.14);--nova-page-line-strong:rgba(49,58,84,.22);--nova-page-text:#1c2334;--nova-page-muted:#626b80;--nova-page-accent:#6850c8;--nova-page-accent-soft:rgba(104,80,200,.11);background:var(--nova-page-bg);color:var(--nova-page-text)}
+    @media(max-width:700px){.settings-layout{grid-template-columns:1fr}.settings-nav{display:flex;overflow:auto;gap:4px}.settings-nav a{white-space:nowrap}.setting-row{align-items:flex-start;flex-direction:column}.setting-control{width:100%}}
+  </style>
+</head>
+<body>
+  <main class="settings-page">
+    <header class="settings-head"><a href="/app">← Back to Nova</a><h1>Settings</h1><p>Preferences are saved to your Nova account and apply when you return.</p></header>
+    <div class="settings-layout">
+      <nav class="settings-nav" aria-label="Settings categories">
+        <a href="#general" aria-current="page">General</a><a href="#chat">Chat</a><a href="#appearance">Appearance</a><a href="#voice">Voice</a><a href="#projects">Projects</a><a href="#memory">Memory</a><a href="#privacy">Privacy &amp; data</a><a href="#account">Account</a>
+      </nav>
+      <div class="settings-content">
+        <section id="general"><h2>General</h2><div class="setting-row"><div class="setting-copy"><strong>Preferences</strong><p>These settings are saved to your signed-in Nova account.</p></div></div></section>
+        <section id="chat"><h2>Chat</h2><div class="setting-row"><div class="setting-copy"><strong>Enter sends</strong><p>Turn this off to use Enter for a new line. Shift+Enter continues to insert a line break.</p></div><label><input id="enterToSend" type="checkbox"> On</label></div><p class="setting-copy">New conversations are automatically named from a meaningful first message. Greetings are skipped, and manual titles are kept.</p></section>
+        <section id="appearance"><h2>Appearance</h2><div class="setting-row"><div class="setting-copy"><strong>Theme</strong><p>Choose Nova's dark, light, or device-matched colors.</p></div><div class="setting-control"><select id="theme"><option value="system">Use device setting</option><option value="dark">Dark</option><option value="light">Light</option></select></div></div></section>
+        <section id="voice"><h2>Voice</h2><p class="setting-copy">Voice uses your browser's speech recognition when available. Speak reads the latest reply aloud with browser text-to-speech. Voice choice depends on your device, so Nova does not offer a separate unsupported voice selector.</p></section>
+        <section id="projects"><h2>Projects</h2><p class="setting-copy">Project actions and approvals are controlled in the project workspace. Settings do not change execution safety or approval requirements.</p></section>
+        <section id="memory"><h2>Memory &amp; personalization</h2><p class="setting-copy">Nova Memory stores information you choose to save for future conversations. Manage saved items in the Memory panel in Nova.</p></section>
+        <section id="privacy"><h2>Privacy &amp; data</h2><p class="setting-copy">Manage individual conversations from their row menu. Project deletion is available in Projects and asks for confirmation.</p></section>
+        <section id="account"><h2>Account</h2><p class="setting-copy"><a href="/account">Account, security, and billing</a></p></section>
+        <div class="settings-status" id="settingsStatus" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+  </main>
+  <script src="/static/js/nova-settings.js?v=settings-20261003-1"></script>
+</body>
+</html>

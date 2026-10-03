@@ -3,6 +3,7 @@
 import subprocess
 from pathlib import Path
 
+from nova_backend.services.code_workspace_service import CodeWorkspaceService
 from nova_backend.tools.base import NovaTool
 
 
@@ -63,6 +64,13 @@ class TerminalExecuteTool(NovaTool):
             return {
                 "ok": False,
                 "error": "missing_command",
+            }
+
+        if CodeWorkspaceService.is_git_command_text(command):
+            return {
+                "ok": False,
+                "error": "git_shell_command_blocked",
+                "message": "Use Nova Code Workspace for repository inspection. Git shell commands are disabled in read-only Phase 1.",
             }
 
         working_directory = None

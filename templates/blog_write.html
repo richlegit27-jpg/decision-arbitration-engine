@@ -202,6 +202,8 @@
     <meta name="twitter:description" content="Nova blog writing surface for product updates and public build notes.">
     <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
     <!-- /NOVA_SOCIAL_META_20260709 -->
+
+<link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
 </head>
 
 <body>
@@ -232,6 +234,10 @@
 
                 <label for="tags">Tags</label>
                 <input id="tags" placeholder="Nova, Mobile, Build Notes">
+
+                <label for="adminKey">Administrator publishing key</label>
+                <input id="adminKey" type="password" autocomplete="current-password" placeholder="Provided to Nova administrators">
+                <small>Publishing requires a signed-in account and the configured Nova administrator key. The key is sent only with this publish request.</small>
 
                 <label for="body">Body</label>
                 <textarea id="body" placeholder="Write your blog post here..."></textarea>
@@ -330,7 +336,8 @@
                 const res = await fetch("/api/blog/posts", {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "X-NOVA-ADMIN-KEY": document.getElementById("adminKey").value
                     },
                     body: JSON.stringify(value)
                 });

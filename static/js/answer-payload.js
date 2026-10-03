@@ -41,14 +41,44 @@ function renderParagraphBlock(block){
 
 function renderListBlock(block){
   const lines = block.split("\n").filter(Boolean)
+  const roots = []
+  const stack = []
 
-  const items = lines.map((line) => {
-    const cleaned = line.replace(/^(\s*[-*]\s+|\s*\d+\.\s+)/, "")
-    return `<li>${renderInline(cleaned)}</li>`
-  }).join("")
+  lines.forEach((line) => {
+    const match = line.match(/^(\s*)([-*+]\s+|\d+\.\s+)(.*)$/)
+    if (!match) return
 
-  const isOrdered = lines.every((line) => /^\s*\d+\.\s+/.test(line))
-  return isOrdered ? `<ol>${items}</ol>` : `<ul>${items}</ul>`
+    const indent = match[1].replace(/\t/g, "  ").length
+    const type = /^\d/.test(match[2]) ? "ol" : "ul"
+    const item = { content: match[3], children: [] }
+
+    while (
+      stack.length &&
+      (indent < stack[stack.length - 1].indent ||
+        (indent === stack[stack.length - 1].indent && type !== stack[stack.length - 1].list.type))
+    ) stack.pop()
+
+    let list = stack[stack.length - 1]?.list
+    if (!list || indent > stack[stack.length - 1].indent) {
+      const parentItem = stack[stack.length - 1]?.lastItem || null
+      const container = parentItem ? parentItem.children : roots
+      list = container[container.length - 1]
+      if (!list || list.type !== type || indent <= list.indent) {
+        list = { type, indent, items: [] }
+        container.push(list)
+      }
+      stack.push({ indent, list, lastItem: null })
+    }
+
+    list.items.push(item)
+    stack[stack.length - 1].lastItem = item
+  })
+
+  const renderList = (list) => `<${list.type}>${list.items.map((item) =>
+    `<li>${renderInline(item.content)}${item.children.map(renderList).join("")}</li>`
+  ).join("")}</${list.type}>`
+
+  return roots.map(renderList).join("")
 }
 
 function renderCodeBlock(code, lang = "", messageId = ""){
@@ -180,6 +210,17 @@ function parseBlocks(text){
             continue
         }
 
+        const headingMatch = line.match(/^\s*(#{1,6})\s+(.+)$/)
+        if(headingMatch){
+            blocks.push({
+                type: "heading",
+                level: headingMatch[1].length,
+                content: headingMatch[2],
+            })
+            i += 1
+            continue
+        }
+
         if(/^\s*([-*+]\s+|\d+\.\s+)/.test(line)){
             const listLines = [line]
             i += 1
@@ -248,6 +289,10 @@ function renderAnswerPayload(content, options = {}){
 
     if(block.type === "list"){
       return renderListBlock(block.content)
+    }
+
+    if(block.type === "heading"){
+      return `<h${block.level}>${renderInline(block.content)}</h${block.level}>`
     }
 
     return renderParagraphBlock(block.content)

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verify your Nova account</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px; background: #090b13; color: #f3f1fa; font: 16px/1.55 system-ui, sans-serif; }
+    h1 { margin: 0 0 10px; font-size: clamp(1.6rem, 5vw, 2rem); letter-spacing: -.04em; }
+    p { color: #a7a4b7; }
+    #message { min-height: 3em; }
+  </style>
+
+<link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
+</head>
+<body>
+  <main class="verify-shell">
+    <div class="verify-brand"><span class="verify-brand-mark" aria-hidden="true">N</span><span>Nova</span></div>
+    <h1>Verify your email</h1>
+    <p id="message" role="status" aria-live="polite">Checking your verification link…</p>
+    <a id="login" href="/login" hidden>Continue to login</a>
+  </main>
+  <script>
+    (async function () {
+      const message = document.getElementById("message");
+      const login = document.getElementById("login");
+      const token = new URLSearchParams(location.hash.slice(1)).get("token")
+        || new URLSearchParams(location.search).get("token");
+      if (!token) {
+        message.textContent = "This verification link is invalid or incomplete.";
+        return;
+      }
+      try {
+        const response = await fetch("/api/auth/verify-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || "Verification failed.");
+        message.textContent = "Your email is verified. You can now log in.";
+        login.hidden = false;
+      } catch (error) {
+        message.textContent = error.message || "Unable to verify this email.";
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Super AI · Nova</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-super-ai.css') }}">
+
+<link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
+</head>
+<body>
+  <div class="super-app">
+    <header class="super-topbar">
+      <a class="brand" href="/app" aria-label="Return to Nova">
+        <span class="brand-mark">N</span>
+        <span>Nova <span class="brand-divider">/</span> Super AI</span>
+      </a>
+      <div class="topbar-controls">
+        <label class="model-control" for="modelSelect">
+          <span>Model</span>
+          <select id="modelSelect" aria-label="Select model"><option>Loading models…</option></select>
+        </label>
+        <button class="icon-button mobile-session-toggle" id="mobileSessionsToggle" type="button" aria-label="Show conversations">Chats</button>
+        <span class="connection-state" id="connectionState" role="status">Connecting</span>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="session-rail" id="sessionRail" aria-label="Conversations">
+        <button id="newSessionBtn" class="new-chat-button" type="button"><span>＋</span> New conversation</button>
+        <div class="rail-heading">Your conversations</div>
+        <div id="sessionList" class="session-list" aria-live="polite"><div class="muted">Loading conversations…</div></div>
+        <a class="back-link" href="/app">← Main Nova workspace</a>
+      </aside>
+
+      <main class="conversation-panel">
+        <div class="conversation-heading">
+          <div>
+            <div class="eyebrow">NOVA INTELLIGENCE</div>
+            <h1 id="conversationTitle">New conversation</h1>
+          </div>
+          <button id="retryBtn" class="quiet-button" type="button" disabled>Retry last</button>
+        </div>
+
+        <section id="messageList" class="message-list" aria-label="Conversation" aria-live="polite">
+          <div id="emptyState" class="empty-state">
+            <div class="orb" aria-hidden="true">✦</div>
+            <h2>What are we working on?</h2>
+            <p>Ask a question, explore an idea, or turn a goal into an executable project.</p>
+            <div class="prompt-suggestions">
+              <button type="button" data-prompt="Help me understand a difficult topic">Understand a topic</button>
+              <button type="button" data-prompt="Plan a small project to solve this problem: ">Plan a project</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="composer-wrap">
+          <div id="composerError" class="inline-error" role="alert" hidden></div>
+          <form id="composerForm" class="composer">
+            <textarea id="composerInput" rows="1" maxlength="20000" placeholder="Message Nova…" aria-label="Message Nova"></textarea>
+            <div class="composer-footer">
+              <span class="privacy-note">Your conversation is saved to this Nova session.</span>
+              <div class="composer-actions">
+                <button id="stopBtn" class="stop-button" type="button" hidden>Stop response</button>
+                <button id="sendBtn" class="send-button" type="submit" aria-label="Send message">Send <span>↑</span></button>
+              </div>
+            </div>
+          </form>
+          <div id="streamNotice" class="stream-notice" hidden>Stopping closes this response view; provider-side cancellation depends on the chat backend.</div>
+        </div>
+      </main>
+
+      <aside class="context-rail" aria-label="Work context">
+        <section class="context-card">
+          <div class="card-heading"><div><div class="eyebrow">CONTEXT</div><h2>Memory</h2></div><button id="refreshMemoryBtn" class="text-button" type="button">Refresh</button></div>
+          <div id="memoryList" class="context-list"><div class="muted">Loading saved memory…</div></div>
+        </section>
+
+        <section class="context-card plan-card">
+          <div class="card-heading"><div><div class="eyebrow">PROJECT WORK</div><h2>Plan and execute</h2></div></div>
+          <label class="visually-hidden" for="planGoal">Project goal</label>
+          <textarea id="planGoal" rows="3" placeholder="Describe a goal to turn into a project…"></textarea>
+          <button id="planBtn" class="action-button" type="button">Create project plan</button>
+          <div id="planStatus" class="small-status" role="status"></div>
+          <div id="planList" class="context-list"><div class="muted">Plans become real Nova project tasks.</div></div>
+        </section>
+
+        <section class="context-card execution-card">
+          <div class="card-heading"><div><div class="eyebrow">LIVE STATUS</div><h2>Execution</h2></div><button id="refreshExecutionBtn" class="text-button" type="button">Refresh</button></div>
+          <label class="visually-hidden" for="projectSelect">Active project</label>
+          <select id="projectSelect"><option value="">No active project</option></select>
+          <div id="executionStatus" class="execution-status"><span class="status-dot"></span><span>Select a project to view persisted execution.</span></div>
+          <div id="executionSteps" class="context-list"></div>
+          <div class="execution-actions">
+            <button id="runProjectBtn" type="button" disabled>Run all</button>
+            <button id="continueProjectBtn" type="button" disabled>Continue</button>
+            <button id="stopProjectBtn" type="button" disabled>Stop</button>
+          </div>
+        </section>
+
+        <section class="context-card artifact-card">
+          <div class="card-heading"><div><div class="eyebrow">OUTPUTS</div><h2>Artifacts</h2></div><button id="refreshArtifactsBtn" class="text-button" type="button">Refresh</button></div>
+          <div id="artifactList" class="context-list"><div class="muted">Loading artifacts…</div></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='js/nova-super-ai.js') }}" defer></script>
+</body>
+</html>

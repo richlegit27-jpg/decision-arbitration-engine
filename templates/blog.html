@@ -147,9 +147,16 @@
 
         }
 
+        .post-link { color: inherit; text-decoration: none; }
+        .post-link:hover h2 { color: var(--nova-page-accent); }
+        .post-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+        .post-tags span { padding: 4px 8px; border: 1px solid var(--nova-page-line); border-radius: 999px; color: var(--nova-page-muted); font-size: 11px; }
+
 
     </style>
 
+
+<link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
 </head>
 
 
@@ -166,8 +173,12 @@ Nova Updates
 </h1>
 
 <p class="subtitle">
-Product updates, engineering notes, and Nova milestones.
+Updates, practical guides, and notes about building with Nova.
 </p>
+
+<nav aria-label="Nova site navigation" class="nova-blog-nav">
+    <a href="/app">Open Nova</a><a href="/help">Help</a><a href="/account">Account</a>
+</nav>
 
 </div>
 
@@ -216,7 +227,7 @@ async function loadPosts() {
             container.innerHTML =
                 `
                 <div class="empty">
-                    No Nova updates yet.
+                    Nova updates, guides, and behind-the-scenes notes will appear here.
                 </div>
                 `;
 
@@ -225,6 +236,8 @@ async function loadPosts() {
         }
 
 
+        const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+        const formatDate = (value) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date); };
         container.innerHTML =
             data.posts.map(
                 post =>
@@ -232,19 +245,18 @@ async function loadPosts() {
 
                 <article class="post">
 
-                    <h2>
-                        ${post.title}
-                    </h2>
+                    <a href="/blog/${encodeURIComponent(post.slug)}" class="post-link"><h2>${escapeHtml(post.title)}</h2></a>
 
 
                     <div class="date">
-                        ${post.created_at || ""}
+                        ${escapeHtml(formatDate(post.created_at || post.updated_at))}
                     </div>
 
 
                     <p>
-                        ${post.excerpt || post.body}
+                        ${escapeHtml(post.excerpt || post.body)}
                     </p>
+                    <div class="post-tags">${(Array.isArray(post.tags) ? post.tags : []).map(tag => `<span>${escapeHtml(tag)}</span>`).join("")}</div>
 
                 </article>
 

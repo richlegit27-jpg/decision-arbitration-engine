@@ -11,11 +11,6 @@ class ChatGuardService:
         execution_bridge_service,
     ):
         try:
-            print(
-                "[CHAT GUARD ENTERED]",
-                repr(payload),
-                flush=True,
-            )
             user_text = str(
                 payload.get("user_text")
                 or payload.get("text")
@@ -41,8 +36,7 @@ class ChatGuardService:
                 "[CHAT GUARD ENTER]",
                 {
                     "session_id": session_id,
-                    "user_text": user_text,
-                    "clean": clean,
+                    "text_chars": len(user_text),
                 },
                 flush=True,
             )

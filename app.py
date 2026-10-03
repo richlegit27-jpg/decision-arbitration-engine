@@ -229,6 +229,7 @@ from nova_backend.services.session_history_service import (
 )
 from nova_backend.services.history_service import HistoryService
 from nova_backend.services.artifact_service import ArtifactService
+from nova_backend.services.video_generation_service import VideoGenerationService
 from nova_backend.services.memory_service import MemoryService
 from nova_backend.services.memory_guard_route_service import (
     MemoryGuardRouteService,
@@ -400,6 +401,7 @@ from nova_backend.services.blog_service import (
 from nova_backend.services.blog_route_service import (
     BlogRouteService,
 )
+from nova_backend.services.preferences_route_service import PreferencesRouteService
 from nova_backend.services.public_route_service import (
     PublicRouteService,
 )
@@ -607,6 +609,7 @@ debug_route_service = DebugRouteService()
 blog_route_service = BlogRouteService(
     blog_service
 )
+preferences_route_service = PreferencesRouteService(DATA_DIR)
 RuntimeBootstrap.save(
     runtime_brain
 )
@@ -689,6 +692,33 @@ def _nova_durable_data_bootstrap_20260703():
 
         os.environ["NOVA_DATA_DIR"] = str(chosen)
 
+        # Preserve files written by older releases to the ephemeral
+        # repository-level uploads directory. Copy only missing files so a
+        # deployment never overwrites newer durable content or removes legacy
+        # files; filenames and stored references remain unchanged.
+        legacy_uploads = base_dir / "uploads"
+        durable_uploads = Path(
+            os.environ.get("NOVA_UPLOADS_DIR", str(chosen / "uploads"))
+        )
+        try:
+            legacy_root = legacy_uploads.resolve()
+            durable_root = durable_uploads.resolve()
+            if legacy_root != durable_root and legacy_root.is_dir():
+                for source in legacy_root.rglob("*"):
+                    if source.is_symlink() or not source.is_file():
+                        continue
+                    relative = source.relative_to(legacy_root)
+                    target = durable_root / relative
+                    if target.exists():
+                        continue
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, target)
+        except Exception as migration_error:
+            print(
+                "[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] upload migration failed:",
+                type(migration_error).__name__,
+            )
+
         should_bridge_app_data = False
         try:
             should_bridge_app_data = chosen.resolve() != app_data.resolve()
@@ -756,6 +786,20 @@ app = Flask(
     static_folder=str(BASE_DIR / "static"),
 )
 
+
+@app.before_request
+def nova_session_api_auth_guard():
+    # Register this before compatibility and adapter hooks so unauthenticated
+    # requests cannot be handled by an earlier session-writing path.
+    from nova_backend.services.auth_context import session_api_auth_required
+
+    if session_api_auth_required(request.path, get_current_user_id()):
+        return jsonify({
+            "ok": False,
+            "error": "Authentication required.",
+        }), 401
+    return None
+
 @app.route("/debug/routes")
 def debug_routes():
     return {
@@ -805,6 +849,7 @@ memory_route_service.install_routes(app)
 blog_route_service.install_routes(
     app
 )
+preferences_route_service.install_routes(app)
 
 register_planner_routes(app)
 print("[NOVA_PLANNER_ROUTES_20260812] installed")
@@ -939,6 +984,15 @@ chat_service = ChatService(
     execution_state_service=execution_state_service,
     chat_execution_service=chat_execution_service,
 )
+video_generation_service = VideoGenerationService(
+    DATA_DIR / "nova_video_jobs.json",
+    UPLOADS_DIR,
+    artifact_service=artifact_service,
+    session_service=session_service,
+    project_service=project_workspace_service,
+)
+chat_service.video_generation_service = video_generation_service
+video_generation_service.install_routes(app)
 
 execution_bridge_service = (
     chat_service.execution_bridge_service
@@ -1589,9 +1643,6 @@ def api_models_select_route():
 @app.route("/api/chat", methods=["POST"])
 def api_chat_route():
     data = request.get_json(silent=True) or {}
-    print("[CHAT RAW CONTENT TYPE]", request.content_type, flush=True)
-    print("[CHAT RAW DATA]", request.get_data(cache=True), flush=True)
-    print("[CHAT PARSED DATA]", repr(data), flush=True)
 
     user_text = str(
         data.get("user_text")
@@ -1614,15 +1665,11 @@ def api_chat_route():
 
     attachments = data.get("attachments") or []
 
-    print(
-        "[NOVA CHAT]",
-        {
-            "user_text": repr(user_text),
-            "session_id": repr(session_id),
-            "requested_model": repr(requested_model),
-            "attachments_count": len(attachments),
-        },
-        flush=True,
+    app.logger.debug(
+        "Chat request received: text_chars=%d attachments=%d model_selected=%s",
+        len(user_text),
+        len(attachments),
+        bool(requested_model),
     )
 
     if not user_text and not attachments:
@@ -1772,6 +1819,24 @@ def api_projects():
         }
     )
 
+
+@app.route(
+    "/api/projects/delete-all",
+    methods=["POST"],
+)
+def api_projects_delete_all():
+    try:
+        deleted_count = project_workspace_service.delete_all_projects()
+    except PermissionError:
+        return jsonify({"ok": False, "error": "Authentication required."}), 401
+
+    return jsonify(
+        {
+            "ok": True,
+            "deleted_count": deleted_count,
+        }
+    )
+
 @app.before_request
 def nova_project_api_auth_guard():
     from nova_backend.services.auth_context import project_api_auth_required
@@ -1787,6 +1852,7 @@ def nova_project_api_auth_guard():
             }
         ), 401
     return None
+
 
 @app.route("/api/debug/chat-route", methods=["GET"])
 def api_debug_chat_route():
@@ -2019,12 +2085,7 @@ def _nova_casual_chat_guard():
     if request.path == "/api/chat" and request.method == "POST":
         print(
             "[HOOK 1 BEFORE JSON]",
-            repr(
-                request.get_data(
-                    cache=True,
-                    as_text=True,
-                )
-            ),
+            {"content_length": request.content_length},
             flush=True,
         )
 
@@ -2039,7 +2100,7 @@ def _nova_casual_chat_guard():
 
         print(
             "[HOOK 1 AFTER JSON]",
-            repr(payload),
+            {"content_length": request.content_length},
             flush=True,
         )
 
@@ -2073,7 +2134,7 @@ def _nova_casual_chat_guard():
         ):
             print(
                 "[HOOK 1 BYPASSING CASUAL GUARD FOR EXECUTION]",
-                repr(user_text),
+                {"text_chars": len(user_text)},
                 flush=True,
             )
             return None
@@ -2154,38 +2215,14 @@ def api_chat():
         flush=True,
     )
 
-    print(
-        "[API CHAT RAW CHECK]",
-        request.get_data(
-            cache=True,
-            as_text=True,
-        ),
-        flush=True,
-    )
-
-    print(
-        "[API CHAT JSON CHECK]",
-        request.get_json(silent=True),
-        flush=True,
-    )
-
-    print("[RAW BODY]", request.get_data())
-
     data = request.get_json(
         silent=True,
         cache=True,
     ) or {}
 
-    print(
-        "[CHAT STEP 1 DATA]",
-        data,
-        flush=True,
-    )
-
-    print(
-        "[CHAT RAW DATA DEBUG]",
-        data,
-        flush=True,
+    app.logger.debug(
+        "Chat payload parsed: content_length=%s",
+        request.content_length,
     )
 
     user_text = str(
@@ -2235,15 +2272,7 @@ def api_chat():
         _nova_payload = data
 
 
-        print(
-            "[NOVA CHECKPOINT 1 BEFORE EXECUTION GUARD]",
-            {
-                "payload": repr(_nova_payload),
-                "user_text": repr(user_text),
-                "session_id": repr(session_id),
-            },
-            flush=True,
-        )
+        print("[NOVA CHECKPOINT 1 BEFORE EXECUTION GUARD]", flush=True)
 
         execution_guard_result = (
             execution_guard_service.handle(
@@ -2270,9 +2299,8 @@ def api_chat():
         print(
             "[CHAT CONTEXT DEBUG]",
             {
-                "payload": _nova_payload,
-                "context": _nova_chat_context,
-                "before_override_user_text": repr(user_text),
+                "text_chars": len(str(user_text or "")),
+                "attachments_count": len(_nova_chat_context.get("attachments") or []),
             },
             flush=True,
         )
@@ -2299,7 +2327,7 @@ def api_chat():
 
         print(
             "[NOVA ATTACHMENT DEBUG]",
-            _nova_attachments,
+            {"attachments_count": len(_nova_attachments)},
         )
 
         # ?? IMAGE FASTPATH SAFETY GUARD
@@ -2512,14 +2540,7 @@ def api_chat():
             exc,
         )
 
-    print(
-        "[CHAT BEFORE EMPTY GUARD]",
-        {
-            "user_text": repr(user_text),
-            "_nova_user_text": repr(user_text),
-            "data": data,
-        }
-    )
+    print("[CHAT BEFORE EMPTY GUARD]", {"text_chars": len(user_text)})
 
     _nova_user_text_lower = str(
         user_text or ""
@@ -2562,42 +2583,8 @@ def api_chat():
     )
 
     print(
-        "REQUEST JSON:",
-        repr(
-            request.get_json(
-                silent=True
-            )
-        ),
-        flush=True,
-    )
-
-    print(
-        "DATA:",
-        repr(data),
-        flush=True,
-    )
-
-    print(
-        "USER TEXT:",
-        repr(user_text),
-        flush=True,
-    )
-
-    print(
-        "SESSION ID:",
-        repr(session_id),
-        flush=True,
-    )
-
-    print(
-        "REQUESTED SESSION ID:",
-        repr(requested_session_id),
-        flush=True,
-    )
-
-    print(
-        "ATTACHMENTS:",
-        repr(attachments),
+        "[NOVA LIVE EMPTY GUARD INPUT]",
+        {"text_chars": len(user_text), "attachments_count": len(attachments)},
         flush=True,
     )
 
@@ -2674,10 +2661,7 @@ def api_chat():
         attachments,
     )
 
-    print(
-        "[DEBUG AFTER ATTACHMENT GUARD]",
-        attachments,
-    )
+    print("[DEBUG AFTER ATTACHMENT GUARD]", {"attachments_count": len(attachments)})
 
     inline_attachment_result = (
         chat_attachment_guard_service.handle_inline_text_attachment(
@@ -2856,10 +2840,7 @@ def api_chat():
                 logger=app.logger,
             )
 
-            print(
-                "[DEBUG FINAL CHAT ATTACHMENTS]",
-                attachments,
-            )
+            print("[DEBUG FINAL CHAT ATTACHMENTS]", {"attachments_count": len(attachments)})
 
             return jsonify({
                 "ok": True,
@@ -2922,7 +2903,7 @@ def api_chat():
                 if key != "text"
             },
         )
-    print("[BEFORE PROJECT RECALL]", repr(user_text), repr(session_id))
+    print("[BEFORE PROJECT RECALL]", {"text_chars": len(user_text)})
 
     direct_project_focus_response = (
         project_recall_service
@@ -2965,17 +2946,7 @@ def api_chat():
                 or ""
             ).strip()
 
-            print(
-                "MEMORY GUARD RAW PAYLOAD =",
-                payload,
-                flush=True,
-            )
-
-            print(
-                "MEMORY GUARD RAW TEXT =",
-                repr(raw_user_text),
-                flush=True,
-            )
+            print("MEMORY GUARD INPUT", {"text_chars": len(raw_user_text)}, flush=True)
 
             lowered = raw_user_text.lower().strip()
 
@@ -2984,17 +2955,13 @@ def api_chat():
             )
 
             print(
-                "EARLY MEMORY EXTRACTED =",
-                repr(_nova_explicit_memory_text),
+                "EARLY MEMORY EXTRACTED",
+                {"text_chars": len(_nova_explicit_memory_text)},
                 flush=True,
             )
 
             if _nova_explicit_memory_text:
-                print(
-                    "EARLY MEMORY ABOUT TO SAVE =",
-                    repr(_nova_explicit_memory_text),
-                    flush=True,
-                )
+                print("EARLY MEMORY ABOUT TO SAVE", flush=True)
 
                 _nova_memory_result = memory_service.add_memory(
                     {
@@ -3220,11 +3187,7 @@ def api_chat():
 
     print(
         "[ABOUT TO CALL CHAT SERVICE]",
-        {
-            "user_text": user_text,
-            "session_id": session_id,
-            "attachments": attachments_for_chat_service,
-        },
+        {"text_chars": len(user_text), "attachments_count": len(attachments_for_chat_service)},
         flush=True,
     )
 
@@ -3240,21 +3203,9 @@ def api_chat():
 
         print(
             "[CHAT SERVICE FAILURE DEBUG]",
-            repr(chat_error),
+            type(chat_error).__name__,
             flush=True,
         )
-
-        traceback.print_exc()
-
-        with open(
-            "chat_exception_trace.txt",
-            "a",
-            encoding="utf-8",
-        ) as f:
-            f.write("\n\n===== CHAT FAILURE =====\n")
-            f.write(repr(chat_error))
-            f.write("\n")
-            traceback.print_exc(file=f)
 
         result = {
             "ok": False,
@@ -3266,13 +3217,13 @@ def api_chat():
         }
 
         app.logger.warning(
-            "[CHAT_SERVICE_FAILURE] failed: %s",
-            chat_error,
+            "[CHAT_SERVICE_FAILURE] request failed (%s)",
+            type(chat_error).__name__,
         )
 
     print(
         "[CHAT SERVICE RESULT DEBUG]",
-        repr(result)[:3000],
+        {"ok": bool(result.get("ok")) if isinstance(result, dict) else False},
     )
 
     # NOVA_MOBILE_IMAGE_SESSION_SERVICE_20260812
@@ -4543,43 +4494,14 @@ def api_project_intelligence(
 )
 def execution_stream():
     try:
-        raw_body = request.get_data(
-            cache=True,
-            as_text=True,
-        )
-
-        print(
-            "EXECUTION STREAM RAW BODY =",
-            repr(raw_body),
-            flush=True,
-        )
-
-        import json
-
-        try:
-            data = json.loads(
-                raw_body
-            )
-        except Exception as json_exc:
-            print(
-                "EXECUTION STREAM JSON PARSE FAILED =",
-                repr(json_exc),
-                flush=True,
-            )
-
+        data = request.get_json(silent=True)
+        if data is None:
             return jsonify(
                 {
                     "ok": False,
                     "error": "Invalid JSON body",
-                    "raw_body": raw_body,
                 }
             ), 400
-
-        print(
-            "EXECUTION STREAM PARSED JSON =",
-            repr(data),
-            flush=True,
-        )
 
         if not isinstance(data, dict):
             return jsonify(
@@ -5001,12 +4923,6 @@ def nova_session_put_messages_compat_20260829(session_id):
     except Exception:
         user_id = ""
 
-    if not user_id:
-        user_id = str(
-            request.headers.get("X-Nova-User-Id")
-            or ""
-        ).strip()
-
     print(
         "[SESSION PUT DEBUG]",
         {
@@ -5059,7 +4975,6 @@ def nova_session_put_messages_compat_20260829(session_id):
                 {
                     "session_id": sid,
                     "user_id": user_id,
-                    "message": message,
                 },
             )
 
@@ -5275,7 +5190,7 @@ def nova_attachment_boundary_capture():
 
         print(
             "[ATTACHMENT BOUNDARY CAPTURE]",
-            attachments,
+            {"attachment_count": len(attachments)},
         )
 
     except Exception as error:

@@ -10,6 +10,10 @@ from filelock import FileLock, Timeout
 from nova_backend.services.email_verification_service import (
     EmailVerificationService,
 )
+from nova_backend.services.email_delivery_service import (
+    EmailDeliveryError,
+    EmailDeliveryService,
+)
 
 class LocalAuthRouteService:
 
@@ -55,6 +59,25 @@ class LocalAuthRouteService:
         email_verification_service = (
             EmailVerificationService()
         )
+        email_delivery_service = EmailDeliveryService()
+
+        def email_token_exposure_allowed():
+            return bool(
+                app.testing
+                or (
+                    app.debug
+                    and app.config.get("NOVA_EXPOSE_EMAIL_VERIFICATION_TOKEN", False)
+                )
+            )
+
+        def reset_token_exposure_allowed():
+            return bool(
+                app.testing
+                or (
+                    app.debug
+                    and app.config.get("NOVA_EXPOSE_RESET_TOKEN", False)
+                )
+            )
 
         app = self.app
         request = self.request
@@ -80,18 +103,20 @@ class LocalAuthRouteService:
                 )
 
                 if not isinstance(data, dict):
-                    return {"users": []}
+                    raise ValueError("Authentication user store must be an object.")
 
                 if not isinstance(
                     data.get("users"),
                     list,
                 ):
-                    data["users"] = []
+                    raise ValueError("Authentication user store has an invalid users list.")
 
                 return data
 
             except Exception:
-                return {"users": []}
+                raise ValueError(
+                    f"Unable to read authentication user store: {self.users_path}"
+                )
 
         def save_users(data):
 
@@ -391,6 +416,12 @@ class LocalAuthRouteService:
                     ),
                 }), 400
 
+            if not email_token_exposure_allowed() and not email_delivery_service.is_configured():
+                return jsonify({
+                    "ok": False,
+                    "error": "Account email delivery is not configured.",
+                }), 503
+
             data = load_users()
 
             if (
@@ -443,6 +474,27 @@ class LocalAuthRouteService:
 
             save_users(data)
 
+            if not email_token_exposure_allowed():
+                try:
+                    email_delivery_service.send_verification(
+                        email,
+                        verification["token"],
+                    )
+                except EmailDeliveryError as exc:
+                    data["users"] = [
+                        item for item in data["users"]
+                        if item.get("id") != user["id"]
+                    ]
+                    save_users(data)
+                    app.logger.error(
+                        "Verification email delivery failed (%s).",
+                        type(exc).__name__,
+                    )
+                    return jsonify({
+                        "ok": False,
+                        "error": "Unable to deliver verification email. Please try again.",
+                    }), 503
+
             return jsonify({
                 "ok": True,
                 "authenticated": False,
@@ -466,6 +518,53 @@ class LocalAuthRouteService:
                     else {}
                 ),
             })
+
+        def auth_resend_verification():
+            payload = request.get_json(silent=True) or {}
+            email = clean(payload.get("email")).lower()
+            if not email:
+                return jsonify({"ok": False, "error": "Email is required."}), 400
+
+            if not email_token_exposure_allowed() and not email_delivery_service.is_configured():
+                return jsonify({
+                    "ok": False,
+                    "error": "Account email delivery is not configured.",
+                }), 503
+
+            data = load_users()
+            user = next(
+                (item for item in data.get("users", [])
+                 if clean(item.get("email")).lower() == email),
+                None,
+            )
+            response = {
+                "ok": True,
+                "message": "If the account needs verification, a new link has been sent.",
+            }
+            if not user or user.get("email_verified"):
+                return jsonify(response)
+
+            verification = email_verification_service.create_verification()
+            user["email_verification_token_hash"] = verification["token_hash"]
+            user["email_verification_expires_at"] = verification["expires_at"]
+            save_users(data)
+
+            if email_token_exposure_allowed():
+                response["verification_url"] = (
+                    "/verify-email?token=" + verification["token"]
+                )
+            else:
+                try:
+                    email_delivery_service.send_verification(email, verification["token"])
+                except EmailDeliveryError as exc:
+                    user["email_verification_token_hash"] = ""
+                    user["email_verification_expires_at"] = ""
+                    save_users(data)
+                    app.logger.error(
+                        "Verification resend failed (%s).",
+                        type(exc).__name__,
+                    )
+            return jsonify(response)
 
         def auth_verify_email():
 
@@ -692,6 +791,12 @@ class LocalAuthRouteService:
                 payload.get("email")
             ).lower()
 
+            if not reset_token_exposure_allowed() and not email_delivery_service.is_configured():
+                return jsonify({
+                    "ok": False,
+                    "error": "Account email delivery is not configured.",
+                }), 503
+
             user = find_user(email)
 
             if not user:
@@ -731,6 +836,24 @@ class LocalAuthRouteService:
 
             save_users(data)
 
+            if not reset_token_exposure_allowed():
+                try:
+                    email_delivery_service.send_password_reset(email, token)
+                except EmailDeliveryError as exc:
+                    for item in data["users"]:
+                        if item.get("id") == user.get("id"):
+                            item.pop("password_reset_token_hash", None)
+                            item.pop("password_reset_expires", None)
+                    save_users(data)
+                    app.logger.error(
+                        "Password reset email delivery failed (%s).",
+                        type(exc).__name__,
+                    )
+                    return jsonify({
+                        "ok": True,
+                        "message": "If the account exists, a password reset link has been sent.",
+                    })
+
             response = {
                 "ok": True,
                 "message": (
@@ -739,10 +862,7 @@ class LocalAuthRouteService:
                 ),
             }
 
-            if app.testing or (
-                app.debug
-                and app.config.get("NOVA_EXPOSE_RESET_TOKEN", False)
-            ):
+            if reset_token_exposure_allowed():
                 response["token"] = token
 
             return jsonify(response)
@@ -759,6 +879,7 @@ class LocalAuthRouteService:
 
             password = str(
                 payload.get("password")
+                or payload.get("new_password")
                 or ""
             )
 
@@ -1238,6 +1359,12 @@ class LocalAuthRouteService:
                 ["POST"],
             ),
             (
+                "/api/auth/verify-email/resend",
+                "nova_auth_resend_verification_20261002",
+                auth_resend_verification,
+                ["POST"],
+            ),
+            (
                 "/api/auth/login",
                 "nova_auth_login_20260908",
                 auth_login,
@@ -1256,8 +1383,20 @@ class LocalAuthRouteService:
                 ["POST"],
             ),
             (
+                "/api/auth/forgot-password",
+                "nova_auth_password_reset_compat_request_20261002",
+                auth_password_reset_request,
+                ["POST"],
+            ),
+            (
                 "/api/auth/password-reset/confirm",
                 "nova_auth_password_reset_confirm_20260908",
+                auth_password_reset_confirm,
+                ["POST"],
+            ),
+            (
+                "/api/auth/reset-password",
+                "nova_auth_password_reset_compat_confirm_20261002",
                 auth_password_reset_confirm,
                 ["POST"],
             ),

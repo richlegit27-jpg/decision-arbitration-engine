@@ -59,6 +59,24 @@
         }
     }
 
+    function showProjectWorkspaceView() {
+        const panel = document.querySelector(".chat-panel");
+        const workspace = $("desktopProjectWorkspace");
+
+        if (!panel || !workspace) return;
+        workspace.hidden = false;
+        panel.classList.add("project-workspace-open");
+    }
+
+    function showChatWorkspaceView() {
+        const panel = document.querySelector(".chat-panel");
+        const workspace = $("desktopProjectWorkspace");
+
+        if (!panel || !workspace) return;
+        workspace.hidden = true;
+        panel.classList.remove("project-workspace-open");
+    }
+
 
     function showProjectsLoading() {
         const container = $("desktopProjectList");
@@ -149,6 +167,10 @@ const isActive =
             card.dataset.projectId =
                 projectId || "";
 
+            if (isActive) {
+                card.setAttribute("aria-current", "true");
+            }
+
             card.innerHTML = `
                 <div class="nova-project-card-main">
                     <button
@@ -185,9 +207,10 @@ const isActive =
                     <button
                         type="button"
                         class="nova-project-delete-button"
+                        aria-label="Delete project: ${escapeHtml(name)}"
                         title="Delete project"
                     >
-                        Delete
+                        <span aria-hidden="true">×</span>
                     </button>
                 </div>
             `;
@@ -276,6 +299,7 @@ const isActive =
                             ) {
                                 window.__NOVA_PROJECT_STATE
                                     .activeProjectId = null;
+                                window.NovaDesktopUX?.renderExecution(null);
 
                                 const workspace =
                                     $("desktopProjectWorkspace");
@@ -289,7 +313,7 @@ const isActive =
                                                 </h2>
 
                                                 <p>
-                                                    Select a project to open workspace.
+                                                    Create or select a project for work that needs multiple steps.
                                                 </p>
                                             </div>
                                         </div>
@@ -311,8 +335,8 @@ const isActive =
                             );
 
                             window.alert(
-                                error.message ||
-                                "Project deletion failed"
+                                window.NovaDesktopUX?.formatError("project", error, "Nova couldn't delete this project. Please try again.") ||
+                                "Nova couldn't delete this project. Please try again."
                             );
 
                             deleteButton.disabled =
@@ -328,6 +352,8 @@ const isActive =
         });
     }
 function openProjectWorkspace(project) {
+    showProjectWorkspaceView();
+
     const status = $("desktopProjectStatus");
     const mission = $("desktopProjectMission");
     const progress = $("desktopProjectProgress");
@@ -335,7 +361,7 @@ function openProjectWorkspace(project) {
     const focus = $("desktopProjectFocus");
     const nextAction = $("desktopProjectNextAction");
     const recommendation = $("desktopProjectRecommendation");
-    const activity = $("desktopProjectRecentActivity");
+    const activity = $("desktopProjectRecentActivityItems");
 
     if (status) {
         status.textContent = "Loading project intelligence...";
@@ -611,7 +637,7 @@ async function loadProjectIntelligence(projectId) {
         }
 
         const activity =
-            $("desktopProjectRecentActivity");
+            $("desktopProjectRecentActivityItems");
 
         if (activity) {
             const recentActivity = (
@@ -652,8 +678,6 @@ async function loadProjectIntelligence(projectId) {
                 .filter(Boolean);
 
             activity.innerHTML = `
-                <h3>Recent Activity</h3>
-
                 ${
                     recentActivity.length
                         ? recentActivity
@@ -689,8 +713,8 @@ async function loadProjectIntelligence(projectId) {
         );
 
         setProjectStatus(
-            error.message ||
-            "Project Brain unavailable"
+            window.NovaDesktopUX?.formatError("project-load", error) ||
+            "Nova couldn't load this project's details. Please try again."
         );
 
         return null;
@@ -838,6 +862,12 @@ function renderProjectPhases(data) {
         data?.execution_state ||
         {};
 
+    window.NovaDesktopUX?.renderExecution({
+        projectId: window.__NOVA_PROJECT_STATE?.activeProjectId,
+        execution,
+        tasks,
+    });
+
     const activeTaskId =
         execution?.current_task_id ||
         null;
@@ -935,6 +965,9 @@ function renderProjectPhases(data) {
             String(
                 step?.status || "open"
             ).toLowerCase();
+        const visibleStepStatus =
+            window.NovaDesktopUX?.statusLabel(status) || status;
+        const stepBlocker = step?.blocker || step?.error || step?.last_error || "";
 
         const active =
             isActiveStep(
@@ -987,6 +1020,16 @@ function renderProjectPhases(data) {
                     ${title}
                 </span>
 
+                <span class="nova-project-tree-step-status" data-status="${escapeHtml(status)}">
+                    ${escapeHtml(visibleStepStatus)}
+                </span>
+
+                ${
+                    stepBlocker
+                        ? `<span class="nova-project-tree-step-blocker">${escapeHtml(window.NovaDesktopUX?.formatError("execution", stepBlocker) || "This step needs attention before the project can continue.")}</span>`
+                        : ""
+                }
+
                 ${
                     active
                         ? `
@@ -1024,6 +1067,8 @@ function renderProjectPhases(data) {
             String(
                 task?.status || "open"
             ).toLowerCase();
+        const visibleTaskStatus =
+            window.NovaDesktopUX?.statusLabel(taskStatus) || taskStatus;
 
         const taskComplete =
             isComplete(taskStatus) ||
@@ -1083,6 +1128,10 @@ function renderProjectPhases(data) {
                         0/0
                     </span>
 
+                    <span class="nova-project-tree-task-status" data-status="${escapeHtml(taskStatus)}">
+                        ${escapeHtml(visibleTaskStatus)}
+                    </span>
+
                     ${
                         taskActive
                             ? `
@@ -1128,6 +1177,10 @@ function renderProjectPhases(data) {
                         class="nova-project-tree-task-count"
                     >
                         ${completedSteps}/${taskSteps.length}
+                    </span>
+
+                    <span class="nova-project-tree-task-status" data-status="${escapeHtml(taskStatus)}">
+                        ${escapeHtml(visibleTaskStatus)}
                     </span>
 
                     ${
@@ -1217,7 +1270,7 @@ function renderProjectPhases(data) {
                             <div
                                 class="nova-project-tree-execution-status"
                             >
-                                Execution: ${executionStatus}
+                                Execution · ${window.NovaDesktopUX?.statusLabel(executionStatus) || executionStatus}
                             </div>
                         `
                         : ""
@@ -1237,7 +1290,7 @@ function renderProjectPhases(data) {
                                 <div
                                     class="session-placeholder"
                                 >
-                                    No tasks found.
+                                    No project tasks yet. Add a task to define work for this project.
                                 </div>
                             `
                     }
@@ -1550,8 +1603,8 @@ function renderProjectTasks(data) {
                                 false;
 
                             setProjectStatus(
-                                error.message ||
-                                "Task update failed"
+                                window.NovaDesktopUX?.formatError("project", error, "Nova couldn't update this task. Please try again.") ||
+                                "Nova couldn't update this task. Please try again."
                             );
                         }
                     }
@@ -1616,8 +1669,8 @@ function renderProjectTasks(data) {
                                 false;
 
                             setProjectStatus(
-                                error.message ||
-                                "Task delete failed"
+                                window.NovaDesktopUX?.formatError("project", error, "Nova couldn't delete this task. Please try again.") ||
+                                "Nova couldn't delete this task. Please try again."
                             );
                         }
                     }
@@ -1710,8 +1763,8 @@ function renderProjectTasks(data) {
                     );
 
                     setProjectStatus(
-                        error.message ||
-                        "Task creation failed"
+                        window.NovaDesktopUX?.formatError("project", error, "Nova couldn't add this task. Please try again.") ||
+                        "Nova couldn't add this task. Please try again."
                     );
 
                 } finally {
@@ -2015,8 +2068,8 @@ if (
                         );
 
                         setProjectStatus(
-                            error.message ||
-                            "File upload failed"
+                            window.NovaDesktopUX?.formatError("upload", error) ||
+                            "Nova couldn't upload that file. Check the file and connection, then try again."
                         );
 
                     } finally {
@@ -2051,8 +2104,8 @@ if (
             tasksContainer.innerHTML = `
                 <div class="session-placeholder">
                     ${escapeHtml(
-                        error.message ||
-                        "Project could not be loaded."
+                        window.NovaDesktopUX?.formatError("project-load", error) ||
+                        "Nova couldn't load this project. Select it again to retry."
                     )}
                 </div>
             `;
@@ -2118,8 +2171,8 @@ async function deleteProjectFile(
         );
 
         setProjectStatus(
-            error.message ||
-            "File delete failed"
+            window.NovaDesktopUX?.formatError("project", error, "Nova couldn't delete this file. Please try again.") ||
+            "Nova couldn't delete this file. Please try again."
         );
     }
 }
@@ -2152,7 +2205,7 @@ async function loadProjectFiles(projectId) {
 
         if (!files.length) {
             container.innerHTML = `
-                <p>No files yet.</p>
+                <p class="nova-project-empty-state">Files Nova creates for this project will appear here.</p>
             `;
             return;
         }
@@ -2236,10 +2289,7 @@ container
 
         container.innerHTML = `
             <p>
-                ${escapeHtml(
-                    error.message ||
-                    "Could not load files."
-                )}
+                ${escapeHtml(window.NovaDesktopUX?.formatError("project-files", error) || "Nova couldn't load this project's files. Try again.")}
             </p>
         `;
     }
@@ -2273,7 +2323,7 @@ async function loadProjectNotes(projectId) {
 
         if (!notes.length) {
             container.innerHTML = `
-                <p>No notes yet.</p>
+                <p class="nova-project-empty-state">Keep project notes and important details here.</p>
             `;
             return;
         }
@@ -2350,9 +2400,7 @@ container
             error
         );
 
-        container.innerHTML = `
-            <p>Could not load notes.</p>
-        `;
+        container.innerHTML = `<p>${escapeHtml(window.NovaDesktopUX?.formatError("project-notes", error) || "Nova couldn't load this project's notes. Try again.")}</p>`;
     }
 }
 
@@ -2391,6 +2439,9 @@ container
                         : null
                 );
 
+            window.__NOVA_PROJECT_STATE.activeProjectId =
+                activeProject?.id || null;
+
             if (activeProject?.id) {
                 window.__NOVA_PROJECT_STATE.activeProjectId =
                     activeProject.id;
@@ -2411,7 +2462,8 @@ container
             );
 
             showProjectsError(
-                error.message
+                window.NovaDesktopUX?.formatError("project-load", error) ||
+                "Nova couldn't load your projects. Please try again."
             );
         } finally {
             window.__NOVA_PROJECT_STATE.loading =
@@ -2469,8 +2521,8 @@ container
         );
 
         setProjectStatus(
-            error.message ||
-            "Project activation failed"
+            window.NovaDesktopUX?.formatError("project", error, "Nova couldn't open this project. Please try again.") ||
+            "Nova couldn't open this project. Please try again."
         );
     }
 }
@@ -2492,6 +2544,61 @@ const createNewProjectButton =
 
 const cancelNewProjectButton =
     $("cancelNewProject");
+
+const deleteAllProjectsButton =
+    $("deleteAllProjectsBtn");
+
+if (deleteAllProjectsButton) {
+    deleteAllProjectsButton.addEventListener(
+        "click",
+        async () => {
+            if (!window.__NOVA_PROJECT_STATE.projects.length) {
+                setProjectStatus("There are no projects to delete.");
+                return;
+            }
+
+            const confirmed = window.confirm(
+                "Delete all of your saved projects?\n\nThis action is permanent and cannot be undone."
+            );
+            if (!confirmed) return;
+
+            deleteAllProjectsButton.disabled = true;
+            setProjectStatus("Deleting all projects...");
+
+            try {
+                const result = await fetchJson(
+                    "/api/projects/delete-all",
+                    { method: "POST" }
+                );
+
+                window.__NOVA_PROJECT_STATE.activeProjectId = null;
+                window.NovaDesktopUX?.renderExecution(null);
+
+                const title = $("desktopProjectTitle");
+                const description = $("desktopProjectDescription");
+                const phases = $("desktopProjectPhaseList");
+                const treeSummary = $("novaProjectTreeSummary");
+                const status = $("desktopProjectStatus");
+                if (title) title.textContent = "No project selected";
+                if (description) description.textContent = "Create or select a project for work that needs multiple steps.";
+                if (phases) phases.innerHTML = "<div class='session-placeholder'>Select a project to view phases.</div>";
+                if (treeSummary) treeSummary.textContent = "Select a project to view execution.";
+                if (status) status.textContent = "Workspace ready";
+
+                await loadProjects();
+                setProjectStatus(`${Number(result.deleted_count || 0)} project(s) deleted.`);
+            } catch (error) {
+                console.error("[Nova Projects] delete all failed", error);
+                setProjectStatus(
+                    window.NovaDesktopUX?.formatError("project", error, "Nova couldn't delete all projects. Please try again.") ||
+                    "Nova couldn't delete all projects. Please try again."
+                );
+            } finally {
+                deleteAllProjectsButton.disabled = false;
+            }
+        }
+    );
+}
 
 
 if (newProjectButton) {
@@ -2610,6 +2717,7 @@ console.log(
                 await loadProjects();
 
                 if (data.project?.id) {
+                    openProjectWorkspace(data.project);
                     await activateProject(
                         data.project.id
                     );
@@ -2634,8 +2742,8 @@ console.log(
                 );
 
                 setProjectStatus(
-                    error.message ||
-                    "Project creation failed"
+                    window.NovaDesktopUX?.formatError("project", error, "Nova couldn't create this project. Please try again.") ||
+                    "Nova couldn't create this project. Please try again."
                 );
 
             } finally {
@@ -2653,12 +2761,30 @@ console.log(
     continueProject,
         runAllProject,
     controlProjectExecution,
+    showChatView: showChatWorkspaceView,
 };
 
     document.addEventListener(
         "DOMContentLoaded",
         () => {
             loadProjects();
+        }
+    );
+
+    window.addEventListener(
+        "nova:project-created",
+        (event) => {
+            const projectId = event.detail?.projectId;
+            if (projectId) {
+                window.__NOVA_PROJECT_STATE.activeProjectId = projectId;
+            }
+
+            void (async () => {
+                while (window.__NOVA_PROJECT_STATE.loading) {
+                    await new Promise((resolve) => window.setTimeout(resolve, 50));
+                }
+                await loadProjects();
+            })();
         }
     );
 
@@ -2975,6 +3101,9 @@ await loadProjectFiles(
             error
         );
 
+        const userMessage = window.NovaDesktopUX?.formatError("execution", error) ||
+            "Nova couldn't complete this project action. Review the project status and try again.";
+
         try {
             const chatState =
                 window.NovaChatState;
@@ -2998,10 +3127,7 @@ await loadProjectFiles(
                         role:
                             "assistant",
                         content:
-                            `Project execution failed — ${action}.\n${
-                                error.message ||
-                                "Unknown execution error."
-                            }`,
+                            userMessage,
                         timestamp:
                             new Date().toISOString(),
                         metadata: {
@@ -3044,14 +3170,11 @@ await loadProjectFiles(
             );
         }
 
-        setProjectStatus(
-            error.message ||
-            "Project execution failed."
-        );
+        setProjectStatus(userMessage);
         return {
             ok: false,
             status: "error",
-            message: error.message || "Project execution failed.",
+            message: userMessage,
         };
     } finally {
         if (!interruptAction) {
@@ -3078,7 +3201,11 @@ document.addEventListener(
             $("desktopPause");
 
         const stopButton =
-            $("desktopStop");
+            $("desktopStopProject");
+        const nextButton =
+            $("desktopNextProject");
+        const resetButton =
+            $("desktopResetProject");
 
         if (continueButton) {
             continueButton.addEventListener(
@@ -3171,6 +3298,26 @@ document.addEventListener(
             );
         }
 
+        if (nextButton) {
+            nextButton.addEventListener(
+                "click",
+                () => controlProjectExecution(
+                    window.__NOVA_PROJECT_STATE?.activeProjectId,
+                    "next_step"
+                )
+            );
+        }
+
+        if (resetButton) {
+            resetButton.addEventListener(
+                "click",
+                () => controlProjectExecution(
+                    window.__NOVA_PROJECT_STATE?.activeProjectId,
+                    "reset"
+                )
+            );
+        }
+
 
 console.log(
     "[NOVA PROJECT EXECUTION] Controls bound",
@@ -3178,6 +3325,8 @@ console.log(
         runAll: !!runAllButton,
         pause: !!pauseButton,
         stop: !!stopButton,
+        next: !!nextButton,
+        reset: !!resetButton,
     }
 );
     }
@@ -3335,8 +3484,8 @@ if (
                 );
 
                 setProjectStatus(
-                    error.message ||
-                    "Note save failed"
+                    window.NovaDesktopUX?.formatError("project", error, "Nova couldn't save this note. Please try again.") ||
+                    "Nova couldn't save this note. Please try again."
                 );
             }
         }

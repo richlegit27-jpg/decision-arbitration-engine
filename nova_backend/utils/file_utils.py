@@ -99,10 +99,12 @@ def load_json_file(path: str | Path, default: Any = None) -> Any:
         return default
 
     try:
-        with p.open("r", encoding="utf-8") as f:
+        with p.open("r", encoding="utf-8-sig") as f:
             return json.load(f)
-    except Exception:
-        return default
+    except Exception as exc:
+        # A corrupt or unreadable existing store must not look like an empty
+        # store: callers may otherwise overwrite recoverable user data.
+        raise ValueError(f"Unable to read JSON store: {p}") from exc
 
 
 def read_json_file(path: str | Path, default: Any = None) -> Any:

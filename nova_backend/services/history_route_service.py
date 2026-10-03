@@ -108,10 +108,20 @@ class HistoryRouteService:
             return f"""
 <!doctype html>
 <html>
-<body style="background:#0f172a;color:white;font-family:Arial;padding:24px;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session not found | Nova</title>
+<link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
+</head>
+<body>
+<main class="history-status">
+<div class="history-brand">Nova</div>
+<p>Conversation history</p>
 <h1>Session not found</h1>
-<p>{safe_sid}</p>
-<p><a style="color:#c084fc;" href="/history">Back to history</a></p>
+<p>The conversation could not be found.</p>
+<p><a href="/app">Return to Nova</a></p>
+</main>
 </body>
 </html>
 """
@@ -119,8 +129,19 @@ class HistoryRouteService:
         return f"""
 <!doctype html>
 <html>
-<body style="background:#0f172a;color:white;font-family:Arial;padding:24px;">
-<p>Opening session...</p>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opening conversation | Nova</title>
+<link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
+</head>
+<body>
+<main class="history-status" role="status">
+<div class="history-brand">Nova</div>
+<p>Conversation history</p>
+<h1>Opening conversation…</h1>
+<p>Taking you to your workspace.</p>
+</main>
 
 <script>
 const sid = "{safe_sid}";
@@ -238,10 +259,20 @@ location.replace(
             return f"""
 <!doctype html>
 <html>
-<body style="font-family:Arial;background:#0f172a;color:white;padding:24px;">
-  <h1>Session not found</h1>
-  <p>{html.escape(session_id)}</p>
-  <p><a style="color:#c084fc;" href="/history">Back to history</a></p>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session not found | Nova</title>
+<link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
+</head>
+<body>
+  <main class="history-status">
+    <div class="history-brand">Nova</div>
+    <p>Conversation history</p>
+    <h1>Session not found</h1>
+    <p>The conversation could not be found.</p>
+    <p><a href="/app">Return to Nova</a></p>
+  </main>
 </body>
 </html>
 """
@@ -257,17 +288,17 @@ location.replace(
 
             rows.append(
                 f"""
-<div class="msg {html.escape(role.lower())}">
-<div class="role">{html.escape(role)}</div>
+<article class="history-message {html.escape(role.lower())}">
+<p class="history-role">{html.escape(role)}</p>
 <pre>{html.escape(text)}</pre>
-</div>
+</article>
 """
             )
 
         if not rows:
             rows.append(
                 """
-<div class="empty">
+<div class="history-empty">
 This is a new empty session. No messages yet.
 </div>
 """
@@ -278,16 +309,25 @@ This is a new empty session. No messages yet.
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)}</title>
+<link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
 </head>
 <body>
-<div class="wrap">
-<h1>{html.escape(title)}</h1>
-<div>{html.escape(sid)}</div>
-<div>
+<main class="history-page">
+<nav class="history-nav" aria-label="Conversation navigation">
+  <a class="history-brand" href="/">Nova</a>
+  <a href="/app">Open workspace</a>
+</nav>
+<header class="history-hero">
+  <p>Conversation history</p>
+  <h1>{html.escape(title)}</h1>
+  <div class="history-session-id">{html.escape(sid)}</div>
+</header>
+<section class="history-transcript" aria-label="Conversation messages">
 {''.join(rows)}
-</div>
-</div>
+</section>
+</main>
 </body>
 </html>
 """
@@ -394,7 +434,19 @@ This is a new empty session. No messages yet.
         return f"""
 <!doctype html>
 <html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New chat | Nova</title>
+<link rel="stylesheet" href="/static/css/nova-pages-polish.css?v=pages-polish-20261003">
+</head>
 <body>
+<main class="history-status" role="status">
+<div class="history-brand">Nova</div>
+<p>Workspace</p>
+<h1>Starting a new chat…</h1>
+<p>Your new conversation is ready.</p>
+</main>
 <script>
 localStorage.setItem("nova_active_session_id", "{sid}");
 localStorage.setItem("nova_session_id", "{sid}");
@@ -402,7 +454,6 @@ localStorage.setItem("nova_desktop_active_session_id", "{sid}");
 localStorage.setItem("nova_current_session_id", "{sid}");
 location.href = "/app?session_id={sid}&bust=" + Date.now();
 </script>
-New session created.
 </body>
 </html>
 """
