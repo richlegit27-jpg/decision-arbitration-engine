@@ -486,9 +486,15 @@ class LocalAuthRouteService:
                         if item.get("id") != user["id"]
                     ]
                     save_users(data)
+
                     app.logger.error(
-                        "Verification email delivery failed (%s).",
+                        "Verification email delivery failed (%s; cause=%s).",
                         type(exc).__name__,
+                        (
+                            type(exc.__cause__).__name__
+                            if exc.__cause__ is not None
+                            else "unknown"
+                        ),
                     )
                     return jsonify({
                         "ok": False,
